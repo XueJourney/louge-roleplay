@@ -292,9 +292,51 @@ function buildPathMessages(allMessages, leafMessageId) {
   return path.reverse();
 }
 
+function buildTreeEntries(allMessages, activeIds, childrenMap) {
+  const roots = allMessages
+    .filter((message) => !message.parent_message_id)
+    .sort((a, b) => {
+      if (a.sequence_no !== b.sequence_no) {
+        return Number(a.sequence_no) - Number(b.sequence_no);
+      }
+      return Number(a.id) - Number(b.id);
+    });
+
+  const entries = [];
+
+  function walk(message, depth, parentActive) {
+    const messageId = Number(message.id);
+    const children = childrenMap.get(messageId) || [];
+    const isActive = activeIds.has(messageId);
+    const hasActiveDescendant = children.some((child) => activeIds.has(Number(child.id)) || (childrenMap.get(Number(child.id)) || []).some(() => false));
+    const shortContent = String(message.content || '').replace(/\s+/g, ' ').slice(0, 52);
+
+    entries.push({
+      id: message.id,
+      parentId: message.parent_message_id || null,
+      depth,
+      senderType: message.sender_type,
+      promptKind: message.prompt_kind || 'normal',
+      shortContent,
+      isActive,
+      isOnActiveTrail: isActive || parentActive,
+      childCount: children.length,
+    });
+
+    children.forEach((child) => {
+      const childId = Number(child.id);
+      const childOnTrail = activeIds.has(childId) || isActive || parentActive || hasActiveDescendant;
+      walk(child, depth + 1, childOnTrail);
+    });
+  }
+
+  roots.forEach((root) => walk(root, 0, false));
+  return entries;
+}
+
 function buildConversationView(allMessages, activeLeafId) {
   const normalizedLeafId = activeLeafId ? Number(activeLeafId) : null;
-  const { byId, childrenMap } = buildMessageMaps(allMessages);
+  const { childrenMap } = buildMessageMaps(allMessages);
   const path = buildPathMessages(allMessages, normalizedLeafId);
   const activeIds = new Set(path.map((message) => Number(message.id)));
 
@@ -356,9 +398,12 @@ function buildConversationView(allMessages, activeLeafId) {
     };
   });
 
+  const treeEntries = buildTreeEntries(allMessages, activeIds, childrenMap);
+
   return {
     pathMessages,
     branches,
+    treeEntries,
     activeLeafId: normalizedLeafId,
     messageCount: allMessages.length,
   };

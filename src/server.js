@@ -610,6 +610,75 @@ async function bootstrap() {
     }
   });
 
+  app.post('/chat/:conversationId/messages/:messageId/edit-user', requireAuth, async (req, res, next) => {
+    try {
+      const conversationId = Number(req.params.conversationId);
+      const messageId = Number(req.params.messageId);
+      const content = String(req.body.content || '').trim();
+      const conversation = await loadConversationForUserOrFail(req, res, conversationId);
+      if (!conversation) {
+        return;
+      }
+      if (!content) {
+        return renderPage(res, 'message', { title: '提示', message: '内容不能为空。' });
+      }
+
+      const targetMessage = await getMessageById(conversationId, messageId);
+      if (!targetMessage || targetMessage.sender_type !== 'user') {
+        return renderPage(res, 'message', { title: '提示', message: '这里只支持修改用户输入。' });
+      }
+
+      const allMessages = await listMessages(conversationId);
+      const historyBeforeUser = targetMessage.parent_message_id
+        ? buildPathMessages(allMessages, targetMessage.parent_message_id)
+        : [];
+
+      const newUserMessageId = await addMessage({
+        conversationId,
+        senderType: 'user',
+        content,
+        parentMessageId: targetMessage.parent_message_id || null,
+        branchFromMessageId: targetMessage.id,
+        editedFromMessageId: targetMessage.id,
+        promptKind: 'edit',
+        metadataJson: JSON.stringify({
+          requestId: req.requestId,
+          operation: 'user-edit-branch',
+          sourceMessageId: messageId,
+        }),
+      });
+
+      const reply = await generateReply({
+        character: {
+          name: conversation.character_name,
+          summary: conversation.character_summary,
+          personality: conversation.personality,
+        },
+        messages: [...historyBeforeUser, { sender_type: 'user', content }],
+        userMessage: content,
+        systemHint: '这是基于用户改写后的旧输入重新开出的分支，请自然延续，不要提到你被要求重生成。',
+      });
+
+      const replyMessageId = await addMessage({
+        conversationId,
+        senderType: 'character',
+        content: reply,
+        parentMessageId: newUserMessageId,
+        branchFromMessageId: newUserMessageId,
+        promptKind: 'branch',
+        metadataJson: JSON.stringify({
+          requestId: req.requestId,
+          operation: 'assistant-reply-from-user-edit',
+          sourceMessageId: messageId,
+        }),
+      });
+
+      return res.redirect(`/chat/${conversationId}?leaf=${replyMessageId}`);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post('/chat/:conversationId/optimize-input', requireAuth, async (req, res, next) => {
     try {
       const conversationId = Number(req.params.conversationId);

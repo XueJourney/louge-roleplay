@@ -1,7 +1,7 @@
 <style>
   .chat-shell {
     display: grid;
-    grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+    grid-template-columns: minmax(0, 1.75fr) minmax(300px, 1fr);
     gap: 22px;
     align-items: start;
   }
@@ -187,12 +187,6 @@
     margin: 0;
   }
 
-  .inline-form input,
-  .inline-form textarea,
-  .inline-form button {
-    width: auto;
-  }
-
   .inline-form textarea {
     width: min(100%, 560px);
     min-height: 108px;
@@ -286,6 +280,69 @@
     font-size: 13px;
     color: #87867f;
     line-height: 1.5;
+  }
+
+  .tree-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .tree-node {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid #e8e6dc;
+    background: #f8f5ee;
+  }
+
+  .tree-node.trail {
+    border-color: #d9c2b7;
+    background: #f5ece8;
+  }
+
+  .tree-node.active {
+    background: #141413;
+    border-color: #30302e;
+  }
+
+  .tree-node.active .tree-content,
+  .tree-node.active .tree-kind,
+  .tree-node.active .tree-id {
+    color: #faf9f5;
+  }
+
+  .tree-line {
+    width: 18px;
+    height: 1px;
+    background: #d1cfc5;
+    flex: 0 0 auto;
+  }
+
+  .tree-id {
+    font-size: 12px;
+    color: #87867f;
+    min-width: 42px;
+  }
+
+  .tree-kind {
+    font-size: 12px;
+    color: #87867f;
+    min-width: 52px;
+  }
+
+  .tree-content {
+    color: #4d4c48;
+    line-height: 1.4;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tree-node form {
+    margin-left: auto;
   }
 
   @media (max-width: 980px) {
@@ -385,7 +442,17 @@
                   <textarea name="content" maxlength="8000" required><%= message.content %></textarea>
                   <button class="inline-btn primary" type="submit">保存为新 AI 分支</button>
                 </form>
-                <div class="mini-note">不会覆盖旧内容，而是从同一父节点下创建一个新的 AI 变体，方便比较和切换。</div>
+                <div class="mini-note">不会覆盖旧内容，而是从同一父节点下创建新的 AI 变体。</div>
+              </div>
+            <% } %>
+
+            <% if (message.sender_type === 'user') { %>
+              <div class="draft-box">
+                <form class="inline-form" method="POST" action="/chat/<%= conversation.id %>/messages/<%= message.id %>/edit-user">
+                  <textarea name="content" maxlength="4000" required><%= message.content %></textarea>
+                  <button class="inline-btn primary" type="submit">修改这句并从这里重开分支</button>
+                </form>
+                <div class="mini-note">会复制这条用户消息为一个新分支节点，并从它重新生成后续 AI，不会覆盖旧线。</div>
               </div>
             <% } %>
           </article>
@@ -434,7 +501,26 @@
 
   <aside class="chat-side">
     <section class="sidebar-card">
-      <h2>分支导航</h2>
+      <h2>对话树</h2>
+      <p class="mini-note">像 codeview 一样看整棵消息树。高亮的是你当前这条线，切节点就能跳过去。</p>
+      <div class="tree-list">
+        <% view.treeEntries.forEach(node => { %>
+          <div class="tree-node <%= node.isActive ? 'active' : '' %> <%= node.isOnActiveTrail ? 'trail' : '' %>" style="margin-left: <%= node.depth * 18 %>px;">
+            <span class="tree-line"></span>
+            <span class="tree-id">#<%= node.id %></span>
+            <span class="tree-kind"><%= node.senderType === 'user' ? '你' : 'AI' %></span>
+            <span class="tree-content"><%= node.shortContent || '（空）' %></span>
+            <form class="inline-form" method="GET" action="/chat/<%= conversation.id %>">
+              <input type="hidden" name="leaf" value="<%= node.id %>" />
+              <button class="inline-btn <%= node.isActive ? 'primary' : '' %>" type="submit"><%= node.isActive ? '当前' : '切换' %></button>
+            </form>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+
+    <section class="sidebar-card">
+      <h2>叶子分支</h2>
       <p class="mini-note">这里列的是当前对话里所有叶子分支。切换叶子，就等于切换你正在看的那条剧情线。</p>
       <% view.branches.forEach(branch => { %>
         <div class="branch-item <%= branch.isActive ? 'active' : '' %>">
@@ -455,8 +541,9 @@
       <div class="mini-note">
         1. 重新生成：给同一条用户输入再生一个 AI 候选。<br />
         2. 保存为新 AI 分支：手动改写 AI 回复，但不覆盖旧版本。<br />
-        3. 新建独立分支对话：把当前节点之前的主线复制成一个新会话。<br />
-        4. 优化输入：先润色，再一键采用并发送。
+        3. 修改用户输入并重开分支：从旧用户节点重新长出一条新线。<br />
+        4. 新建独立分支对话：把当前节点之前的主线复制成一个新会话。<br />
+        5. 优化输入：先润色，再一键采用并发送。
       </div>
     </section>
   </aside>
