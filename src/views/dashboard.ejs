@@ -7,7 +7,7 @@
   .welcome-card {
     padding: 30px;
     border-radius: 28px;
-    background: linear-gradient(180deg, #141413 0%, #30302e 100%);
+    background: #141413;
     color: #faf9f5;
     border: 1px solid #30302e;
     box-shadow: rgba(20, 20, 19, 0.12) 0px 24px 60px;
@@ -20,7 +20,7 @@
   }
 
   .welcome-card p {
-    color: #d8d4ca;
+    color: #b0aea5;
     margin: 0;
     line-height: 1.8;
   }
@@ -80,7 +80,7 @@
 <div class="dashboard-shell">
   <section class="welcome-card">
     <h1>晚上好，<%= user.username %></h1>
-    <p>这里是你的安静角落。角色在这边，会话也在这边。想继续旧故事，或者写一个新的开始，都行。</p>
+    <p>这里是你的安静角落。角色在这边，会话也在这边。现在每段对话都已经支持分支、重写、重生和继续延展。</p>
   </section>
 
   <section class="dashboard-grid">
@@ -110,6 +110,9 @@
             · 最近更新：<%= conversation.updated_at %>
             <% if (conversation.current_message_id) { %>
               · 当前叶子：#<%= conversation.current_message_id %>
+            <% } %>
+            <% if (conversation.parent_conversation_id) { %>
+              · 分支自：#<%= conversation.parent_conversation_id %>
             <% } %>
           </p>
         </div>
