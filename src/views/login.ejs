@@ -1,87 +1,20 @@
-<style>
-  .auth-shell {
-    max-width: 440px;
-    margin: 60px auto 0;
-    animation: scaleIn var(--duration-slow) var(--ease-out) both;
-  }
+<link rel="stylesheet" href="/public/styles/shared-feedback.css" />
 
-  .auth-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-2xl);
-    padding: 36px;
-    box-shadow: var(--shadow-md);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .auth-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--brand), var(--brand-hover), var(--accent-blue));
-    border-radius: 3px 3px 0 0;
-  }
-
-  .auth-card h1 {
-    font-size: 32px;
-    margin-bottom: 8px;
-    margin-top: 8px;
-  }
-
-  .auth-card p {
-    color: var(--text-secondary);
-    margin-bottom: 28px;
-    line-height: 1.7;
-    font-size: 15px;
-  }
-
-  .field-group {
-    margin-bottom: 18px;
-  }
-
-  .submit-btn {
-    margin-top: 12px;
-    width: 100%;
-    padding: 14px 18px;
-    font-size: 15px;
-  }
-
-  .foot-note {
-    margin-top: 20px;
-    color: var(--text-tertiary);
-    font-size: 14px;
-    text-align: center;
-  }
-
-  .foot-note a {
-    color: var(--brand);
-    font-weight: 500;
-  }
-
-  .foot-note a:hover {
-    color: var(--brand-hover);
-  }
-</style>
-
-<div class="auth-shell">
-  <div class="auth-card">
-    <h1>欢迎回来</h1>
-    <p>继续你上次没聊完的话。你可以用用户名、邮箱或者手机号登录。</p>
+<div class="feedback-shell feedback-shell--compact">
+  <div class="feedback-card">
+    <h1 class="feedback-title">欢迎回来</h1>
+    <p class="feedback-copy">继续你上次没聊完的话。你可以用用户名、邮箱或者手机号登录。</p>
     <form method="POST" action="/login">
-      <div class="field-group">
+      <div class="feedback-field-group">
         <label for="login">账号</label>
         <input id="login" name="login" maxlength="120" required placeholder="用户名 / 邮箱 / 手机号" />
       </div>
-      <div class="field-group">
+      <div class="feedback-field-group">
         <label for="password">密码</label>
         <input id="password" name="password" type="password" maxlength="100" required placeholder="输入密码" />
       </div>
-      <button class="submit-btn" type="submit">登录</button>
+      <button class="feedback-submit-btn" type="submit">登录</button>
     </form>
-    <div class="foot-note">第一次来？<a href="/register">注册账号 →</a></div>
+    <div class="feedback-foot-note">第一次来？<a href="/register">注册账号 →</a></div>
   </div>
 </div>

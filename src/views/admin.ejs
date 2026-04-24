@@ -1,208 +1,4 @@
-<style>
-  .admin-shell {
-    display: grid;
-    gap: 22px;
-    animation: fadeIn var(--duration-slow) var(--ease-out) both;
-  }
-
-  .hero-card,
-  .section-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-2xl);
-    padding: 24px;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .hero-card h1 {
-    font-size: 32px;
-    margin-bottom: 10px;
-  }
-
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 18px;
-  }
-
-  .metric {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    border-left: 3px solid var(--brand);
-  }
-
-  .metric:nth-child(2) { border-left-color: var(--accent-green); }
-  .metric:nth-child(3) { border-left-color: var(--accent-blue); }
-  .metric:nth-child(4) { border-left-color: #f59e0b; }
-
-  .metric strong {
-    display: block;
-    font-size: 24px;
-    color: var(--text);
-  }
-
-  .metric span {
-    color: var(--text-tertiary);
-    font-size: 13px;
-  }
-
-  .table-wrap {
-    overflow-x: auto;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  th, td {
-    text-align: left;
-    padding: 12px 10px;
-    border-top: 1px solid var(--border);
-    vertical-align: top;
-  }
-
-  th {
-    color: var(--text-secondary);
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  td {
-    color: var(--text);
-  }
-
-  tr:nth-child(even) td {
-    background: rgba(255, 255, 255, 0.01);
-  }
-
-  td form {
-    display: grid;
-    gap: 8px;
-  }
-
-  .inline-grid {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .provider-card,
-  .prompt-block-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 18px;
-    margin-top: 14px;
-    background: var(--bg-elevated);
-  }
-
-  .prompt-block-item {
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    background: var(--bg-elevated);
-    margin-top: 14px;
-    cursor: grab;
-    transition: all var(--duration-fast) ease;
-  }
-
-  .prompt-block-item:hover {
-    border-color: var(--border-hover);
-  }
-
-  .prompt-block-item.dragging {
-    opacity: 0.5;
-    border-color: var(--brand);
-  }
-
-  .prompt-preview {
-    white-space: pre-wrap;
-    line-height: 1.65;
-    color: var(--text-secondary);
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 12px 14px;
-    margin-top: 8px;
-    font-family: 'SFMono-Regular', Consolas, monospace;
-    font-size: 13px;
-  }
-
-  .live-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 12px;
-    border-radius: var(--radius-full);
-    background: var(--brand-subtle);
-    color: var(--brand-hover);
-    font-size: 12px;
-    margin-bottom: 10px;
-  }
-
-  .drag-tip {
-    color: var(--text-tertiary);
-    font-size: 12px;
-    margin-top: 8px;
-  }
-
-  .toolbar-row {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .danger-button {
-    background: rgba(249, 112, 102, 0.1);
-    color: #fca5a0;
-    border: 1px solid rgba(249, 112, 102, 0.2);
-  }
-
-  .danger-button:hover {
-    background: rgba(249, 112, 102, 0.15);
-    box-shadow: none;
-  }
-
-  .hidden-field {
-    display: none;
-  }
-
-  .model-picker {
-    display: grid;
-    gap: 8px;
-  }
-
-  .model-picker select {
-    min-height: 42px;
-  }
-
-  .model-picker small {
-    color: var(--text-tertiary);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-
-  .context-grid {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .muted-text {
-    color: var(--text-tertiary);
-    font-size: 14px;
-  }
-
-  @media (max-width: 960px) {
-    .metrics,
-    .inline-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-</style>
+<link rel="stylesheet" href="/public/styles/site-pages.css" />
 <div class="admin-shell">
   <section class="hero-card">
     <h1>管理员后台</h1>
@@ -496,7 +292,7 @@
             </div>
           <% }) %>
         </div>
-        <div class="toolbar-row" style="margin-top: 14px;">
+        <div class="toolbar-row toolbar-row--spaced">
           <button type="submit">按当前顺序保存排序</button>
         </div>
       </form>
@@ -575,7 +371,7 @@
               <label>标准模型 (standard)</label>
               <select name="standardModel" data-current="<%= provider.standard_model || provider.model || '' %>">
                 <% (provider.availableModels || []).forEach(option => { %>
-                  <option value="<%= option.value %>" <%= option.value === (provider.standard_model || provider.model) ? 'selected' : '' %>><%= option.label %></option>
+                  <option value="<%= option.id %>" <%= option.id === (provider.standard_model || provider.model) ? 'selected' : '' %>><%= option.label %></option>
                 <% }) %>
               </select>
               <small>当前：<%= provider.standard_model || provider.model || '未选择' %></small>
@@ -584,7 +380,7 @@
               <label>越狱模型 (jailbreak)</label>
               <select name="jailbreakModel">
                 <% (provider.availableModels || []).forEach(option => { %>
-                  <option value="<%= option.value %>" <%= option.value === provider.jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
+                  <option value="<%= option.id %>" <%= option.id === provider.jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
                 <% }) %>
               </select>
               <small>当前：<%= provider.jailbreak_model || '未选择' %></small>
@@ -596,7 +392,7 @@
               <label>强越狱模型 (force_jailbreak)</label>
               <select name="forceJailbreakModel">
                 <% (provider.availableModels || []).forEach(option => { %>
-                  <option value="<%= option.value %>" <%= option.value === provider.force_jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
+                  <option value="<%= option.id %>" <%= option.id === provider.force_jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
                 <% }) %>
               </select>
               <small>当前：<%= provider.force_jailbreak_model || '未选择' %></small>
@@ -605,7 +401,7 @@
               <label>压缩模型 (compression)</label>
               <select name="compressionModel">
                 <% (provider.availableModels || []).forEach(option => { %>
-                  <option value="<%= option.value %>" <%= option.value === provider.compression_model ? 'selected' : '' %>><%= option.label %></option>
+                  <option value="<%= option.id %>" <%= option.id === provider.compression_model ? 'selected' : '' %>><%= option.label %></option>
                 <% }) %>
               </select>
               <small>当前：<%= provider.compression_model || '未选择' %></small>
@@ -644,7 +440,7 @@
             </label>
           </div>
 
-          <label class="toolbar-row" style="gap: 6px;">
+          <label class="toolbar-row toolbar-row--tight">
             <input type="checkbox" name="refreshModels" value="1" />
             <span>保存时从上游重新拉取模型列表</span>
           </label>
@@ -663,58 +459,4 @@
   </section>
 </div>
 
-<script>
-  (function () {
-    document.querySelectorAll('[data-billing-mode]').forEach((select) => {
-      const group = select.closest('form')?.querySelector('[data-plan-quota-group]');
-      if (!group) return;
-      const requestField = group.querySelector('[data-request-quota-field]');
-      const tokenField = group.querySelector('[data-token-quota-field]');
-      function apply() {
-        const mode = select.value;
-        if (requestField) requestField.style.display = mode === 'per_request' ? '' : 'none';
-        if (tokenField) tokenField.style.display = mode === 'per_token' ? '' : 'none';
-      }
-      select.addEventListener('change', apply);
-      apply();
-    });
-  })();
-
-  (function () {
-    const list = document.getElementById('prompt-blocks-list');
-    if (!list) return;
-    const hidden = document.getElementById('prompt-blocks-reorder-ids');
-    let dragging = null;
-
-    function syncOrder() {
-      const ids = Array.from(list.querySelectorAll('.prompt-block-item')).map((item) => item.dataset.blockId);
-      if (hidden) hidden.value = ids.join(',');
-      Array.from(list.querySelectorAll('.prompt-block-item')).forEach((item, index) => {
-        const label = item.querySelector('[data-order]');
-        if (label) label.textContent = index;
-      });
-    }
-
-    Array.from(list.querySelectorAll('.prompt-block-item')).forEach((item) => {
-      item.addEventListener('dragstart', () => {
-        dragging = item;
-        item.classList.add('dragging');
-      });
-      item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        dragging = null;
-        syncOrder();
-      });
-      item.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        if (!dragging || dragging === item) return;
-        const rect = item.getBoundingClientRect();
-        const after = event.clientY > rect.top + rect.height / 2;
-        if (after) item.after(dragging);
-        else item.before(dragging);
-      });
-    });
-
-    syncOrder();
-  })();
-</script>
+<script src="/public/js/admin-page.js"></script>

@@ -1,92 +1,14 @@
-<style>
-  .error-shell {
-    max-width: 560px;
-    margin: 48px auto 0;
-    animation: scaleIn var(--duration-slow) var(--ease-out) both;
-  }
+<link rel="stylesheet" href="/public/styles/shared-feedback.css" />
 
-  .error-card {
-    position: relative;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-2xl);
-    padding: 36px;
-    box-shadow: var(--shadow-md);
-    overflow: hidden;
-  }
-
-  .error-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #f97066, #fca5a0);
-  }
-
-  .error-kicker {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    border-radius: var(--radius-full);
-    background: rgba(249, 112, 102, 0.1);
-    border: 1px solid rgba(249, 112, 102, 0.2);
-    color: #fca5a0;
-    font-size: 12px;
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    margin-bottom: 14px;
-  }
-
-  .error-card h1 {
-    font-size: 32px;
-    line-height: 1.25;
-    margin-bottom: 14px;
-    color: var(--text);
-  }
-
-  .error-card p {
-    color: var(--text-secondary);
-    line-height: 1.75;
-    margin-bottom: 14px;
-    font-size: 15px;
-  }
-
-  .error-meta {
-    margin-top: 24px;
-    padding-top: 18px;
-    border-top: 1px solid var(--border);
-    display: grid;
-    gap: 6px;
-  }
-
-  .error-code,
-  .error-request-id {
-    color: var(--text-tertiary);
-    font-size: 13px;
-    font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
-    word-break: break-all;
-  }
-
-  .error-code strong,
-  .error-request-id strong {
-    color: var(--text-secondary);
-    margin-right: 6px;
-    font-weight: 500;
-  }
-</style>
-
-<div class="error-shell">
-  <div class="error-card">
-    <div class="error-kicker">Something went wrong</div>
-    <h1>出了点小问题</h1>
-    <p><%= message %></p>
-    <div class="error-meta">
-      <div class="error-code"><strong>错误码</strong><%= errorCode %></div>
+<div class="feedback-shell">
+  <div class="feedback-card feedback-card--danger">
+    <div class="feedback-kicker feedback-kicker--danger">Something went wrong</div>
+    <h1 class="feedback-title">出了点小问题</h1>
+    <p class="feedback-copy"><%= message %></p>
+    <div class="feedback-meta">
+      <div class="feedback-code"><strong>错误码</strong><%= errorCode %></div>
       <% if (requestId) { %>
-        <div class="error-request-id"><strong>请求编号</strong><%= requestId %></div>
+        <div class="feedback-request-id"><strong>请求编号</strong><%= requestId %></div>
       <% } %>
     </div>
   </div>
