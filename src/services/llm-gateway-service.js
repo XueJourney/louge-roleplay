@@ -301,53 +301,6 @@ function drainQueue() {
   }
 }
 
-async function callProvider(provider, promptMessages, maxOutputTokens, modelMode = 'standard') {
-  const startedAt = Date.now();
-  const modelId = getProviderModelId(provider, modelMode);
-  const normalizedBaseUrl = String(provider.base_url || '').replace(/\/$/, '');
-  const response = await fetch(`${normalizedBaseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${provider.api_key}`,
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages: promptMessages,
-      temperature: modelMode === 'compression' ? 0.2 : 0.9,
-      max_tokens: maxOutputTokens || undefined,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`AI provider error: ${response.status} ${text.slice(0, 300)}`);
-  }
-
-  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
-  if (!contentType.includes('application/json')) {
-    const text = await response.text();
-    throw new Error(`AI provider returned non-JSON response: ${contentType || 'unknown'} ${text.slice(0, 300)}`);
-  }
-
-  const data = await response.json();
-  const content = extractMessageContent(data).trim();
-  const reasoning = extractReasoningText(data).trim();
-  const combinedContent = combineReplyContent(content, reasoning) || '……';
-  const usage = data.usage || {};
-
-  return {
-    content: combinedContent,
-    latencyMs: Date.now() - startedAt,
-    inputTokens: Number(usage.prompt_tokens || estimatePromptTokens(promptMessages)),
-    outputTokens: Number(usage.completion_tokens || estimateTokens(combinedContent)),
-    totalTokens:
-      Number(usage.total_tokens || 0)
-      || (Number(usage.prompt_tokens || 0) + Number(usage.completion_tokens || 0))
-      || (estimatePromptTokens(promptMessages) + estimateTokens(combinedContent)),
-  };
-}
-
 function extractStreamDeltaParts(data) {
   const choice = data?.choices?.[0] || {};
   const delta = choice.delta || choice.message || {};
@@ -389,34 +342,164 @@ function extractStreamDeltaParts(data) {
   return { content, reasoning };
 }
 
+function normalizeProviderError(error, timeoutMs = 60000) {
+  const rawMessage = String(error?.message || error || '').trim();
+  if (!rawMessage) {
+    return new Error('AI provider request failed');
+  }
+
+  if (rawMessage === 'PROVIDER_REQUEST_ABORTED') {
+    return new Error('AI provider request aborted by downstream client');
+  }
+
+  if (rawMessage === 'PROVIDER_REQUEST_TIMEOUT' || /timeout/i.test(rawMessage)) {
+    return new Error(`AI provider request timeout after ${timeoutMs}ms`);
+  }
+
+  if (error?.name === 'AbortError') {
+    return new Error(`AI provider request timeout after ${timeoutMs}ms`);
+  }
+
+  return error instanceof Error ? error : new Error(rawMessage);
+}
+
+async function readProviderErrorBody(response) {
+  try {
+    return await response.text();
+  } catch (_) {
+    return '';
+  }
+}
+
 async function callProviderStream(provider, promptMessages, maxOutputTokens, modelMode = 'standard', hooks = {}) {
   const startedAt = Date.now();
   const modelId = getProviderModelId(provider, modelMode);
   const normalizedBaseUrl = String(provider.base_url || '').replace(/\/$/, '');
-  const response = await fetch(`${normalizedBaseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${provider.api_key}`,
-    },
-    body: JSON.stringify({
-      model: modelId,
-      messages: promptMessages,
-      temperature: modelMode === 'compression' ? 0.2 : 0.9,
-      max_tokens: maxOutputTokens || undefined,
-      stream: true,
-      stream_options: { include_usage: true },
-    }),
+  const timeoutMs = Math.max(1000, Number(provider.timeout_ms || 60000));
+  const controller = new AbortController();
+  const externalSignal = hooks.signal;
+  let cleanedUp = false;
+
+  const cleanup = () => {
+    if (cleanedUp) {
+      return;
+    }
+    cleanedUp = true;
+    clearTimeout(timeout);
+    if (externalSignal && typeof externalSignal.removeEventListener === 'function' && onExternalAbort) {
+      externalSignal.removeEventListener('abort', onExternalAbort);
+    }
+  };
+
+  const onExternalAbort = externalSignal && typeof externalSignal.addEventListener === 'function'
+    ? () => {
+        if (!controller.signal.aborted) {
+          controller.abort(new Error('PROVIDER_REQUEST_ABORTED'));
+        }
+      }
+    : null;
+
+  if (onExternalAbort) {
+    if (externalSignal.aborted) {
+      controller.abort(new Error('PROVIDER_REQUEST_ABORTED'));
+    } else {
+      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+    }
+  }
+
+  const timeout = setTimeout(() => {
+    if (!controller.signal.aborted) {
+      controller.abort(new Error('PROVIDER_REQUEST_TIMEOUT'));
+    }
+  }, timeoutMs);
+
+  logger.info('LLM provider request start', {
+    providerId: provider.id,
+    providerType: provider.provider_type,
+    modelMode,
+    modelId,
+    baseUrl: normalizedBaseUrl,
+    timeoutMs,
+    promptMessagesCount: Array.isArray(promptMessages) ? promptMessages.length : 0,
+    maxOutputTokens: maxOutputTokens || 0,
+    streaming: true,
+  });
+
+  let response;
+  try {
+    response = await fetch(`${normalizedBaseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${provider.api_key}`,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: promptMessages,
+        temperature: modelMode === 'compression' ? 0.2 : 0.9,
+        max_tokens: maxOutputTokens || undefined,
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+    });
+  } catch (error) {
+    cleanup();
+    throw normalizeProviderError(error, timeoutMs);
+  }
+
+  logger.info('LLM provider response received', {
+    providerId: provider.id,
+    providerType: provider.provider_type,
+    modelMode,
+    status: response.status,
+    contentType: String(response.headers.get('content-type') || '').toLowerCase(),
+    elapsedMs: Date.now() - startedAt,
   });
 
   if (!response.ok) {
-    const text = await response.text();
+    const text = await readProviderErrorBody(response);
+    cleanup();
+    logger.error('LLM provider response error', {
+      providerId: provider.id,
+      providerType: provider.provider_type,
+      modelMode,
+      status: response.status,
+      bodySnippet: text.slice(0, 300),
+    });
     throw new Error(`AI provider error: ${response.status} ${text.slice(0, 300)}`);
   }
 
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    cleanup();
+    const content = extractMessageContent(data).trim();
+    const reasoning = extractReasoningText(data).trim();
+    const combinedContent = combineReplyContent(content, reasoning) || '……';
+    const usage = data.usage || {};
+    return {
+      content: combinedContent,
+      latencyMs: Date.now() - startedAt,
+      inputTokens: Number(usage.prompt_tokens || estimatePromptTokens(promptMessages)),
+      outputTokens: Number(usage.completion_tokens || estimateTokens(combinedContent)),
+      totalTokens:
+        Number(usage.total_tokens || 0)
+        || (Number(usage.prompt_tokens || 0) + Number(usage.completion_tokens || 0))
+        || (estimatePromptTokens(promptMessages) + estimateTokens(combinedContent)),
+    };
+  }
+
   if (!response.body) {
+    cleanup();
     throw new Error('AI provider stream body is empty');
   }
+
+  logger.info('LLM provider stream body ready', {
+    providerId: provider.id,
+    providerType: provider.provider_type,
+    modelMode,
+  });
 
   const decoder = new TextDecoder();
   const reader = response.body.getReader();
@@ -502,27 +585,36 @@ async function callProviderStream(provider, promptMessages, maxOutputTokens, mod
     return false;
   };
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-    const blocks = buffer.split(/\n\n+/);
-    buffer = blocks.pop() || '';
-
-    for (const block of blocks) {
-      const shouldStop = await handleSseBlock(block);
-      if (shouldStop) {
-        buffer = '';
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
         break;
       }
-    }
-  }
 
-  if (buffer.trim()) {
-    await handleSseBlock(buffer);
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split(/\n\n+/);
+      buffer = blocks.pop() || '';
+
+      for (const block of blocks) {
+        const shouldStop = await handleSseBlock(block);
+        if (shouldStop) {
+          buffer = '';
+          break;
+        }
+      }
+    }
+
+    if (buffer.trim()) {
+      await handleSseBlock(buffer);
+    }
+  } catch (error) {
+    throw normalizeProviderError(error, timeoutMs);
+  } finally {
+    cleanup();
+    try {
+      reader.releaseLock();
+    } catch (_) {}
   }
 
   fullContent += closeReasoningIfNeeded();
@@ -538,6 +630,10 @@ async function callProviderStream(provider, promptMessages, maxOutputTokens, mod
       || (Number(usage.prompt_tokens || 0) + Number(usage.completion_tokens || 0))
       || (estimatePromptTokens(promptMessages) + estimateTokens(combinedContent)),
   };
+}
+
+async function callProvider(provider, promptMessages, maxOutputTokens, modelMode = 'standard', hooks = {}) {
+  return callProviderStream(provider, promptMessages, maxOutputTokens, modelMode, hooks);
 }
 
 
@@ -717,22 +813,39 @@ async function executeLlmQueued(requestMeta, runner) {
   }, Number(subscription.priority_weight || 0));
 }
 
-async function generateReplyViaGateway({ requestId, userId, conversationId = null, character, messages, userMessage, systemHint = '', promptKind = 'chat', modelMode = 'standard' }) {
+async function generateReplyViaGateway({ requestId, userId, conversationId = null, character, messages, userMessage, systemHint = '', promptKind = 'chat', modelMode = 'standard', signal = null }) {
   const result = await executeLlmQueued(
     { requestId, userId, conversationId, character, messages, userMessage, systemHint, promptKind, modelMode },
-    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, modelMode),
+    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { signal }),
   );
   return result.content;
 }
 
-async function streamReplyViaGateway({ requestId, userId, conversationId = null, character, messages, userMessage, systemHint = '', promptKind = 'chat', modelMode = 'standard', onDelta = null }) {
+async function streamReplyViaGateway({ requestId, userId, conversationId = null, character, messages, userMessage, systemHint = '', promptKind = 'chat', modelMode = 'standard', onDelta = null, signal = null }) {
   return executeLlmQueued(
     { requestId, userId, conversationId, character, messages, userMessage, systemHint, promptKind, modelMode },
-    ({ provider, promptMessages, subscription }) => callProviderStream(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { onDelta }),
+    ({ provider, promptMessages, subscription }) => callProviderStream(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { onDelta, signal }),
   );
 }
 
-async function optimizeUserInputViaGateway({ requestId, userId, conversationId = null, character, messages, userInput, modelMode = 'standard' }) {
+async function streamOptimizeUserInputViaGateway({ requestId, userId, conversationId = null, character, messages, userInput, modelMode = 'standard', onDelta = null, signal = null }) {
+  return executeLlmQueued(
+    {
+      requestId,
+      userId,
+      conversationId,
+      character,
+      messages,
+      userMessage: `原始输入：\n${String(userInput || '').trim()}`,
+      systemHint: '你要帮用户优化输入内容。输出只给优化后的用户输入，不要解释，不要加引号。',
+      promptKind: 'optimize',
+      modelMode,
+    },
+    ({ provider, promptMessages, subscription }) => callProviderStream(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { onDelta, signal }),
+  );
+}
+
+async function optimizeUserInputViaGateway({ requestId, userId, conversationId = null, character, messages, userInput, modelMode = 'standard', signal = null }) {
   const result = await executeLlmQueued(
     {
       requestId,
@@ -745,7 +858,7 @@ async function optimizeUserInputViaGateway({ requestId, userId, conversationId =
       promptKind: 'optimize',
       modelMode,
     },
-    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, modelMode),
+    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { signal }),
   );
   return result.content;
 }
@@ -782,6 +895,7 @@ module.exports = {
   MAX_GLOBAL_CONCURRENCY,
   generateReplyViaGateway,
   streamReplyViaGateway,
+  streamOptimizeUserInputViaGateway,
   optimizeUserInputViaGateway,
   getChatModelSelector,
 };

@@ -26,6 +26,28 @@ function renderErrorWithLayout(res, statusCode, title, message, errorCode) {
   });
 }
 
+function mapErrorToPresentation(error) {
+  const message = String(error?.message || '');
+
+  if (message === 'REQUEST_QUOTA_EXCEEDED') {
+    return { statusCode: 429, title: '额度已用完', message: '请求次数额度已经用完了，先升级套餐或者等额度恢复。', errorCode: 'REQUEST_QUOTA_EXCEEDED' };
+  }
+
+  if (message === 'TOKEN_QUOTA_EXCEEDED') {
+    return { statusCode: 429, title: '额度不够', message: '当前 Token 额度不足，这次请求先发不出去。', errorCode: 'TOKEN_QUOTA_EXCEEDED' };
+  }
+
+  if (/rate limited|429/i.test(message)) {
+    return { statusCode: 429, title: '请求太快了', message: '上游模型服务正在限流，等一会儿再试。', errorCode: 'UPSTREAM_RATE_LIMITED' };
+  }
+
+  if (/gateway timeout|request timeout|provider request timeout|504/i.test(message)) {
+    return { statusCode: 504, title: '模型响应超时', message: '上游模型服务超时了，这次没生成完。稍后重试会更稳一些。', errorCode: 'UPSTREAM_TIMEOUT' };
+  }
+
+  return { statusCode: 500, title: '系统错误', message: '请求处理失败，请稍后再试。', errorCode: 'INTERNAL_SERVER_ERROR' };
+}
+
 function errorHandler(error, req, res, next) {
   logger.error('Unhandled application error', {
     requestId: req.requestId,
@@ -35,15 +57,8 @@ function errorHandler(error, req, res, next) {
     stack: error.stack,
   });
 
-  if (error.message === 'REQUEST_QUOTA_EXCEEDED') {
-    return renderErrorWithLayout(res, 429, '额度已用完', '请求次数额度已经用完了，先升级套餐或者等额度恢复。', 'REQUEST_QUOTA_EXCEEDED');
-  }
-
-  if (error.message === 'TOKEN_QUOTA_EXCEEDED') {
-    return renderErrorWithLayout(res, 429, '额度不够', '当前 Token 额度不足，这次请求先发不出去。', 'TOKEN_QUOTA_EXCEEDED');
-  }
-
-  renderErrorWithLayout(res, 500, '系统错误', '请求处理失败，请稍后再试。', 'INTERNAL_SERVER_ERROR');
+  const presentation = mapErrorToPresentation(error);
+  renderErrorWithLayout(res, presentation.statusCode, presentation.title, presentation.message, presentation.errorCode);
 }
 
 module.exports = {

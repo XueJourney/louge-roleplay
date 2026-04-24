@@ -50,7 +50,7 @@ const exposeAliyunPhoneAuthAppKey = readBool('ALIYUN_PHONE_AUTH_EXPOSE_APP_KEY',
 const config = {
   port: Number(process.env.PORT || 3217),
   appName: readString('APP_NAME', '楼阁'),
-  appUrl: readString('APP_URL', 'https://aicafe.momentsofus.cn'),
+  appUrl: readString('APP_URL', 'http://127.0.0.1:3217'),
   sessionSecret,
   sessionSecretIsEphemeral,
   databaseUrl: readString('DATABASE_URL', ''),

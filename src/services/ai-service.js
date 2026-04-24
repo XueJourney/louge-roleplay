@@ -7,6 +7,7 @@ const config = require('../config');
 const logger = require('../lib/logger');
 
 const THINK_TAG_PATTERN = /<\s*(think|thinking)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi;
+const STREAM_DONE_SENTINEL = '[DONE]';
 
 function normalizeTextContent(value) {
   if (Array.isArray(value)) {
@@ -118,19 +119,73 @@ function buildPromptMessages({ character, messages, userMessage, systemHint = ''
   ];
 }
 
+function parseStreamDelta(data) {
+  const choice = data?.choices?.[0] || {};
+  const delta = choice.delta || choice.message || {};
+  const contentCandidates = [delta.content, delta.text, choice.text, data?.text];
+  const reasoningCandidates = [
+    delta.reasoning_content,
+    delta.reasoning,
+    delta.reasoning_text,
+    choice.reasoning_content,
+    choice.reasoning,
+    data?.reasoning_content,
+    data?.reasoning,
+  ];
+
+  let content = '';
+  let reasoning = '';
+
+  for (const candidate of contentCandidates) {
+    const text = normalizeTextContent(candidate);
+    if (text) {
+      content = text;
+      break;
+    }
+  }
+
+  for (const candidate of reasoningCandidates) {
+    const text = normalizeTextContent(candidate);
+    if (text) {
+      reasoning = text;
+      break;
+    }
+  }
+
+  return { content, reasoning };
+}
+
 async function callProvider(promptMessages) {
-  const response = await fetch(`${config.openaiBaseUrl.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.openaiApiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.openaiModel,
-      messages: promptMessages,
-      temperature: 0.9,
-    }),
-  });
+  const baseUrl = String(config.openaiBaseUrl || '').replace(/\/$/, '');
+  const controller = new AbortController();
+  const timeoutMs = 60000;
+  const timeout = setTimeout(() => controller.abort(new Error('PROVIDER_REQUEST_TIMEOUT')), timeoutMs);
+  let response;
+
+  try {
+    response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.openaiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.openaiModel,
+        messages: promptMessages,
+        temperature: 0.9,
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError' || error?.message === 'PROVIDER_REQUEST_TIMEOUT') {
+      throw new Error(`AI provider request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     const text = await response.text();
@@ -138,10 +193,115 @@ async function callProvider(promptMessages) {
     throw new Error(`AI provider error: ${response.status}`);
   }
 
-  const data = await response.json();
-  const content = extractMessageContent(data).trim();
-  const reasoning = extractReasoningText(data).trim();
-  return combineReplyContent(content, reasoning) || '……';
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    const content = extractMessageContent(data).trim();
+    const reasoning = extractReasoningText(data).trim();
+    return combineReplyContent(content, reasoning) || '……';
+  }
+
+  if (!response.body) {
+    throw new Error('AI provider stream body is empty');
+  }
+
+  const decoder = new TextDecoder();
+  const reader = response.body.getReader();
+  let buffer = '';
+  let fullContent = '';
+  let reasoningOpen = false;
+
+  const appendReasoningDelta = (text) => {
+    const normalized = String(text || '');
+    if (!normalized) {
+      return '';
+    }
+    if (!reasoningOpen) {
+      reasoningOpen = true;
+      return `<think>\n${normalized}`;
+    }
+    return normalized;
+  };
+
+  const appendContentDelta = (text) => {
+    const normalized = String(text || '');
+    if (!normalized) {
+      return '';
+    }
+    if (reasoningOpen) {
+      reasoningOpen = false;
+      return `\n</think>\n\n${normalized}`;
+    }
+    return normalized;
+  };
+
+  const closeReasoningIfNeeded = () => {
+    if (!reasoningOpen) {
+      return '';
+    }
+    reasoningOpen = false;
+    return '\n</think>';
+  };
+
+  const handleSseBlock = (block) => {
+    const lines = String(block || '').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data:')) {
+        continue;
+      }
+
+      const payload = trimmed.slice(5).trim();
+      if (!payload) {
+        continue;
+      }
+      if (payload === STREAM_DONE_SENTINEL) {
+        return true;
+      }
+
+      let data;
+      try {
+        data = JSON.parse(payload);
+      } catch (_) {
+        continue;
+      }
+
+      const { content, reasoning } = parseStreamDelta(data);
+      if (reasoning) {
+        fullContent += appendReasoningDelta(reasoning);
+      }
+      if (content) {
+        fullContent += appendContentDelta(content);
+      }
+    }
+    return false;
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split(/\n\n+/);
+    buffer = blocks.pop() || '';
+
+    for (const block of blocks) {
+      const shouldStop = handleSseBlock(block);
+      if (shouldStop) {
+        buffer = '';
+        break;
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    handleSseBlock(buffer);
+  }
+
+  fullContent += closeReasoningIfNeeded();
+  return String(fullContent || '').trim() || '……';
 }
 
 async function generateReply({ character, messages, userMessage, systemHint = '' }) {

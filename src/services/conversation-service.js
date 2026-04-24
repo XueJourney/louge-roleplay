@@ -317,9 +317,15 @@ function buildTreeEntries(allMessages, activeIds, childrenMap) {
     });
 
   const entries = [];
+  const visited = new Set();
 
   function walk(message, depth) {
     const messageId = Number(message.id);
+    if (!messageId || visited.has(messageId)) {
+      return false;
+    }
+    visited.add(messageId);
+
     const children = childrenMap.get(messageId) || [];
     const entry = {
       id: message.id,
@@ -335,11 +341,11 @@ function buildTreeEntries(allMessages, activeIds, childrenMap) {
     entries.push(entry);
 
     let subtreeHasActive = entry.isActive;
-    children.forEach((child) => {
+    for (const child of children) {
       if (walk(child, depth + 1)) {
         subtreeHasActive = true;
       }
-    });
+    }
     entry.isOnActiveTrail = subtreeHasActive;
     return subtreeHasActive;
   }
@@ -394,12 +400,13 @@ function buildBranchDescriptor(allMessages, leaf, normalizedLeafId, childrenMap)
 
 function buildConversationView(allMessages, activeLeafId) {
   const normalizedLeafId = activeLeafId ? Number(activeLeafId) : null;
-  const { childrenMap } = buildMessageMaps(allMessages);
+  const { byId, childrenMap } = buildMessageMaps(allMessages);
   const path = buildPathMessages(allMessages, normalizedLeafId);
   const activeIds = new Set(path.map((message) => Number(message.id)));
 
   const pathMessages = path.map((message, index) => {
     const parentId = message.parent_message_id ? Number(message.parent_message_id) : null;
+    const parentMessage = parentId ? byId.get(parentId) || null : null;
     const siblingVariants = parentId && childrenMap.has(parentId)
       ? childrenMap.get(parentId).map((item) => ({
           id: item.id,
@@ -423,6 +430,7 @@ function buildConversationView(allMessages, activeLeafId) {
       ...message,
       depth: index,
       visibleContent: stripThinkTags(message.content),
+      parentUserPreviewContent: parentMessage && parentMessage.sender_type === 'user' ? parentMessage.content : '',
       siblingVariants,
       nextChoices,
       siblingCount: siblingVariants.length,
