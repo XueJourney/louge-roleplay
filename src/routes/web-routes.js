@@ -464,7 +464,7 @@ function registerWebRoutes(app) {
       }
 
       await issueEmailCode(email, ip);
-      return refreshAndRespond(200, { message: '邮箱验证码已发送，请输入新的图形验证码以继续后续操作。' });
+      return refreshAndRespond(200, { message: '邮箱验证码已发送。图形验证码已刷新；只有再次发送验证码时才需要填写新的图形验证码。' });
     } catch (error) {
       try {
         return refreshAndRespond(400, { message: `${error.message || '发送失败'}，请输入新的图形验证码后重试。` });
@@ -510,7 +510,7 @@ function registerWebRoutes(app) {
         phoneMasked: `${phone.slice(0, 3)}****${phone.slice(-4)}`,
         provider: 'aliyun-sms',
       });
-      return refreshAndRespond(200, { message: '短信验证码已发送，请输入新的图形验证码以继续后续操作。' });
+      return refreshAndRespond(200, { message: '短信验证码已发送。图形验证码已刷新；只有再次发送验证码时才需要填写新的图形验证码。' });
     } catch (error) {
       try {
         return refreshAndRespond(400, { message: `${error.message || '发送失败'}，请输入新的图形验证码后重试。` });
@@ -541,11 +541,11 @@ function registerWebRoutes(app) {
         ...registerLogMeta(),
         reason: reason || message,
       });
-      const nextCaptcha = await refreshCaptcha(String(req.body.captchaId || '').trim());
+      const nextCaptcha = await createCaptcha();
       return renderRegisterPage(res, {
         captcha: nextCaptcha,
         form: buildFormState(),
-        formMessage: `${message} 请重新输入新的图形验证码。`,
+        formMessage: message,
       });
     };
 
@@ -563,14 +563,6 @@ function registerWebRoutes(app) {
       const emailCode = String(req.body.emailCode || '').trim();
       const phone = String(req.body.phone || '').trim() || null;
       const phoneCode = String(req.body.phoneCode || '').trim();
-      const captchaId = String(req.body.captchaId || '').trim();
-      const captchaText = String(req.body.captchaText || '').trim();
-
-      const captchaPassed = await verifyCaptcha(captchaId, captchaText, true);
-      if (!captchaPassed) {
-        return renderRegisterError('图形验证码错误或已失效。', 'CAPTCHA_INVALID');
-      }
-
       if (username.length < 3 || password.length < 6) {
         return renderRegisterError('用户名至少 3 位，密码至少 6 位。', 'USERNAME_OR_PASSWORD_TOO_SHORT');
       }
@@ -1193,7 +1185,7 @@ function registerWebRoutes(app) {
         sortOrder: parseIntegerField(req.body.sortOrder, { fieldLabel: '排序值', defaultValue: 0, min: 0 }),
         isEnabled: String(req.body.isEnabled || '1') !== '0',
       });
-      return res.redirect('/admin');
+      return res.redirect('/admin/prompts');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
@@ -1227,7 +1219,7 @@ function registerWebRoutes(app) {
         .map((item) => parseIntegerField(item, { fieldLabel: '提示词片段 ID', min: 1, allowEmpty: true }))
         .filter((item) => item > 0);
       await reorderPromptBlocks(blockIds);
-      return res.redirect('/admin');
+      return res.redirect('/admin/prompts');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
