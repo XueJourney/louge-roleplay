@@ -14,8 +14,8 @@ ExecStart=/usr/bin/node /root/.openclaw/workspace/deployments/local/ai-roleplay-
 Restart=always
 RestartSec=5
 User=root
-StandardOutput=append:/root/.openclaw/workspace/deployments/local/ai-roleplay-site/logs/app.log
-StandardError=append:/root/.openclaw/workspace/deployments/local/ai-roleplay-site/logs/app-error.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

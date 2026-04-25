@@ -14,6 +14,7 @@ const morgan = require('morgan');
 
 const config = require('./config');
 const logger = require('./lib/logger');
+const { appendDailyLog } = require('./services/log-service');
 const { waitReady: waitDbReady, getDbType } = require('./lib/db');
 const { initRedis, redisClient, isRedisReal } = require('./lib/redis');
 const { requestContext } = require('./middleware/request-context');
@@ -51,7 +52,14 @@ async function bootstrap() {
   }));
   app.use(express.urlencoded({ extended: false, limit: '20kb' }));
   app.use(express.json({ limit: '20kb' }));
-  app.use(morgan('combined'));
+  app.use(morgan('combined', {
+    stream: {
+      write(line) {
+        appendDailyLog('access', String(line || '').trimEnd());
+        process.stdout.write(line);
+      },
+    },
+  }));
 
   const sessionStore = isRedisReal()
     ? new RedisStore({ client: redisClient })

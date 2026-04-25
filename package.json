@@ -10,7 +10,9 @@
     "grant-admin": "node scripts/grant-admin.js",
     "smoke:test": "node scripts/smoke-test.js",
     "health:check": "node scripts/health-check.js",
-    "test:think": "node scripts/test-think-parser.js"
+    "test:think": "node scripts/test-think-parser.js",
+    "logs:test": "node scripts/test-log-service.js",
+    "admin-logs:test": "node scripts/test-admin-logs-route.js"
   },
   "dependencies": {
     "@alicloud/dypnsapi20170525": "^2.0.0",
