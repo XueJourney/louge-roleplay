@@ -1,5 +1,5 @@
 <!-- @file src/views/admin-conversations.ejs
-     @description 管理后台全局对话记录列表。调用说明：GET /admin/conversations 渲染，支持按用户、角色卡、日期筛选和分页查看。
+     @description 管理后台全局对话记录列表。调用说明：GET /admin/conversations 渲染，支持按用户、角色卡、日期、删除状态筛选和分页查看。
 -->
 <div class="admin-shell">
   <section class="hero-card admin-hero">
@@ -62,6 +62,19 @@
         <input type="date" name="date" value="<%= conversationResult.filters.date %>" />
       </label>
       <label>
+        状态
+        <select name="status">
+          <% [
+            ['all', '全部状态'],
+            ['active', 'active'],
+            ['archived', 'archived'],
+            ['deleted', 'deleted']
+          ].forEach(([value, label]) => { %>
+            <option value="<%= value %>" <%= conversationResult.filters.status === value ? 'selected' : '' %>><%= label %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>
         <%= t('每页') %>
         <select name="pageSize">
           <% [10, 25, 50, 100].forEach(size => { %>
@@ -121,11 +134,22 @@
             <span><strong><%= t('角色卡') %></strong><%= conversation.character_name %></span>
             <span><strong><%= t('创建时间') %></strong><%= conversation.display_created_at %></span>
             <span><strong><%= t('最后消息') %></strong><%= conversation.display_last_message_at %></span>
+            <span><strong>删除时间</strong><%= conversation.display_deleted_at %></span>
           </div>
           <p class="admin-conversation-preview">
             <span><%= conversation.latest_sender_type || '—' %></span>
             <%= conversation.latest_message_preview || t('暂无消息内容') %>
           </p>
+          <div class="toolbar-row toolbar-row--admin">
+            <% if (conversation.status === 'deleted') { %>
+              <form method="POST" action="/admin/conversations/<%= conversation.id %>/restore">
+                <button type="submit">恢复会话</button>
+              </form>
+              <form method="POST" action="/admin/conversations/<%= conversation.id %>/permanent-delete" onsubmit="return confirm('确认永久删除这条会话及其所有消息吗？这个操作不可恢复。');">
+                <button type="submit" class="danger">永久删除</button>
+              </form>
+            <% } %>
+          </div>
         </article>
       <% }) %>
     </div>

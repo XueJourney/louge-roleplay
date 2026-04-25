@@ -6,10 +6,11 @@
  * 调用说明：
  * - `src/routes/web-routes.js` 的 `/admin/conversations` 调用 `listAdminConversations()` 渲染全局会话列表。
  * - `src/routes/web-routes.js` 的 `/admin/conversations/:id` 调用 `getAdminConversationDetail()` 查看单条会话完整消息。
- * - 支持按用户、角色卡、日期筛选；只做后台只读查询，不修改聊天数据。
+ * - 支持按用户、角色卡、日期和删除状态筛选；后台可以恢复或永久删除软删除数据。
  */
 
 const { query } = require('../lib/db');
+const { invalidateConversationCache } = require('./conversation-service');
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -36,12 +37,23 @@ function formatDateTime(value) {
   return date.toLocaleString('zh-CN', { timeZone: 'Asia/Hong_Kong', hour12: false });
 }
 
+function normalizeStatusFilter(value) {
+  const raw = String(value || 'all').trim();
+  return ['all', 'active', 'archived', 'deleted'].includes(raw) ? raw : 'all';
+}
+
 function buildConversationWhere(filters = {}) {
-  const clauses = ["c.status <> 'deleted'"];
+  const clauses = [];
   const params = [];
   const userId = normalizePositiveInteger(filters.userId);
   const characterId = normalizePositiveInteger(filters.characterId);
   const date = normalizeDate(filters.date);
+  const status = normalizeStatusFilter(filters.status);
+
+  if (status !== 'all') {
+    clauses.push('c.status = ?');
+    params.push(status);
+  }
 
   if (userId) {
     clauses.push('c.user_id = ?');
@@ -59,7 +71,7 @@ function buildConversationWhere(filters = {}) {
   return {
     whereSql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
     params,
-    normalized: { userId, characterId, date },
+    normalized: { userId, characterId, date, status },
   };
 }
 
@@ -68,7 +80,7 @@ async function listConversationFilterOptions() {
     query(
       `SELECT u.id, u.username, u.nickname, COUNT(c.id) AS conversation_count
        FROM users u
-       JOIN conversations c ON c.user_id = u.id AND c.status <> 'deleted'
+       JOIN conversations c ON c.user_id = u.id
        GROUP BY u.id, u.username, u.nickname
        ORDER BY MAX(c.updated_at) DESC, u.id DESC
        LIMIT 300`,
@@ -76,7 +88,7 @@ async function listConversationFilterOptions() {
     query(
       `SELECT ch.id, ch.name, COUNT(c.id) AS conversation_count
        FROM characters ch
-       JOIN conversations c ON c.character_id = ch.id AND c.status <> 'deleted'
+       JOIN conversations c ON c.character_id = ch.id
        GROUP BY ch.id, ch.name
        ORDER BY MAX(c.updated_at) DESC, ch.id DESC
        LIMIT 300`,
@@ -129,6 +141,7 @@ async function listAdminConversations(options = {}) {
        c.created_at,
        c.updated_at,
        c.last_message_at,
+       c.deleted_at,
        u.id AS user_id,
        u.username,
        u.nickname,
@@ -160,6 +173,7 @@ async function listAdminConversations(options = {}) {
       display_created_at: formatDateTime(row.created_at),
       display_updated_at: formatDateTime(row.updated_at),
       display_last_message_at: formatDateTime(row.last_message_at),
+      display_deleted_at: formatDateTime(row.deleted_at),
     })),
     total,
     page,
@@ -185,7 +199,7 @@ async function getAdminConversationDetail(conversationId) {
      FROM conversations c
      JOIN users u ON u.id = c.user_id
      JOIN characters ch ON ch.id = c.character_id
-     WHERE c.id = ? AND c.status <> 'deleted'
+     WHERE c.id = ?
      LIMIT 1`,
     [id],
   );
@@ -203,7 +217,9 @@ async function getAdminConversationDetail(conversationId) {
        branch_from_message_id,
        edited_from_message_id,
        prompt_kind,
-       created_at
+       created_at,
+       deleted_at,
+       metadata_json
      FROM messages
      WHERE conversation_id = ?
      ORDER BY sequence_no ASC, id ASC`,
@@ -216,16 +232,85 @@ async function getAdminConversationDetail(conversationId) {
       display_created_at: formatDateTime(conversation.created_at),
       display_updated_at: formatDateTime(conversation.updated_at),
       display_last_message_at: formatDateTime(conversation.last_message_at),
+      display_deleted_at: formatDateTime(conversation.deleted_at),
     },
     messages: messages.map((message) => ({
       ...message,
       display_created_at: formatDateTime(message.created_at),
+      display_deleted_at: formatDateTime(message.deleted_at),
     })),
   };
 }
 
+
+async function restoreConversation(conversationId) {
+  const id = normalizePositiveInteger(conversationId);
+  if (!id) return false;
+  const result = await query(
+    "UPDATE conversations SET status = 'active', deleted_at = NULL, updated_at = NOW() WHERE id = ? AND status = 'deleted'",
+    [id],
+  );
+  if (Number(result.affectedRows || 0) > 0) {
+    await invalidateConversationCache(id);
+    return true;
+  }
+  return false;
+}
+
+async function permanentlyDeleteConversation(conversationId) {
+  const id = normalizePositiveInteger(conversationId);
+  if (!id) return false;
+  const rows = await query("SELECT id FROM conversations WHERE id = ? AND status = 'deleted' LIMIT 1", [id]);
+  if (!rows.length) return false;
+  await query('DELETE FROM messages WHERE conversation_id = ?', [id]);
+  const result = await query("DELETE FROM conversations WHERE id = ? AND status = 'deleted'", [id]);
+  await invalidateConversationCache(id);
+  return Number(result.affectedRows || 0) > 0;
+}
+
+async function restoreMessage(conversationId, messageId) {
+  const conversation = normalizePositiveInteger(conversationId);
+  const message = normalizePositiveInteger(messageId);
+  if (!conversation || !message) return false;
+  const result = await query(
+    "UPDATE messages SET deleted_at = NULL WHERE id = ? AND conversation_id = ? AND deleted_at IS NOT NULL",
+    [message, conversation],
+  );
+  if (Number(result.affectedRows || 0) > 0) {
+    await invalidateConversationCache(conversation);
+    return true;
+  }
+  return false;
+}
+
+async function permanentlyDeleteMessage(conversationId, messageId) {
+  const conversation = normalizePositiveInteger(conversationId);
+  const message = normalizePositiveInteger(messageId);
+  if (!conversation || !message) return false;
+  const childRows = await query(
+    'SELECT COUNT(*) AS childCount FROM messages WHERE conversation_id = ? AND parent_message_id = ?',
+    [conversation, message],
+  );
+  if (Number(childRows[0]?.childCount || 0) > 0) {
+    const error = new Error('MESSAGE_HAS_CHILDREN');
+    error.code = 'MESSAGE_HAS_CHILDREN';
+    error.childMessageCount = Number(childRows[0]?.childCount || 0);
+    throw error;
+  }
+  const result = await query("DELETE FROM messages WHERE id = ? AND conversation_id = ? AND deleted_at IS NOT NULL", [message, conversation]);
+  if (Number(result.affectedRows || 0) > 0) {
+    await invalidateConversationCache(conversation);
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
   getAdminConversationDetail,
+  permanentlyDeleteConversation,
+  permanentlyDeleteMessage,
+  restoreConversation,
+  restoreMessage,
   listAdminConversations,
   listConversationFilterOptions,
 };

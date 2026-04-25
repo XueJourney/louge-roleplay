@@ -22,7 +22,7 @@ const { createCharacter, updateCharacter, listPublicCharacters, listUserCharacte
 const { listPlans, findPlanById, createPlan, updatePlan, deletePlan, getActiveSubscriptionForUser, getUserQuotaSnapshot, updateUserPlan } = require('../services/plan-service');
 const { listUsersWithPlans, getAdminOverview } = require('../services/admin-service');
 const { listLogEntries } = require('../services/log-service');
-const { getAdminConversationDetail, listAdminConversations } = require('../services/admin-conversation-service');
+const { getAdminConversationDetail, listAdminConversations, permanentlyDeleteConversation, permanentlyDeleteMessage, restoreConversation, restoreMessage } = require('../services/admin-conversation-service');
 const { listProviders, createProvider, updateProvider } = require('../services/llm-provider-service');
 const {
   listPromptBlocks,
@@ -937,6 +937,7 @@ function registerWebRoutes(app) {
         userId: req.query.userId,
         characterId: req.query.characterId,
         date: req.query.date,
+        status: req.query.status,
         page: parseIntegerField(req.query.page, { fieldLabel: '页码', defaultValue: 1, min: 1 }),
         pageSize: parseIntegerField(req.query.pageSize, { fieldLabel: '分页大小', defaultValue: 25, min: 1 }),
       });
@@ -970,13 +971,64 @@ function registerWebRoutes(app) {
       const conversationId = parseIdParam(req.params.conversationId, '会话 ID');
       const detail = await getAdminConversationDetail(conversationId);
       if (!detail) {
-        return renderValidationMessage(res, '这条对话记录不存在，或者已经被删除。', '全局对话记录');
+        return renderValidationMessage(res, '这条对话记录不存在。', '全局对话记录');
       }
 
       renderPage(res, 'admin-conversation-detail', {
         title: `对话 #${conversationId}`,
         detail,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/conversations/:conversationId/restore', requireAdmin, async (req, res, next) => {
+    try {
+      const conversationId = parseIdParam(req.params.conversationId, '会话 ID');
+      await restoreConversation(conversationId);
+      return res.redirect(`/admin/conversations/${conversationId}`);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/conversations/:conversationId/permanent-delete', requireAdmin, async (req, res, next) => {
+    try {
+      const conversationId = parseIdParam(req.params.conversationId, '会话 ID');
+      await permanentlyDeleteConversation(conversationId);
+      return res.redirect('/admin/conversations?status=deleted');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/conversations/:conversationId/messages/:messageId/restore', requireAdmin, async (req, res, next) => {
+    try {
+      const conversationId = parseIdParam(req.params.conversationId, '会话 ID');
+      const messageId = parseIdParam(req.params.messageId, '消息 ID');
+      await restoreMessage(conversationId, messageId);
+      invalidateConversationCache(conversationId).catch(() => {});
+      return res.redirect(`/admin/conversations/${conversationId}#message-${messageId}`);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/conversations/:conversationId/messages/:messageId/permanent-delete', requireAdmin, async (req, res, next) => {
+    try {
+      const conversationId = parseIdParam(req.params.conversationId, '会话 ID');
+      const messageId = parseIdParam(req.params.messageId, '消息 ID');
+      try {
+        await permanentlyDeleteMessage(conversationId, messageId);
+      } catch (error) {
+        if (error.code === 'MESSAGE_HAS_CHILDREN') {
+          return renderValidationMessage(res, `这条消息还有 ${error.childMessageCount} 条子消息，不能单独永久删除。`, '全局对话记录');
+        }
+        throw error;
+      }
+      invalidateConversationCache(conversationId).catch(() => {});
+      return res.redirect(`/admin/conversations/${conversationId}`);
     } catch (error) {
       next(error);
     }
@@ -1468,18 +1520,6 @@ function registerWebRoutes(app) {
       } catch (error) {
         if (error.code === 'CONVERSATION_NOT_FOUND') {
           return renderPage(res, 'message', { title: '提示', message: '会话不存在或无权删除。' });
-        }
-        if (error.code === 'CONVERSATION_HAS_MESSAGES') {
-          return renderPage(res, 'message', {
-            title: '暂时不能删除对话',
-            message: `这条对话里已经有 ${error.messageCount} 条消息。为了避免误删长对话，现在已有消息的会话不能直接删除；后续会改成归档/隐藏。`,
-          });
-        }
-        if (error.code === 'CONVERSATION_HAS_CHILDREN') {
-          return renderPage(res, 'message', {
-            title: '暂时不能删除对话',
-            message: `这条对话下面还有 ${error.childCount} 条独立分支会话挂着。为了避免把分支树砍断，现在只允许删除没有子分支对话的会话。你可以先删末端分支，再回来删上游对话。`,
-          });
         }
         throw error;
       }

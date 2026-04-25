@@ -50,6 +50,14 @@ function ensureSqliteCharactersVisibilityColumn(db) {
   }
 }
 
+function ensureSqliteColumn(db, tableName, columnName, definitionSql) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
+  const hasColumn = columns.some((column) => String(column.name || '').trim() === columnName);
+  if (!hasColumn) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${definitionSql}`);
+  }
+}
+
 function initSqliteSchema(db) {
   // ─── 用户表 ──────────────────────────────────────────────────────────────────
   db.exec(`
@@ -225,6 +233,7 @@ function initSqliteSchema(db) {
       selected_model_mode     TEXT NOT NULL DEFAULT 'standard',
       title                   TEXT NULL,
       status                  TEXT NOT NULL DEFAULT 'active',
+      deleted_at              TEXT NULL,
       last_message_at         TEXT NULL,
       created_at              TEXT NOT NULL,
       updated_at              TEXT NOT NULL
@@ -234,6 +243,7 @@ function initSqliteSchema(db) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_conversations_parent ON conversations (parent_conversation_id)');
 
   ensureSqliteCharactersVisibilityColumn(db);
+  ensureSqliteColumn(db, 'conversations', 'deleted_at', 'deleted_at TEXT NULL');
 
   // ─── 消息表 ──────────────────────────────────────────────────────────────────
   db.exec(`
@@ -249,11 +259,13 @@ function initSqliteSchema(db) {
       prompt_kind           TEXT NOT NULL DEFAULT 'normal',
       metadata_json         TEXT NULL,
       status                TEXT NOT NULL DEFAULT 'success',
+      deleted_at            TEXT NULL,
       created_at            TEXT NOT NULL
     )
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages (conversation_id, sequence_no)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_parent ON messages (parent_message_id)');
+  ensureSqliteColumn(db, 'messages', 'deleted_at', 'deleted_at TEXT NULL');
 
   // ─── 默认套餐种子数据 ─────────────────────────────────────────────────────────
   const planCount = db.prepare('SELECT COUNT(*) AS cnt FROM plans').get();

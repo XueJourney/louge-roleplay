@@ -347,6 +347,7 @@ async function main() {
       current_message_id       BIGINT NULL,
       title                    VARCHAR(200) NULL,
       status                   ENUM('active','archived','deleted') DEFAULT 'active',
+      deleted_at               DATETIME NULL,
       last_message_at          DATETIME NULL,
       created_at               DATETIME NOT NULL,
       updated_at               DATETIME NOT NULL,
@@ -358,6 +359,7 @@ async function main() {
   await ensureColumn('conversations', 'branched_from_message_id', 'branched_from_message_id BIGINT NULL');
   await ensureColumn('conversations', 'current_message_id',       'current_message_id BIGINT NULL');
   await ensureColumn('conversations', 'selected_model_mode',      "selected_model_mode ENUM('standard','jailbreak','force_jailbreak') NOT NULL DEFAULT 'standard'");
+  await ensureColumn('conversations', 'deleted_at',               'deleted_at DATETIME NULL');
   await ensureIndex('conversations', 'idx_conversations_parent',         '(parent_conversation_id)');
   await ensureIndex('conversations', 'idx_conversations_branch_message', '(branched_from_message_id)');
   await ensureIndex('conversations', 'idx_conversations_current_message','(current_message_id)');
@@ -377,6 +379,7 @@ async function main() {
       prompt_kind            ENUM('normal','regenerate','branch','edit','optimized','replay','conversation-start','first-message') NOT NULL DEFAULT 'normal',
       metadata_json          JSON NULL,
       status                 ENUM('success','failed','streaming') DEFAULT 'success',
+      deleted_at             DATETIME NULL,
       created_at             DATETIME NOT NULL,
       CONSTRAINT fk_messages_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
       INDEX idx_messages_conversation_sequence (conversation_id, sequence_no)
@@ -388,6 +391,7 @@ async function main() {
   await ensureColumn('messages', 'prompt_kind',
     "prompt_kind ENUM('normal','regenerate','branch','edit','optimized','replay','conversation-start','first-message') NOT NULL DEFAULT 'normal'");
   await ensureColumn('messages', 'metadata_json', 'metadata_json JSON NULL');
+  await ensureColumn('messages', 'deleted_at', 'deleted_at DATETIME NULL');
   await ensureIndex('messages', 'idx_messages_parent',      '(parent_message_id)');
   await ensureIndex('messages', 'idx_messages_branch_from', '(branch_from_message_id)');
   await ensureIndex('messages', 'idx_messages_edited_from', '(edited_from_message_id)');

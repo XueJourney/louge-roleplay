@@ -123,7 +123,8 @@ async function listUserConversations(userId) {
   );
 }
 
-async function fetchMessagesFromDatabase(conversationId) {
+async function fetchMessagesFromDatabase(conversationId, options = {}) {
+  const includeDeleted = options.includeDeleted === true;
   return query(
     `SELECT
        id,
@@ -137,9 +138,10 @@ async function fetchMessagesFromDatabase(conversationId) {
        branch_from_message_id,
        edited_from_message_id,
        prompt_kind,
-       metadata_json
+       metadata_json,
+       deleted_at
      FROM messages
-     WHERE conversation_id = ?
+     WHERE conversation_id = ?${includeDeleted ? '' : ' AND deleted_at IS NULL'}
      ORDER BY sequence_no ASC, id ASC`,
     [conversationId],
   );
@@ -540,7 +542,7 @@ async function cloneConversationBranch(options) {
 
 async function countChildConversations(conversationId) {
   const rows = await query(
-    "SELECT COUNT(*) AS childCount FROM conversations WHERE parent_conversation_id = ? AND status <> 'deleted'",
+    "SELECT COUNT(*) AS childCount FROM conversations WHERE parent_conversation_id = ? AND deleted_at IS NULL",
     [conversationId],
   );
   return Number(rows[0]?.childCount || 0);
@@ -562,7 +564,7 @@ async function deleteMessageSafely(conversationId, messageId, userId) {
   }
 
   const childMessageRows = await query(
-    'SELECT COUNT(*) AS childCount FROM messages WHERE conversation_id = ? AND parent_message_id = ?',
+    "SELECT COUNT(*) AS childCount FROM messages WHERE conversation_id = ? AND parent_message_id = ? AND deleted_at IS NULL",
     [conversationId, messageId],
   );
   const childMessageCount = Number(childMessageRows[0]?.childCount || 0);
@@ -574,7 +576,7 @@ async function deleteMessageSafely(conversationId, messageId, userId) {
   }
 
   const branchedConversationRows = await query(
-    "SELECT COUNT(*) AS branchConversationCount FROM conversations WHERE parent_conversation_id = ? AND branched_from_message_id = ? AND status <> 'deleted'",
+    "SELECT COUNT(*) AS branchConversationCount FROM conversations WHERE parent_conversation_id = ? AND branched_from_message_id = ? AND deleted_at IS NULL",
     [conversationId, messageId],
   );
   const branchConversationCount = Number(branchedConversationRows[0]?.branchConversationCount || 0);
@@ -585,7 +587,7 @@ async function deleteMessageSafely(conversationId, messageId, userId) {
     throw error;
   }
 
-  await query('DELETE FROM messages WHERE id = ? AND conversation_id = ?', [messageId, conversationId]);
+  await query("UPDATE messages SET deleted_at = NOW() WHERE id = ? AND conversation_id = ?", [messageId, conversationId]);
 
   if (Number(conversation.current_message_id || 0) === Number(messageId)) {
     const fallbackMessageId = targetMessage.parent_message_id ? Number(targetMessage.parent_message_id) : null;
@@ -608,27 +610,7 @@ async function deleteConversationSafely(conversationId, userId) {
     throw error;
   }
 
-  const messageRows = await query(
-    'SELECT COUNT(*) AS messageCount FROM messages WHERE conversation_id = ?',
-    [conversationId],
-  );
-  const messageCount = Number(messageRows[0]?.messageCount || 0);
-  if (messageCount > 0) {
-    const error = new Error('CONVERSATION_HAS_MESSAGES');
-    error.code = 'CONVERSATION_HAS_MESSAGES';
-    error.messageCount = messageCount;
-    throw error;
-  }
-
-  const childCount = await countChildConversations(conversationId);
-  if (childCount > 0) {
-    const error = new Error('CONVERSATION_HAS_CHILDREN');
-    error.code = 'CONVERSATION_HAS_CHILDREN';
-    error.childCount = childCount;
-    throw error;
-  }
-
-  await query("UPDATE conversations SET status = 'deleted', updated_at = NOW() WHERE id = ? AND user_id = ?", [conversationId, userId]);
+  await query("UPDATE conversations SET status = 'deleted', deleted_at = NOW(), updated_at = NOW() WHERE id = ? AND user_id = ?", [conversationId, userId]);
   await invalidateConversationCache(conversationId);
 }
 
