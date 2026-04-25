@@ -1,0 +1,12 @@
+/*
+ * @file public/styles/site-pages/70-shared-utilities.css
+ * @description 页面级共享工具类，放少量跨页面复用但还不值得拆进 core 的样式。
+ * 调用说明：由 public/styles/site-pages.css 统一引入。
+ */
+
+.character-start-form { margin-top: 16px; }
+.chat-error-banner { background: rgba(249,112,102,0.1); border: 1px solid rgba(249,112,102,0.2); color: #fca5a0; border-radius: 12px; padding: 14px 20px; margin-bottom: 16px; }
+.chat-meta--spaced { margin-top: 10px; }
+.bubble-actions--solid { opacity: 1; }
+.toolbar-row--spaced { margin-top: 14px; }
+.toolbar-row--tight { gap: 6px; }

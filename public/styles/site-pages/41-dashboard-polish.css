@@ -1,0 +1,89 @@
+/*
+ * Dashboard refinements.
+ */
+
+.dashboard-stats {
+  align-items: stretch;
+}
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 122px;
+}
+
+.stat-card strong {
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #fff, #cbbdff 60%, #9ed0ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dashboard-item {
+  transition: transform var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out);
+}
+
+.dashboard-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(155, 124, 255, 0.26);
+  box-shadow: var(--shadow-sm);
+}
+
+.dashboard-item-head h3 {
+  letter-spacing: -0.025em;
+}
+
+.subscription-card {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.subscription-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.feature-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.feature-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+}
+
+.feature-list strong {
+  color: var(--text);
+}
+
+.quota-bar {
+  height: 12px;
+}
+
+@media (max-width: 768px) {
+  .subscription-meta {
+    justify-content: flex-start;
+  }
+
+  .feature-list li {
+    display: grid;
+  }
+}

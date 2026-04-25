@@ -1,0 +1,190 @@
+
+
+/* Chat polish and motion */
+.chat-shell {
+  gap: 24px;
+}
+
+.chat-head,
+.compose-card,
+.sidebar-card,
+.hero-card,
+.section-card,
+.panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.chat-head,
+.compose-card,
+.sidebar-card,
+.hero-card,
+.section-card,
+.panel {
+  backdrop-filter: blur(10px) saturate(1.08);
+}
+
+.chat-head,
+.compose-card,
+.sidebar-card,
+.panel,
+.hero-card,
+.section-card {
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out), border-color 180ms var(--ease-out);
+}
+
+.chat-head:hover,
+.compose-card:hover,
+.sidebar-card:hover,
+.panel:hover,
+.hero-card:hover,
+.section-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.chat-head::before,
+.compose-card::before,
+.sidebar-card::before,
+.panel::before,
+.hero-card::before,
+.section-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(124,92,252,0.08), transparent 38%, transparent 62%, rgba(96,165,250,0.06));
+  opacity: 0.55;
+}
+
+.bubble {
+  animation: bubbleIn 240ms var(--ease-out) both;
+  transition: transform 160ms var(--ease-out), box-shadow 160ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+
+.bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.bubble-pending {
+  border-color: rgba(124, 92, 252, 0.22);
+  box-shadow: 0 0 0 1px rgba(124, 92, 252, 0.08), 0 0 18px rgba(124, 92, 252, 0.08);
+}
+
+.bubble-pending .bubble-kind {
+  color: var(--brand-hover);
+}
+
+.bubble-pending .bubble-header {
+  border-bottom-color: rgba(124, 92, 252, 0.14);
+}
+
+.bubble-system {
+  animation: bubbleIn 220ms var(--ease-out) both;
+}
+
+.bubble-text-streaming-tail {
+  display: inline-block;
+  position: relative;
+  color: var(--text-soft);
+  opacity: 0.9;
+}
+
+.bubble-text-streaming-tail::after {
+  content: '▍';
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--brand-hover);
+  animation: caretBlink 1s steps(1, end) infinite;
+}
+
+.chat-error-banner {
+  animation: slideUp 240ms var(--ease-out) both;
+}
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes caretBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble,
+  .chat-head,
+  .compose-card,
+  .sidebar-card,
+  .panel,
+  .hero-card,
+  .section-card,
+  .chat-error-banner {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .bubble-text-streaming-tail::after {
+    animation: none !important;
+  }
+}
+
+
+.bubble-header::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--brand);
+  box-shadow: 0 0 0 4px rgba(124, 92, 252, 0.12);
+  flex: 0 0 auto;
+}
+
+.bubble-user .bubble-header::before {
+  background: var(--accent-blue);
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.12);
+}
+
+.bubble-character .bubble-header::before {
+  background: var(--brand);
+}
+
+.bubble-system .bubble-header::before {
+  background: var(--accent-green);
+  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.12);
+}
+
+.bubble-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bubble-kind::before {
+  content: '·';
+  opacity: 0.6;
+}
+
+.bubble-live-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bubble-ghost-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--brand-hover);
+  box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.35);
+  animation: ghostPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ghostPulse {
+  0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(124, 92, 252, 0.28); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(124, 92, 252, 0); }
+  100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(124, 92, 252, 0); }
+}
+

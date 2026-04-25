@@ -1,0 +1,146 @@
+/*
+ * Rich message / Markdown rendering styles.
+ */
+
+.bubble-rich {
+  display: grid;
+  gap: 12px;
+  color: var(--text-secondary);
+  line-height: 1.82;
+}
+
+.bubble-rich > :first-child {
+  margin-top: 0;
+}
+
+.bubble-rich > :last-child {
+  margin-bottom: 0;
+}
+
+.bubble-rich p,
+.bubble-rich ul,
+.bubble-rich ol,
+.bubble-rich blockquote,
+.bubble-rich pre,
+.bubble-rich table,
+.bubble-rich details {
+  margin: 0;
+}
+
+.bubble-rich h1,
+.bubble-rich h2,
+.bubble-rich h3,
+.bubble-rich h4,
+.bubble-rich h5,
+.bubble-rich h6 {
+  margin: 4px 0 0;
+  color: var(--text);
+}
+
+.bubble-rich ul,
+.bubble-rich ol {
+  padding-left: 1.35rem;
+  display: grid;
+  gap: 6px;
+}
+
+.bubble-rich li::marker {
+  color: var(--brand-hover);
+}
+
+.bubble-rich blockquote {
+  padding: 12px 14px;
+  border-left: 3px solid rgba(155, 124, 255, 0.58);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: rgba(155, 124, 255, 0.08);
+  color: var(--text-soft);
+}
+
+.bubble-rich hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.bubble-rich pre {
+  max-width: 100%;
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(3, 6, 18, 0.62);
+  color: #d8e2ff;
+  white-space: pre-wrap;
+}
+
+.bubble-rich code {
+  padding: 2px 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.065);
+  color: #e6ddff;
+}
+
+.bubble-rich pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.bubble-rich a {
+  color: #aad4ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.bubble-rich img {
+  max-width: 100%;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bubble-rich table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.bubble-rich th,
+.bubble-rich td {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.bubble-rich th {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.bubble-folds {
+  display: grid;
+  gap: 10px;
+}
+
+.bubble-fold {
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(155, 124, 255, 0.18);
+  background: rgba(155, 124, 255, 0.065);
+  overflow: hidden;
+}
+
+.bubble-fold summary {
+  cursor: pointer;
+  padding: 10px 13px;
+  color: #d9ceff;
+  font-weight: 700;
+}
+
+.bubble-fold-body {
+  padding: 0 13px 13px;
+  color: var(--text-tertiary);
+  white-space: pre-wrap;
+}
+
+.bubble-quote {
+  color: #eadfff;
+}

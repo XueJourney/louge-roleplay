@@ -1,0 +1,124 @@
+/*
+ * Typography system.
+ *
+ * Latin/mono fonts are loaded from the same-origin /fonts/google.css proxy.
+ * Chinese text uses local system fonts to avoid large remote CJK webfonts.
+ */
+
+:root {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Songti SC", "SimSun", "Noto Serif CJK SC", Georgia, serif;
+  --font-display: "Songti SC", "SimSun", "Noto Serif CJK SC", Georgia, serif;
+  --font-logo: "Songti SC", "SimSun", "Noto Serif CJK SC", serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --tracking-tight: -0.045em;
+  --tracking-title: -0.032em;
+}
+
+body,
+input,
+textarea,
+select,
+button {
+  font-family: var(--font-sans);
+}
+
+code,
+pre,
+.prompt-preview,
+.preview-box,
+.bubble-rich code,
+.bubble-rich pre,
+.feedback-code,
+.feedback-request-id {
+  font-family: var(--font-mono);
+}
+
+.hero-card h1,
+.register-hero h1,
+.profile-hero-copy h1,
+.editor-card h1,
+.chat-head h1,
+.admin-hero h1,
+.feedback-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+h1,
+.section-head h2,
+.section-heading h2,
+.panel-title,
+.register-panel-header h2,
+.home-empty h3 {
+  letter-spacing: var(--tracking-title);
+}
+
+.character-card h3,
+.dashboard-item-head h3,
+.sidebar-card h2,
+.profile-card h2,
+.admin-item-main strong,
+.prompt-block-summary strong {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.hero-card p,
+.register-hero p,
+.feedback-copy,
+.bubble-rich p,
+.bubble-rich blockquote,
+.character-card p {
+  letter-spacing: 0.01em;
+}
+
+.section-kicker,
+.register-kicker,
+.meta-pill,
+.pill,
+.meta-chip,
+.quick-link,
+.inline-btn,
+.chip,
+.nav a:not(.brand),
+.nav-locale-switch {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: 0.018em;
+}
+
+.hero-stat strong,
+.stat-card strong,
+.metric strong {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight);
+}
+
+.bubble-role,
+.bubble-kind,
+.bubble-time,
+.tree-id,
+.tree-kind,
+.branch-meta {
+  font-family: var(--font-mono);
+}
+
+textarea,
+.bubble-rich,
+.rich-preview {
+  font-variant-ligatures: common-ligatures;
+}
+
+.brand {
+  font-family: var(--font-logo);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.nav .brand {
+  font-size: 24px;
+}

@@ -1,0 +1,231 @@
+/*
+ * Chat page structural polish. Complements 50-chat.css and 80-chat-polish.css.
+ */
+
+.chat-head {
+  display: grid;
+  gap: 12px;
+}
+
+.chat-head h1 {
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+.chat-head-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.conversation-path {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.bubble {
+  position: relative;
+  overflow: hidden;
+}
+
+.bubble-user {
+  margin-left: min(7vw, 80px);
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.09), rgba(255, 255, 255, 0.03));
+}
+
+.bubble-character {
+  margin-right: min(7vw, 80px);
+  background: linear-gradient(135deg, rgba(155, 124, 255, 0.1), rgba(255, 255, 255, 0.03));
+}
+
+.bubble-role {
+  font-weight: 750;
+  color: var(--text);
+}
+
+.bubble-rich,
+.rich-preview {
+  color: var(--text-secondary);
+  line-height: 1.85;
+}
+
+.bubble-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.variant-strip,
+.next-strip,
+.message-tools,
+.draft-box,
+.compose-details-body,
+.tool-details-body,
+.sidebar-details-body {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.variant-strip h4,
+.next-strip h4 {
+  margin: 0 0 10px;
+  color: var(--text-soft);
+}
+
+.chip-list,
+.bubble-actions,
+.bubble-actions--stacked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inline-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.tool-details,
+.compose-details,
+.sidebar-details {
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+.tool-details summary,
+.compose-details summary,
+.sidebar-details summary {
+  cursor: pointer;
+  padding: 13px 15px;
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.editor-form {
+  display: grid;
+  gap: 12px;
+}
+
+.compose-card {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+}
+
+.compose-card form {
+  display: grid;
+  gap: 12px;
+}
+
+.mode-option-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mode-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mode-option.active {
+  border-color: rgba(155, 124, 255, 0.32);
+  background: rgba(155, 124, 255, 0.11);
+}
+
+.mode-option input {
+  width: auto;
+  margin-top: 4px;
+  accent-color: var(--brand);
+}
+
+.tree-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.tree-node,
+.branch-item {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tree-node {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.tree-node.trail {
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.tree-node.active,
+.branch-item.active {
+  border-color: rgba(155, 124, 255, 0.36);
+  background: rgba(155, 124, 255, 0.11);
+}
+
+.tree-line {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--brand-hover);
+  box-shadow: 0 0 0 4px rgba(155, 124, 255, 0.12);
+}
+
+.tree-id,
+.tree-kind,
+.branch-meta {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.tree-content,
+.branch-preview {
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-card.compact {
+  padding: 18px;
+}
+
+@media (max-width: 980px) {
+  .compose-card {
+    position: static;
+  }
+
+  .bubble-user,
+  .bubble-character {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .tree-node {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-head-actions {
+    justify-content: flex-start;
+  }
+}

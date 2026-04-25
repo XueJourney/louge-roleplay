@@ -1,0 +1,222 @@
+/*
+ * Register page visuals.
+ */
+
+.register-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+  gap: 24px;
+  align-items: start;
+  animation: fadeIn var(--duration-slow) var(--ease-out) both;
+}
+
+.register-hero,
+.register-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-2xl);
+  padding: 32px;
+  box-shadow: var(--shadow-sm);
+}
+
+.register-hero {
+  min-height: calc(100vh - 156px);
+  display: grid;
+  align-content: space-between;
+  gap: 28px;
+  background:
+    radial-gradient(circle at 20% 12%, rgba(155, 124, 255, 0.22), transparent 36%),
+    radial-gradient(circle at 90% 90%, rgba(96, 165, 250, 0.13), transparent 34%),
+    linear-gradient(160deg, rgba(20, 18, 38, 0.92), rgba(12, 14, 26, 0.96));
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.register-hero h1 {
+  font-size: clamp(34px, 5vw, 58px);
+  margin: 14px 0 14px;
+}
+
+.register-hero p {
+  color: var(--text-secondary);
+  max-width: 560px;
+  line-height: 1.8;
+}
+
+.register-hero-list {
+  display: grid;
+  gap: 12px;
+}
+
+.register-hero-item {
+  padding: 16px 18px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.register-hero-item strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.register-hero-item span {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.register-panel-header {
+  margin-bottom: 20px;
+}
+
+.register-panel-header h2 {
+  font-size: 30px;
+}
+
+.register-panel form,
+.input-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field-card {
+  position: relative;
+  min-height: 126px;
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+
+.field-card:hover,
+.field-card.active,
+.field-card:has(.choice-radio:checked) {
+  transform: translateY(-1px);
+  border-color: rgba(155, 124, 255, 0.36);
+  background: rgba(155, 124, 255, 0.1);
+}
+
+.choice-radio {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: auto;
+  accent-color: var(--brand);
+}
+
+.field-card h3 {
+  margin: 0 36px 8px 0;
+  font-size: 18px;
+}
+
+.field-card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.section-block {
+  padding: 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.section-block h4 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.captcha-row,
+.inline-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.captcha-row {
+  grid-template-columns: minmax(0, 1fr) 138px auto;
+}
+
+.captcha-box {
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.captcha-box img {
+  display: block;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.email-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 10px 13px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.email-toggle input {
+  width: auto;
+  accent-color: var(--brand);
+}
+
+.submit-wrap {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.submit-wrap .btn-brand {
+  min-width: 180px;
+}
+
+@media (max-width: 1040px) {
+  .register-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .register-hero {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .register-hero,
+  .register-panel {
+    padding: 22px;
+  }
+
+  .field-grid,
+  .captcha-row,
+  .inline-row {
+    grid-template-columns: 1fr;
+  }
+
+  .submit-wrap,
+  .submit-wrap .btn-brand,
+  .btn-soft {
+    width: 100%;
+  }
+}

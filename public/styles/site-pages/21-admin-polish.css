@@ -1,0 +1,105 @@
+/*
+ * Admin console polish.
+ */
+
+.admin-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+  align-items: stretch;
+}
+
+.admin-hero .metrics,
+.admin-hero .metrics--compact {
+  margin-top: 0;
+}
+
+.admin-hub-card,
+.admin-item,
+.prompt-block-item,
+.provider-card,
+.prompt-block-card,
+.metric {
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-hub-card::before,
+.admin-item::before,
+.prompt-block-item::before,
+.provider-card::before,
+.prompt-block-card::before,
+.metric::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(255,255,255,0.055), transparent 42%, rgba(155,124,255,0.045));
+  opacity: 0.72;
+}
+
+.admin-hub-card > *,
+.admin-item > *,
+.prompt-block-item > *,
+.provider-card > *,
+.prompt-block-card > *,
+.metric > * {
+  position: relative;
+  z-index: 1;
+}
+
+.metric strong {
+  letter-spacing: -0.04em;
+}
+
+.admin-table-shell {
+  overflow: hidden;
+}
+
+.admin-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(18, 18, 30, 0.96);
+}
+
+.admin-table tbody tr {
+  transition: background var(--duration-fast) ease;
+}
+
+.admin-table tbody tr:hover td {
+  background: rgba(155, 124, 255, 0.055);
+}
+
+.admin-item summary,
+.prompt-block-summary,
+.admin-fold summary {
+  transition: background var(--duration-fast) ease;
+}
+
+.admin-item summary:hover,
+.prompt-block-summary:hover,
+.admin-fold summary:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.admin-fold[open] summary,
+.admin-item[open] summary,
+.prompt-block-item[open] summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.admin-item-body,
+.prompt-block-body,
+.admin-fold-body {
+  padding-top: 16px;
+}
+
+.prompt-preview {
+  background: rgba(9, 9, 20, 0.56);
+}
+
+@media (max-width: 960px) {
+  .admin-hero {
+    grid-template-columns: 1fr;
+  }
+}

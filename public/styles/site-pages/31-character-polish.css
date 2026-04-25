@@ -1,0 +1,82 @@
+/*
+ * Character editor finishing styles.
+ */
+
+.editor-shell {
+  max-width: 1040px;
+}
+
+.editor-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-card h1 {
+  font-size: clamp(30px, 4vw, 44px);
+}
+
+.hint-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(155, 124, 255, 0.06));
+}
+
+.prompt-item {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.prompt-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--brand), var(--accent-blue));
+  opacity: 0.8;
+}
+
+.prompt-grid {
+  grid-template-columns: minmax(160px, 0.8fr) minmax(260px, 1.4fr) minmax(120px, 0.45fr);
+}
+
+.preview-box {
+  margin: 18px 0 22px;
+  min-height: 92px;
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(9, 9, 20, 0.46);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow: auto;
+}
+
+.preview-box:empty::before {
+  content: '预览会显示在这里。';
+  color: var(--text-tertiary);
+  font-family: inherit;
+}
+
+.danger-zone {
+  margin-top: 28px;
+  padding: 20px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(249, 112, 102, 0.22);
+  background: rgba(249, 112, 102, 0.06);
+}
+
+.danger-zone h3 {
+  color: #ffd0ca;
+}
+
+@media (max-width: 768px) {
+  .prompt-grid {
+    grid-template-columns: 1fr;
+  }
+}

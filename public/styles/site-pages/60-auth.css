@@ -1,0 +1,63 @@
+/* Source: src/views/login.ejs */
+  .auth-shell {
+    min-height: calc(100vh - 160px);
+    display: grid;
+    place-items: center;
+  }
+
+  .auth-card {
+    width: min(460px, 100%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-2xl);
+    padding: 32px;
+    box-shadow: var(--shadow-md);
+    animation: scaleIn var(--duration-slow) var(--ease-out) both;
+  }
+
+  .auth-card h1 {
+    font-size: 30px;
+    margin-bottom: 8px;
+  }
+
+  .auth-card p {
+    color: var(--text-secondary);
+    margin-bottom: 22px;
+  }
+
+  .auth-form {
+    display: grid;
+    gap: 16px;
+  }
+
+  .auth-switch {
+    margin-top: 18px;
+    color: var(--text-tertiary);
+    font-size: 14px;
+  }
+
+  .auth-note {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    line-height: 1.7;
+  }
+
+  .auth-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 680px) {
+    .auth-card {
+      padding: 22px;
+    }
+
+    .auth-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+
+/* Shared utility tweaks extracted from inline style attributes */
