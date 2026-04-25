@@ -18,6 +18,8 @@ const { createUser, findUserByUsername, findUserByEmail, findUserByPhone, findUs
 const { createCharacter, updateCharacter, listPublicCharacters, listUserCharacters, getCharacterById, deleteCharacterSafely } = require('../services/character-service');
 const { listPlans, findPlanById, createPlan, updatePlan, deletePlan, getActiveSubscriptionForUser, getUserQuotaSnapshot, updateUserPlan } = require('../services/plan-service');
 const { listUsersWithPlans, getAdminOverview } = require('../services/admin-service');
+const { listLogEntries } = require('../services/log-service');
+const { getAdminConversationDetail, listAdminConversations } = require('../services/admin-conversation-service');
 const { listProviders, createProvider, updateProvider } = require('../services/llm-provider-service');
 const {
   listPromptBlocks,
@@ -844,28 +846,102 @@ function registerWebRoutes(app) {
           sortOrder: item.sort_order,
           isEnabled: item.is_enabled,
         })),
-        character: {
-          name: '示例角色',
-          summary: '一个用于后台预览拼接效果的示例角色。',
-          personality: '冷静、克制、说话短但有温度。',
-          prompt_profile_json: '[]',
-        },
+        character: {},
       });
 
       const promptPreviewMeta = {
-        characterName: '示例角色',
-        dynamicItemsSource: '后台写死的示例角色 prompt_profile_json，用来演示最终拼接效果，不来自你刚创建的全局提示词片段。',
+        modeLabel: '纯全局片段预览',
+        description: '这里只展示当前启用的全局提示词片段拼接结果，不再注入任何示例角色字段占位。',
       };
 
-      renderPage(res, 'admin', {
-        title: '管理员后台',
-        overview,
-        users,
-        plans,
-        providers,
+      renderPage(res, 'admin-prompts', {
+        title: 'Prompt 配置',
         promptBlocks,
         promptPreview,
         promptPreviewMeta,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/admin/logs', requireAdmin, async (req, res, next) => {
+    try {
+      const logResult = listLogEntries({
+        date: req.query.date,
+        level: req.query.level,
+        file: req.query.file,
+        errorType: req.query.errorType,
+        functionName: req.query.functionName,
+        page: parseIntegerField(req.query.page, { fieldLabel: '页码', defaultValue: 1, min: 1 }),
+        pageSize: parseIntegerField(req.query.pageSize, { fieldLabel: '分页大小', defaultValue: 50, min: 1 }),
+      });
+
+      const buildPageUrl = (targetPage) => {
+        const params = new URLSearchParams();
+        Object.entries({ ...logResult.filters, page: targetPage, pageSize: logResult.pageSize }).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && String(value).trim() !== '') {
+            params.set(key, String(value));
+          }
+        });
+        return `/admin/logs?${params.toString()}`;
+      };
+
+      renderPage(res, 'admin-logs', {
+        title: '日志查询',
+        logResult,
+        buildPageUrl,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/admin/conversations', requireAdmin, async (req, res, next) => {
+    try {
+      const conversationResult = await listAdminConversations({
+        userId: req.query.userId,
+        characterId: req.query.characterId,
+        date: req.query.date,
+        page: parseIntegerField(req.query.page, { fieldLabel: '页码', defaultValue: 1, min: 1 }),
+        pageSize: parseIntegerField(req.query.pageSize, { fieldLabel: '分页大小', defaultValue: 25, min: 1 }),
+      });
+
+      const buildPageUrl = (targetPage) => {
+        const params = new URLSearchParams();
+        Object.entries({
+          ...conversationResult.filters,
+          page: targetPage,
+          pageSize: conversationResult.pageSize,
+        }).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && String(value).trim() !== '' && Number(value) !== 0) {
+            params.set(key, String(value));
+          }
+        });
+        return `/admin/conversations?${params.toString()}`;
+      };
+
+      renderPage(res, 'admin-conversations', {
+        title: '全局对话记录',
+        conversationResult,
+        buildPageUrl,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/admin/conversations/:conversationId', requireAdmin, async (req, res, next) => {
+    try {
+      const conversationId = parseIdParam(req.params.conversationId, '会话 ID');
+      const detail = await getAdminConversationDetail(conversationId);
+      if (!detail) {
+        return renderValidationMessage(res, '这条对话记录不存在，或者已经被删除。', '全局对话记录');
+      }
+
+      renderPage(res, 'admin-conversation-detail', {
+        title: `对话 #${conversationId}`,
+        detail,
       });
     } catch (error) {
       next(error);
@@ -895,7 +971,7 @@ function registerWebRoutes(app) {
         isDefault: String(req.body.isDefault || '') === '1',
         sortOrder: parseIntegerField(req.body.sortOrder, { fieldLabel: '排序值', defaultValue: 0, min: 0 }),
       });
-      return res.redirect('/admin');
+      return res.redirect('/admin/plans');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
@@ -926,7 +1002,7 @@ function registerWebRoutes(app) {
         isDefault: String(req.body.isDefault || '') === '1',
         sortOrder: parseIntegerField(req.body.sortOrder, { fieldLabel: '排序值', defaultValue: 0, min: 0 }),
       });
-      return res.redirect('/admin');
+      return res.redirect('/admin/plans');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
@@ -952,7 +1028,7 @@ function registerWebRoutes(app) {
         throw error;
       }
 
-      return res.redirect('/admin');
+      return res.redirect('/admin/plans');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
@@ -1022,7 +1098,7 @@ function registerWebRoutes(app) {
         inputTokenPrice: parseNumberField(req.body.inputTokenPrice, { fieldLabel: '输入 Token 单价', defaultValue: 0, min: 0 }),
         outputTokenPrice: parseNumberField(req.body.outputTokenPrice, { fieldLabel: '输出 Token 单价', defaultValue: 0, min: 0 }),
       });
-      return res.redirect('/admin');
+      return res.redirect('/admin/providers');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
@@ -1052,7 +1128,7 @@ function registerWebRoutes(app) {
         inputTokenPrice: parseNumberField(req.body.inputTokenPrice, { fieldLabel: '输入 Token 单价', defaultValue: 0, min: 0 }),
         outputTokenPrice: parseNumberField(req.body.outputTokenPrice, { fieldLabel: '输出 Token 单价', defaultValue: 0, min: 0 }),
       });
-      return res.redirect('/admin');
+      return res.redirect('/admin/providers');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
@@ -1093,7 +1169,7 @@ function registerWebRoutes(app) {
         sortOrder: parseIntegerField(req.body.sortOrder, { fieldLabel: '排序值', defaultValue: 0, min: 0 }),
         isEnabled: String(req.body.isEnabled || '1') !== '0',
       });
-      return res.redirect('/admin');
+      return res.redirect('/admin/prompts');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);
@@ -1122,7 +1198,7 @@ function registerWebRoutes(app) {
     try {
       const blockId = parseIdParam(req.params.blockId, '提示词片段 ID');
       await deletePromptBlock(blockId);
-      return res.redirect('/admin');
+      return res.redirect('/admin/prompts');
     } catch (error) {
       if (error.message.includes('必须') || error.message.includes('不能小于') || error.message.includes('不能为空') || error.message.includes('超出允许范围')) {
         return renderValidationMessage(res, error.message);

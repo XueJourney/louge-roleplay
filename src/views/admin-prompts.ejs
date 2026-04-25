@@ -1,0 +1,147 @@
+<!-- @file src/views/admin-prompts.ejs
+     @description 全局 Prompt 片段管理页面模板。调用说明：GET /admin/prompts 渲染，public/js/admin-page.js 负责拖拽排序和预览。
+-->
+<div class="admin-shell">
+  <section class="hero-card admin-hero">
+    <div class="admin-hero-copy">
+      <p class="section-kicker">Prompt</p>
+      <h1>Prompt 配置</h1>
+      <p class="muted-text">全局提示词片段、拖拽排序和最终 Prompt 预览都单独留在这页。写 Prompt 的时候，终于不用被别的配置打断了。</p>
+    </div>
+
+    <div class="metrics metrics--compact">
+      <div class="metric"><strong><%= promptBlocks.length %></strong><span>片段总数</span></div>
+      <div class="metric"><strong><%= promptBlocks.filter(block => block.is_enabled).length %></strong><span>启用中的片段</span></div>
+      <div class="metric"><strong><%= promptPreviewMeta.modeLabel %></strong><span>当前预览模式</span></div>
+    </div>
+  </section>
+
+  <section class="section-card admin-section">
+    <div class="admin-subnav">
+      <a class="quick-link" href="/admin">用户与总览</a>
+      <a class="quick-link" href="/admin/providers">LLM 配置</a>
+      <a class="quick-link" href="/admin/plans">套餐配置</a>
+      <a class="quick-link is-active" href="/admin/prompts">Prompt 配置</a>
+      <a class="quick-link" href="/admin/logs">日志查询</a>
+      <a class="quick-link" href="/admin/conversations">对话记录</a>
+    </div>
+
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Prompting</p>
+        <h2>全局片段</h2>
+        <p class="muted-text">新增片段、片段列表和最终预览都集中在这页。拖拽排序保留，搜索也留着。</p>
+      </div>
+      <div class="section-actions section-actions--stack">
+        <label class="search-field">
+          <span>筛选片段</span>
+          <input type="search" placeholder="按 key / 内容搜索片段" data-admin-filter data-filter-target="prompt-blocks-list" />
+        </label>
+      </div>
+    </div>
+
+    <div class="admin-split-grid">
+      <details class="prompt-block-card admin-fold" <%= promptBlocks.length ? '' : 'open' %>>
+        <summary>新增片段</summary>
+        <div class="admin-fold-body">
+          <form method="post" action="/admin/prompt-blocks/new">
+            <div class="inline-grid">
+              <label>Key<input type="text" name="key" placeholder="比如：全局边界 / 世界观统一" /></label>
+              <label>排序<input type="number" name="sortOrder" value="0" min="0" /></label>
+            </div>
+            <label>Value<textarea name="value" rows="4" placeholder="写这个全局片段的内容"></textarea></label>
+            <div class="inline-grid">
+              <label>
+                启用
+                <select name="isEnabled">
+                  <option value="1" selected>启用</option>
+                  <option value="0">停用</option>
+                </select>
+              </label>
+              <div></div>
+            </div>
+            <div class="toolbar-row toolbar-row--admin">
+              <button type="submit">保存片段</button>
+            </div>
+          </form>
+        </div>
+      </details>
+
+      <details class="prompt-block-card admin-fold" open>
+        <summary>最终 Prompt 预览</summary>
+        <div class="admin-fold-body">
+          <p class="muted-text"><%= promptPreviewMeta.description %></p>
+          <div class="prompt-preview" id="prompt-preview-output"><%= promptPreview %></div>
+        </div>
+      </details>
+    </div>
+
+    <div class="prompt-block-card">
+      <div class="toolbar-row toolbar-row--between">
+        <div class="toolbar-row">
+          <span class="live-badge">实时排序</span>
+          <span class="drag-tip">拖动片段后点一次“保存排序”，顺序就会写回。</span>
+        </div>
+        <form method="post" action="/admin/prompt-blocks/reorder" id="prompt-blocks-reorder-form" class="toolbar-row toolbar-row--admin">
+          <input type="hidden" name="blockIds" id="prompt-blocks-reorder-ids" value="<%= promptBlocks.map(b => b.id).join(',') %>" />
+          <button type="submit">按当前顺序保存排序</button>
+        </form>
+      </div>
+
+      <% if (promptBlocks.length) { %>
+        <div id="prompt-blocks-list" class="admin-list">
+          <% promptBlocks.forEach(block => { %>
+            <details class="prompt-block-item" draggable="true" data-block-id="<%= block.id %>" data-filter-item data-filter-text="<%= [block.block_key, block.block_value, block.is_enabled ? '启用' : '停用'].join(' ') %>">
+              <summary class="prompt-block-summary">
+                <div class="admin-item-main">
+                  <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+                  <strong><%= block.block_key %></strong>
+                  <span class="pill <%= block.is_enabled ? 'pill--success' : '' %>"><%= block.is_enabled ? '启用' : '停用' %></span>
+                </div>
+                <div class="admin-item-meta">
+                  <span class="meta-chip">顺序 <strong data-order><%= block.sort_order %></strong></span>
+                  <div class="order-controls">
+                    <button type="button" class="order-button" data-move="up">上移</button>
+                    <button type="button" class="order-button" data-move="down">下移</button>
+                  </div>
+                </div>
+              </summary>
+              <div class="prompt-block-body">
+                <form method="post" action="/admin/prompt-blocks/<%= block.id %>">
+                  <div class="inline-grid">
+                    <label>Key<input type="text" name="key" value="<%= block.block_key %>" /></label>
+                    <label>排序<input type="number" name="sortOrder" value="<%= block.sort_order %>" min="0" data-sort-input /></label>
+                  </div>
+                  <label>Value<textarea name="value" rows="4"><%= block.block_value %></textarea></label>
+                  <div class="inline-grid">
+                    <label>
+                      启用
+                      <select name="isEnabled">
+                        <option value="1" <%= block.is_enabled ? 'selected' : '' %>>启用</option>
+                        <option value="0" <%= block.is_enabled ? '' : 'selected' %>>停用</option>
+                      </select>
+                    </label>
+                    <div class="muted-text">当前顺序会跟随拖拽同步更新。</div>
+                  </div>
+                  <div class="toolbar-row toolbar-row--admin">
+                    <button type="submit">保存本片段</button>
+                  </div>
+                </form>
+                <form method="post" action="/admin/prompt-blocks/<%= block.id %>/delete" onsubmit="return confirm('确定删除这个片段？');">
+                  <button class="danger-button" type="submit">删除片段</button>
+                </form>
+              </div>
+            </details>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <div class="empty-state">
+          <strong>还没有全局片段</strong>
+          <span class="muted-text">你可以先建几个常驻规则，再回来拖顺序。</span>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</div>
+
+<script src="/public/js/admin-page.js"></script>

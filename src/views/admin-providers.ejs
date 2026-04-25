@@ -1,0 +1,220 @@
+<!-- @file src/views/admin-providers.ejs
+     @description LLM Provider 管理页面模板。调用说明：GET /admin/providers 渲染，POST /admin/providers/* 写入配置。
+-->
+<div class="admin-shell">
+  <section class="hero-card admin-hero">
+    <div class="admin-hero-copy">
+      <p class="section-kicker">LLM</p>
+      <h1>LLM 配置</h1>
+      <p class="muted-text">Provider、模型绑定、上下文、并发、超时和价格都收在这页。总算不用和套餐、Prompt 混着看了。</p>
+    </div>
+
+    <div class="metrics metrics--compact">
+      <div class="metric"><strong><%= overview.activeProviders %></strong><span>启用中的 Provider</span></div>
+      <div class="metric"><strong><%= overview.totalProviders %></strong><span>Provider 总数</span></div>
+      <div class="metric"><strong><%= overview.queuedJobs %></strong><span>当前队列压力</span></div>
+    </div>
+  </section>
+
+  <section class="section-card admin-section">
+    <div class="admin-subnav">
+      <a class="quick-link" href="/admin">用户与总览</a>
+      <a class="quick-link is-active" href="/admin/providers">LLM 配置</a>
+      <a class="quick-link" href="/admin/plans">套餐配置</a>
+      <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
+      <a class="quick-link" href="/admin/logs">日志查询</a>
+      <a class="quick-link" href="/admin/conversations">对话记录</a>
+    </div>
+
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Providers</p>
+        <h2>Provider 列表</h2>
+        <p class="muted-text">先看摘要，想改哪一个再展开。新增 Provider 也单独折起来了。</p>
+      </div>
+      <div class="section-actions section-actions--stack">
+        <label class="search-field">
+          <span>筛选 Provider</span>
+          <input type="search" placeholder="按名称 / URL / 模型 / 状态搜索" data-admin-filter data-filter-target="providers-list" />
+        </label>
+      </div>
+    </div>
+
+    <details class="admin-fold" <%= providers.length ? '' : 'open' %>>
+      <summary>新增 Provider</summary>
+      <div class="admin-fold-body">
+        <div class="provider-card provider-card--flat">
+          <form method="post" action="/admin/providers/new">
+            <div class="inline-grid">
+              <label>名称<input type="text" name="name" placeholder="比如：自建 OpenAI 兼容网关" required /></label>
+              <label>Base URL<input type="text" name="baseUrl" placeholder="https://your-gateway/v1" required /></label>
+            </div>
+            <label>API Key<input type="text" name="apiKey" placeholder="sk-..." required /></label>
+            <div class="context-grid">
+              <label>最大上下文 Token<input type="number" name="maxContextTokens" value="81920" min="1" /></label>
+              <label>裁剪上下文 Token<input type="number" name="trimContextTokens" value="61440" min="1" /></label>
+            </div>
+            <div class="context-grid">
+              <label>最大并发<input type="number" name="maxConcurrency" value="5" min="1" /></label>
+              <label>超时 (ms)<input type="number" name="timeoutMs" value="60000" min="1" /></label>
+            </div>
+            <div class="context-grid">
+              <label>输入 Token 单价<input type="number" name="inputTokenPrice" value="0" min="0" step="0.0001" /></label>
+              <label>输出 Token 单价<input type="number" name="outputTokenPrice" value="0" min="0" step="0.0001" /></label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                是否启用
+                <select name="isActive">
+                  <option value="1" selected>启用</option>
+                  <option value="0">停用</option>
+                </select>
+              </label>
+              <label>
+                状态
+                <select name="status">
+                  <option value="active">active</option>
+                  <option value="archived">archived</option>
+                </select>
+              </label>
+            </div>
+            <p class="muted-text">模型先留空，保存后会自动拉取可用模型列表，再回来细选。</p>
+            <div class="toolbar-row toolbar-row--admin">
+              <button type="submit">创建 Provider</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <% if (providers.length) { %>
+      <div id="providers-list" class="admin-list">
+        <% providers.forEach(provider => { %>
+          <details class="provider-card admin-item admin-item--provider" data-filter-item data-filter-text="<%= [provider.name, provider.base_url, provider.status, provider.provider_type, provider.standard_model || provider.model || '', provider.jailbreak_model || '', provider.force_jailbreak_model || '', provider.compression_model || ''].join(' ') %>">
+            <summary class="admin-item-summary">
+              <div class="admin-item-main">
+                <strong><%= provider.name %></strong>
+                <span class="pill"><%= provider.provider_type %></span>
+                <span class="pill <%= provider.is_active ? 'pill--success' : '' %>"><%= provider.is_active ? '启用' : '停用' %></span>
+                <span class="pill"><%= provider.status %></span>
+              </div>
+              <div class="admin-item-meta">
+                <span class="meta-chip">标准 <strong><%= provider.standard_model || provider.model || '未选' %></strong></span>
+                <span class="meta-chip">越狱 <strong><%= provider.jailbreak_model || '未选' %></strong></span>
+                <span class="meta-chip">强越狱 <strong><%= provider.force_jailbreak_model || '未选' %></strong></span>
+                <span class="meta-chip">压缩 <strong><%= provider.compression_model || '未选' %></strong></span>
+              </div>
+            </summary>
+            <div class="admin-item-body">
+              <form method="post" action="/admin/providers/<%= provider.id %>">
+                <div class="inline-grid">
+                  <label>名称<input type="text" name="name" value="<%= provider.name %>" /></label>
+                  <label>Base URL<input type="text" name="baseUrl" value="<%= provider.base_url %>" /></label>
+                </div>
+                <label>
+                  API Key
+                  <input type="text" name="apiKey" placeholder="留空不改动。当前：<%= provider.api_key_masked || '未设置' %>" />
+                </label>
+
+                <div class="context-grid">
+                  <div class="model-picker">
+                    <label>标准模型 (standard)</label>
+                    <select name="standardModel" data-current="<%= provider.standard_model || provider.model || '' %>">
+                      <% (provider.availableModels || []).forEach(option => { %>
+                        <option value="<%= option.id %>" <%= option.id === (provider.standard_model || provider.model) ? 'selected' : '' %>><%= option.label %></option>
+                      <% }) %>
+                    </select>
+                    <small>当前：<%= provider.standard_model || provider.model || '未选择' %></small>
+                  </div>
+                  <div class="model-picker">
+                    <label>越狱模型 (jailbreak)</label>
+                    <select name="jailbreakModel">
+                      <% (provider.availableModels || []).forEach(option => { %>
+                        <option value="<%= option.id %>" <%= option.id === provider.jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
+                      <% }) %>
+                    </select>
+                    <small>当前：<%= provider.jailbreak_model || '未选择' %></small>
+                  </div>
+                </div>
+
+                <div class="context-grid">
+                  <div class="model-picker">
+                    <label>强越狱模型 (force_jailbreak)</label>
+                    <select name="forceJailbreakModel">
+                      <% (provider.availableModels || []).forEach(option => { %>
+                        <option value="<%= option.id %>" <%= option.id === provider.force_jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
+                      <% }) %>
+                    </select>
+                    <small>当前：<%= provider.force_jailbreak_model || '未选择' %></small>
+                  </div>
+                  <div class="model-picker">
+                    <label>压缩模型 (compression)</label>
+                    <select name="compressionModel">
+                      <% (provider.availableModels || []).forEach(option => { %>
+                        <option value="<%= option.id %>" <%= option.id === provider.compression_model ? 'selected' : '' %>><%= option.label %></option>
+                      <% }) %>
+                    </select>
+                    <small>当前：<%= provider.compression_model || '未选择' %></small>
+                  </div>
+                </div>
+
+                <div class="context-grid">
+                  <label>最大上下文 Token<input type="number" name="maxContextTokens" value="<%= provider.max_context_tokens %>" min="1" /></label>
+                  <label>裁剪上下文 Token<input type="number" name="trimContextTokens" value="<%= provider.trim_context_tokens %>" min="1" /></label>
+                </div>
+
+                <div class="context-grid">
+                  <label>最大并发<input type="number" name="maxConcurrency" value="<%= provider.max_concurrency %>" min="1" /></label>
+                  <label>超时 (ms)<input type="number" name="timeoutMs" value="<%= provider.timeout_ms %>" min="1" /></label>
+                </div>
+
+                <div class="context-grid">
+                  <label>输入 Token 单价<input type="number" name="inputTokenPrice" value="<%= provider.input_token_price %>" min="0" step="0.0001" /></label>
+                  <label>输出 Token 单价<input type="number" name="outputTokenPrice" value="<%= provider.output_token_price %>" min="0" step="0.0001" /></label>
+                </div>
+
+                <div class="inline-grid">
+                  <label>
+                    是否启用
+                    <select name="isActive">
+                      <option value="1" <%= provider.is_active ? 'selected' : '' %>>启用</option>
+                      <option value="0" <%= provider.is_active ? '' : 'selected' %>>停用</option>
+                    </select>
+                  </label>
+                  <label>
+                    状态
+                    <select name="status">
+                      <option value="active" <%= provider.status === 'active' ? 'selected' : '' %>>active</option>
+                      <option value="archived" <%= provider.status === 'archived' ? 'selected' : '' %>>archived</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label class="toolbar-row toolbar-row--tight toolbar-row--checkbox">
+                  <input type="checkbox" name="refreshModels" value="1" />
+                  <span>保存时从上游重新拉取模型列表</span>
+                </label>
+
+                <div class="toolbar-row toolbar-row--between toolbar-row--admin">
+                  <button type="submit">保存 Provider</button>
+                  <span class="muted-text">
+                    Provider ID #<%= provider.id %>
+                    · 类型 <%= provider.provider_type %>
+                    · 最近更新 <%= provider.updated_at %>
+                  </span>
+                </div>
+              </form>
+            </div>
+          </details>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="empty-state">
+        <strong>还没有 Provider</strong>
+        <span class="muted-text">先展开上面的新增表单接一个网关。</span>
+      </div>
+    <% } %>
+  </section>
+</div>
+
+<script src="/public/js/admin-page.js"></script>

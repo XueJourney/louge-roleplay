@@ -1,0 +1,75 @@
+<!-- @file src/views/admin-conversation-detail.ejs
+     @description 管理后台单条对话详情页。调用说明：GET /admin/conversations/:conversationId 渲染完整消息链，只读查看。
+-->
+<div class="admin-shell">
+  <section class="hero-card admin-hero">
+    <div class="admin-hero-copy">
+      <p class="section-kicker">Conversation Detail</p>
+      <h1>对话 #<%= detail.conversation.id %></h1>
+      <p class="muted-text"><%= detail.conversation.title || '未命名对话' %></p>
+    </div>
+
+    <div class="metrics metrics--compact">
+      <div class="metric"><strong><%= detail.messages.length %></strong><span>消息总数</span></div>
+      <div class="metric"><strong><%= detail.conversation.username %></strong><span>用户</span></div>
+      <div class="metric"><strong><%= detail.conversation.character_name %></strong><span>角色卡</span></div>
+    </div>
+  </section>
+
+  <section class="section-card admin-section">
+    <div class="admin-subnav">
+      <a class="quick-link" href="/admin">用户与总览</a>
+      <a class="quick-link" href="/admin/providers">LLM 配置</a>
+      <a class="quick-link" href="/admin/plans">套餐配置</a>
+      <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
+      <a class="quick-link" href="/admin/logs">日志查询</a>
+      <a class="quick-link is-active" href="/admin/conversations">对话记录</a>
+    </div>
+
+    <div class="admin-log-meta-grid">
+      <span><strong>用户</strong><%= detail.conversation.nickname ? `${detail.conversation.username}（${detail.conversation.nickname}）` : detail.conversation.username %></span>
+      <span><strong>角色卡</strong><%= detail.conversation.character_name %> · <%= detail.conversation.character_visibility || 'public' %></span>
+      <span><strong>创建时间</strong><%= detail.conversation.display_created_at %></span>
+      <span><strong>更新时间</strong><%= detail.conversation.display_updated_at %></span>
+    </div>
+
+    <div class="toolbar-row">
+      <a class="quick-link" href="/admin/conversations">返回对话列表</a>
+    </div>
+  </section>
+
+  <section class="section-card admin-section">
+    <div>
+      <p class="section-kicker">Messages</p>
+      <h2>完整消息链</h2>
+      <p class="muted-text">按 sequence_no 顺序展示。这里是后台只读查看，不会改动对话。</p>
+    </div>
+
+    <div class="admin-conversation-message-list">
+      <% detail.messages.forEach(message => { %>
+        <article class="admin-conversation-message admin-conversation-message--<%= message.sender_type %>">
+          <div class="toolbar-row toolbar-row--between">
+            <div class="admin-item-main">
+              <span class="pill pill--brand"><%= message.sender_type %></span>
+              <strong>#<%= message.id %> · seq <%= message.sequence_no %></strong>
+              <span class="pill"><%= message.prompt_kind || 'normal' %></span>
+              <span class="pill"><%= message.status || 'success' %></span>
+            </div>
+            <span class="meta-chip"><%= message.display_created_at %></span>
+          </div>
+          <pre class="admin-conversation-message-content"><%= message.content %></pre>
+          <div class="admin-conversation-message-links">
+            <span>parent: <%= message.parent_message_id || '—' %></span>
+            <span>branch: <%= message.branch_from_message_id || '—' %></span>
+            <span>edited: <%= message.edited_from_message_id || '—' %></span>
+          </div>
+        </article>
+      <% }) %>
+      <% if (!detail.messages.length) { %>
+        <div class="empty-state">
+          <strong>这条会话还没有消息</strong>
+        </div>
+      <% } %>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,201 @@
+<!-- @file src/views/admin-plans.ejs
+     @description 套餐管理页面模板。调用说明：GET /admin/plans 由 web-routes.js 渲染，POST /admin/plans/* 处理新增、编辑、删除。
+-->
+<div class="admin-shell">
+  <section class="hero-card admin-hero">
+    <div class="admin-hero-copy">
+      <p class="section-kicker">Plans</p>
+      <h1>套餐配置</h1>
+      <p class="muted-text">套餐、额度、默认值、并发、计费模式都单独放到这页了。改套餐终于不用路过一堆 Provider 和 Prompt 表单。</p>
+    </div>
+
+    <div class="metrics metrics--compact">
+      <div class="metric"><strong><%= plans.length %></strong><span>套餐总数</span></div>
+      <div class="metric"><strong><%= overview.activeSubscriptions %></strong><span>有效订阅</span></div>
+      <div class="metric"><strong><%= plans.filter(plan => plan.is_default).length %></strong><span>默认套餐数</span></div>
+    </div>
+  </section>
+
+  <section class="section-card admin-section">
+    <div class="admin-subnav">
+      <a class="quick-link" href="/admin">用户与总览</a>
+      <a class="quick-link" href="/admin/providers">LLM 配置</a>
+      <a class="quick-link is-active" href="/admin/plans">套餐配置</a>
+      <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
+      <a class="quick-link" href="/admin/logs">日志查询</a>
+      <a class="quick-link" href="/admin/conversations">对话记录</a>
+    </div>
+
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Billing</p>
+        <h2>套餐方案</h2>
+        <p class="muted-text">新增表单折叠，现有套餐按卡片展开。先看摘要，确认后再编辑。</p>
+      </div>
+      <div class="section-actions section-actions--stack">
+        <label class="search-field">
+          <span>筛选套餐</span>
+          <input type="search" placeholder="按名称 / code / 状态搜索" data-admin-filter data-filter-target="plans-list" />
+        </label>
+      </div>
+    </div>
+
+    <details class="admin-fold" <%= plans.length ? '' : 'open' %>>
+      <summary>新增套餐</summary>
+      <div class="admin-fold-body">
+        <div class="provider-card provider-card--flat">
+          <form method="post" action="/admin/plans/new">
+            <div class="inline-grid">
+              <label>Code<input type="text" name="code" placeholder="free/basic/pro" /></label>
+              <label>名称<input type="text" name="name" placeholder="比如 企业版" /></label>
+            </div>
+            <label>描述<input type="text" name="description" placeholder="一句话描述套餐" /></label>
+            <div class="inline-grid">
+              <label>
+                计费方式
+                <select name="billingMode" data-billing-mode>
+                  <option value="per_request">per_request</option>
+                  <option value="per_token">per_token</option>
+                </select>
+              </label>
+              <label>
+                配额周期
+                <select name="quotaPeriod">
+                  <option value="daily">daily</option>
+                  <option value="monthly" selected>monthly</option>
+                  <option value="lifetime">lifetime</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-grid" data-plan-quota-group>
+              <label data-request-quota-field>
+                请求额度<input type="number" name="requestQuota" value="0" min="0" />
+              </label>
+              <label data-token-quota-field>
+                Token 额度<input type="number" name="tokenQuota" value="0" min="0" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>优先级<input type="number" name="priorityWeight" value="0" /></label>
+              <label>并发保障<input type="number" name="concurrencyLimit" value="1" min="1" /></label>
+            </div>
+            <div class="inline-grid">
+              <label>最大输出 Token<input type="number" name="maxOutputTokens" value="1024" min="1" /></label>
+              <label>排序<input type="number" name="sortOrder" value="0" /></label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                状态
+                <select name="status">
+                  <option value="active">active</option>
+                  <option value="archived">archived</option>
+                </select>
+              </label>
+              <label>
+                默认套餐
+                <select name="isDefault">
+                  <option value="0">否</option>
+                  <option value="1">是</option>
+                </select>
+              </label>
+            </div>
+            <div class="toolbar-row toolbar-row--admin">
+              <button type="submit">新增套餐</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <% if (plans.length) { %>
+      <div id="plans-list" class="admin-list">
+        <% plans.forEach(plan => { %>
+          <details class="admin-item admin-item--plan" data-filter-item data-filter-text="<%= [plan.name, plan.code, plan.description || '', plan.billing_mode, plan.quota_period, plan.status].join(' ') %>">
+            <summary class="admin-item-summary">
+              <div class="admin-item-main">
+                <strong><%= plan.name %></strong>
+                <span class="pill"><%= plan.code %></span>
+                <% if (plan.is_default) { %><span class="pill pill--brand">默认</span><% } %>
+                <span class="pill <%= plan.status === 'active' ? 'pill--success' : '' %>"><%= plan.status %></span>
+              </div>
+              <div class="admin-item-meta">
+                <span class="meta-chip">计费 <strong><%= plan.billing_mode %></strong></span>
+                <span class="meta-chip">周期 <strong><%= plan.quota_period %></strong></span>
+                <span class="meta-chip">请求 <strong><%= plan.request_quota %></strong></span>
+                <span class="meta-chip">Token <strong><%= plan.token_quota %></strong></span>
+                <span class="meta-chip">优先级 <strong><%= plan.priority_weight %></strong></span>
+                <span class="meta-chip">并发 <strong><%= plan.concurrency_limit %></strong></span>
+              </div>
+            </summary>
+            <div class="admin-item-body">
+              <form method="post" action="/admin/plans/<%= plan.id %>">
+                <div class="inline-grid">
+                  <label>名称<input type="text" name="name" value="<%= plan.name %>" /></label>
+                  <label>描述<input type="text" name="description" value="<%= plan.description || '' %>" /></label>
+                </div>
+                <div class="inline-grid">
+                  <label>
+                    计费方式
+                    <select name="billingMode" data-billing-mode>
+                      <option value="per_request" <%= plan.billing_mode === 'per_request' ? 'selected' : '' %>>per_request</option>
+                      <option value="per_token" <%= plan.billing_mode === 'per_token' ? 'selected' : '' %>>per_token</option>
+                    </select>
+                  </label>
+                  <label>
+                    配额周期
+                    <select name="quotaPeriod">
+                      <option value="daily" <%= plan.quota_period === 'daily' ? 'selected' : '' %>>daily</option>
+                      <option value="monthly" <%= plan.quota_period === 'monthly' ? 'selected' : '' %>>monthly</option>
+                      <option value="lifetime" <%= plan.quota_period === 'lifetime' ? 'selected' : '' %>>lifetime</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="inline-grid" data-plan-quota-group>
+                  <label data-request-quota-field>请求额度<input type="number" name="requestQuota" value="<%= plan.request_quota %>" min="0" /></label>
+                  <label data-token-quota-field>Token 额度<input type="number" name="tokenQuota" value="<%= plan.token_quota %>" min="0" /></label>
+                </div>
+                <div class="inline-grid">
+                  <label>优先级<input type="number" name="priorityWeight" value="<%= plan.priority_weight %>" /></label>
+                  <label>并发保障<input type="number" name="concurrencyLimit" value="<%= plan.concurrency_limit %>" min="1" /></label>
+                </div>
+                <div class="inline-grid">
+                  <label>最大输出 Token<input type="number" name="maxOutputTokens" value="<%= plan.max_output_tokens %>" min="1" /></label>
+                  <label>排序<input type="number" name="sortOrder" value="<%= plan.sort_order %>" /></label>
+                </div>
+                <div class="inline-grid">
+                  <label>
+                    状态
+                    <select name="status">
+                      <option value="active" <%= plan.status === 'active' ? 'selected' : '' %>>active</option>
+                      <option value="archived" <%= plan.status === 'archived' ? 'selected' : '' %>>archived</option>
+                    </select>
+                  </label>
+                  <label>
+                    默认套餐
+                    <select name="isDefault">
+                      <option value="0" <%= plan.is_default ? '' : 'selected' %>>否</option>
+                      <option value="1" <%= plan.is_default ? 'selected' : '' %>>是</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="toolbar-row toolbar-row--admin">
+                  <button type="submit">保存套餐</button>
+                </div>
+              </form>
+              <form method="post" action="/admin/plans/<%= plan.id %>/delete" onsubmit="return confirm('确定删除这个套餐？若已被用户订阅，将无法删除。');">
+                <button class="danger-button" type="submit">删除套餐</button>
+              </form>
+            </div>
+          </details>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="empty-state">
+        <strong>还没有套餐</strong>
+        <span class="muted-text">先展开上面的新增表单建一个。</span>
+      </div>
+    <% } %>
+  </section>
+</div>
+
+<script src="/public/js/admin-page.js"></script>

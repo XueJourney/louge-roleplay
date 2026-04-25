@@ -12,7 +12,8 @@
     "health:check": "node scripts/health-check.js",
     "test:think": "node scripts/test-think-parser.js",
     "logs:test": "node scripts/test-log-service.js",
-    "admin-logs:test": "node scripts/test-admin-logs-route.js"
+    "admin-logs:test": "node scripts/test-admin-logs-route.js",
+    "admin-conversations:test": "node scripts/test-admin-conversations.js"
   },
   "dependencies": {
     "@alicloud/dypnsapi20170525": "^2.0.0",
