@@ -2,6 +2,12 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)：`MAJOR.MINOR.PATCH`。
 
+## [1.1.2] - 2026-05-01
+
+### Fixed
+
+- 恢复主页/导航栏“联系客服”入口，仅在二维码弹窗内部隐藏重复的外链按钮。
+
 ## [1.1.1] - 2026-05-01
 
 ### Changed

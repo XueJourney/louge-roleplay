@@ -1,6 +1,6 @@
 {
   "name": "ai-roleplay-site",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Minimal multi-user AI roleplay website",
   "main": "src/server.js",
   "scripts": {
