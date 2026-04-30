@@ -10,7 +10,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/openclaw/workspace/project/app/louge-roleplay
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /opt/openclaw/workspace/project/app/louge-roleplay/src/server.js
+ExecStart=/root/.nvm/versions/node/v24.15.0/bin/node /opt/openclaw/workspace/project/app/louge-roleplay/src/server.js
 Restart=always
 RestartSec=5
 User=root
