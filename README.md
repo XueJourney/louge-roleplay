@@ -32,7 +32,7 @@
 ## 快速启动
 
 ```bash
-cd /root/.openclaw/workspace/deployments/local/ai-roleplay-site
+cd /opt/openclaw/workspace/project/app/louge-roleplay
 npm install
 cp .env.example .env
 npm run db:init

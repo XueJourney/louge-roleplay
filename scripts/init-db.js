@@ -23,6 +23,26 @@
 const mysql = require('mysql2/promise');
 const config = require('../src/config');
 
+function getDatabaseNameFromUrl(databaseUrl) {
+  try {
+    const parsed = new URL(databaseUrl);
+    const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, '').split('/')[0] || '').trim();
+    if (!databaseName) {
+      throw new Error('DATABASE_URL must include a database name');
+    }
+    if (!/^[A-Za-z0-9_$-]+$/.test(databaseName)) {
+      throw new Error(`Unsupported database name: ${databaseName}`);
+    }
+    return databaseName;
+  } catch (error) {
+    throw new Error(`Invalid DATABASE_URL: ${error.message}`);
+  }
+}
+
+function quoteIdentifier(identifier) {
+  return `\`${String(identifier).replace(/`/g, '``')}\``;
+}
+
 /**
  * 对 API Key 进行遮盖，避免明文写入数据库展示层。
  * @param {string} apiKey
@@ -54,14 +74,15 @@ async function main() {
   }
 
   console.log('[init-db] 开始 MySQL 数据库初始化...');
+  const databaseName = getDatabaseNameFromUrl(config.databaseUrl);
 
-  // 1. 用管理员连接创建数据库（若不存在）
+  // 1. 用管理员连接创建 DATABASE_URL 指向的数据库（若不存在）
   const adminConnection = await mysql.createConnection(config.databaseAdminUrl);
   await adminConnection.query(
-    'CREATE DATABASE IF NOT EXISTS `SL` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+    `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(databaseName)} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
   );
   await adminConnection.end();
-  console.log('[init-db] 数据库 SL 已就绪');
+  console.log(`[init-db] 数据库 ${databaseName} 已就绪`);
 
   // 2. 使用业务连接创建/更新表结构
   const connection = await mysql.createConnection(config.databaseUrl);

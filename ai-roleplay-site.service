@@ -8,9 +8,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/.openclaw/workspace/deployments/local/ai-roleplay-site
+WorkingDirectory=/opt/openclaw/workspace/project/app/louge-roleplay
 Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /root/.openclaw/workspace/deployments/local/ai-roleplay-site/src/server.js
+ExecStart=/usr/bin/node /opt/openclaw/workspace/project/app/louge-roleplay/src/server.js
 Restart=always
 RestartSec=5
 User=root
