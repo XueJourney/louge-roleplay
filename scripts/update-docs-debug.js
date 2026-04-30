@@ -88,7 +88,7 @@ function extractFunctions(source) {
 const FILE_NOTES = {
   'src/server.js': 'Express 启动入口：等待 DB/Redis、装配全局中间件、注册路由、启动监听。调用链起点。',
   'src/server-helpers.js': '路由公共辅助：页面渲染、参数解析、账号脱敏、聊天页 view model、NDJSON 输出。被 web-routes.js 调用。',
-  'src/routes/web-routes.js': '主 Web 路由注册文件：公开页、认证、后台、角色、聊天、分支/回放/流式接口。依赖 service 层完成业务。',
+  'src/routes/web-routes.js': '主 Web 路由注册文件：公开页、认证、后台、角色、线性聊天、重写/编辑/流式接口。依赖 service 层完成业务。',
   'src/config.js': '环境变量解析与隐私安全配置摘要。被 server、service、脚本读取。',
   'src/i18n.js': '服务端/客户端共用国际化词典与 HTML 文本翻译工具。被 i18n 中间件和渲染层调用。',
   'src/lib/db.js': '数据库抽象层，MySQL 优先、SQLite 兜底，提供 query/withTransaction。所有 service 的 DB 入口。',
@@ -104,7 +104,7 @@ const FILE_NOTES = {
   'src/services/aliyun-sms-service.js': '阿里云短信验证码发送封装。被 verification-service 调用。',
   'src/services/captcha-service.js': '图形验证码生成、刷新、读取与校验。依赖 Redis/内存缓存。',
   'src/services/character-service.js': '角色 CRUD 与可见性控制。被首页、dashboard、角色编辑和开聊流程调用。',
-  'src/services/conversation-service.js': '会话/消息树核心服务：消息写入、缓存、分支、编辑、删除保护。聊天路由主要依赖它。',
+  'src/services/conversation-service.js': '会话/消息核心服务：消息写入、当前显示链读取、编辑、重写、独立对话克隆和删除保护。聊天路由主要依赖它。',
   'src/services/email-service.js': 'Resend 邮件验证码发送封装。被 verification-service 调用。',
   'src/services/font-proxy-service.js': 'Google Fonts 代理与缓存，避免页面字体资源直接失败。被 /fonts/* 路由调用。',
   'src/services/llm-gateway-service.js': 'LLM 网关核心：Provider 选择、额度校验、上下文裁剪、队列、流式解析、用量记录。',
@@ -117,7 +117,7 @@ const FILE_NOTES = {
   'src/services/rate-limit-service.js': '基于 Redis/内存 incr+expire 的轻量限流。被登录/注册/验证码调用。',
   'src/services/user-service.js': '用户创建、登录查询、资料更新、角色更新。',
   'src/services/verification-service.js': '邮箱/手机验证码签发与验证编排。调用 email/sms/rate-limit/captcha。',
-  'scripts/full-flow-e2e.js': '全流程 E2E 测试脚本：创建临时用户/角色/会话，验证消息树、LLM 流式、后台查询、日志和删除保护，结束后清理测试数据。',
+  'scripts/full-flow-e2e.js': '全流程 E2E 测试脚本：创建临时用户/角色/会话，验证当前显示链、LLM 流式、后台查询、日志和删除保护，结束后清理测试数据。',
   'public/js/chat-page.js': '聊天页前端核心：流式 NDJSON 消费、富文本/Markdown 渲染、思考块折叠、加载历史、输入优化。',
   'public/js/admin-page.js': '后台交互：套餐字段切换、Prompt 片段排序/预览、后台列表过滤。',
   'public/js/character-editor-page.js': '角色编辑器动态字段：提示词条目增删、排序、预览。',
@@ -135,8 +135,8 @@ const FUNCTION_NOTES = {
   buildLoginLogMeta: '生成登录流程结构化日志 meta。',
   writeNdjson: '向响应写入一行 NDJSON，并在支持时 flush。',
   initNdjsonStream: '初始化流式响应头，关闭代理缓冲。',
-  buildChatRequestContext: '根据当前会话/父消息/输入，计算聊天 promptKind、历史路径和分支状态。',
-  renderChatPage: '加载消息树、计算当前叶子和可见消息，渲染聊天页。',
+  buildChatRequestContext: '根据当前会话/父消息/输入，计算聊天 promptKind 和历史上下文。',
+  renderChatPage: '加载当前显示链、计算可见消息，渲染线性聊天页。',
   loadConversationForUserOrFail: '按当前用户加载会话；不存在时直接渲染提示页并返回 null。',
   query: '执行 SQL，自动等待数据库初始化并适配 MySQL/SQLite 返回格式。',
   withTransaction: '以 MySQL/SQLite 兼容形式执行事务回调。',
@@ -152,15 +152,15 @@ const FUNCTION_NOTES = {
   listUserCharacters: '读取某用户自己的角色供 dashboard 展示。',
   getCharacterById: '读取角色详情；传 userId 时限制必须归属该用户。',
   deleteCharacterSafely: '安全删除角色；已有会话时拒绝删除。',
-  createConversation: '创建会话，可带父会话/分支来源/模型模式/标题。',
-  addMessage: '按 sequence_no 追加消息并失效消息树缓存。',
+  createConversation: '创建会话，可带父会话、来源消息、模型模式和标题。',
+  addMessage: '按 sequence_no 追加消息并失效会话消息缓存。',
   normalizeMessagePromptKind: '规范化 messages.prompt_kind 写库值；兼容旧调用传入 chat，并回落到 normal，避免 MySQL ENUM 写入截断。',
-  listMessages: '读取整棵消息树，优先 Redis 缓存，失败回源数据库。',
-  buildPathMessages: '从消息树中取当前叶子到根的路径，作为上下文/展示主线。',
-  buildConversationView: '构造聊天页需要的路径、树、分支描述等 view model。',
-  cloneConversationBranch: '把某条消息路径克隆成独立分支会话。',
-  deleteMessageSafely: '删除消息前检查子消息和派生分支，避免破坏树。',
-  deleteConversationSafely: '删除会话前检查子会话，避免孤儿分支。',
+  listMessages: '读取完整消息列表，保留给克隆独立对话和诊断脚本使用；聊天页不再调用。',
+  buildPathMessages: '从已加载消息列表中取当前显示链，主要给脚本/克隆逻辑复用。',
+  buildConversationPathView: '按当前消息构造聊天页轻量显示链 view model，不加载完整消息列表。',
+  cloneConversationBranch: '把某条消息之前的内容复制成独立对话。',
+  deleteMessageSafely: '删除消息前检查后续消息和派生对话，避免破坏已有内容。',
+  deleteConversationSafely: '删除会话前检查后续关联，避免留下孤立内容。',
   generateReplyViaGateway: '非流式生成 AI 回复，走统一 LLM 网关。',
   streamReplyViaGateway: '流式生成 AI 回复，onDelta 接收增量。',
   streamOptimizeUserInputViaGateway: '流式优化用户输入。',
@@ -211,7 +211,7 @@ function generateProjectMap() {
   return `# ai-roleplay-site 项目梳理\n\n` +
 `> 本文档由 \`scripts/update-docs-debug.js\` 生成并可手工补充。目标是让后续维护者快速知道“文件在哪、谁调用谁、怎么 DEBUG”。\n\n` +
 `## 1. 项目定位\n\n` +
-`\`ai-roleplay-site\` 是一个 Express + EJS 的多用户 AI 角色对话站点，产品名“楼阁”。核心能力包括注册登录、角色创建、对话树、分支/重算/编辑、LLM Provider 管理、套餐额度、流式生成和富文本展示。\n\n` +
+`\`ai-roleplay-site\` 是一个 Express + EJS 的多用户 AI 角色对话站点，产品名“楼阁”。核心能力包括注册登录、角色创建、线性对话、重写/编辑、LLM Provider 管理、套餐额度、流式生成和富文本展示。\n\n` +
 `## 2. 目录职责\n\n` +
 `| 目录/文件 | 职责 |\n|---|---|\n` +
 `| \`src/server.js\` | 应用启动壳，负责全局中间件和路由挂载。 |\n` +
@@ -231,8 +231,8 @@ function generateProjectMap() {
 `\`browser -> src/server.js -> middleware(requestContext/i18n/session) -> src/routes/web-routes.js -> service -> db/redis -> renderPage(EJS layout)\`\n\n` +
 `### 聊天流式生成\n\n` +
 `\`public/js/chat-page.js -> POST /chat/:id/message/stream -> createNdjsonResponder -> streamChatReplyToNdjson -> llm-gateway-service -> provider SSE -> NDJSON -> 前端 renderRichContent\`\n\n` +
-`### 消息树读取\n\n` +
-`\`renderChatPage/load history -> conversation-service.listMessages -> Redis cache -> DB fallback -> buildConversationView -> EJS/partial\`\n\n` +
+`### 当前显示链读取\n\n` +
+`\`renderChatPage/load history -> conversation-service.buildConversationPathView -> recursive CTE path query -> EJS/partial\`\n\n` +
 `### 注册验证码\n\n` +
 `\`register-page.js -> /api/send-email-code 或 /api/send-phone-code -> captcha-service.verifyCaptcha -> verification-service -> email/sms service -> Redis code\`\n\n` +
 `## 4. JS 文件地图\n\n| 文件 | 职责 / 调用说明 |\n|---|---|\n${fileTable}\n\n` +
@@ -243,7 +243,7 @@ function generateProjectMap() {
 `- 每个请求都有 \`requestId\`：错误页会展示，请用它 grep 日志。\n` +
 `- 后端日志统一走 \`src/lib/logger.js\`，支持 \`LOG_LEVEL=debug\`。\n` +
 `- 流式聊天优先看：浏览器 Console、Network 的 NDJSON 分包、后端 \`LLM provider request start/response received\`。\n` +
-`- 消息树异常优先看：\`conversation-service\` 的缓存读写 warning、\`messages.parent_message_id\` 和 \`current_message_id\`。\n` +
+`- 当前显示链异常优先看：\`fetchPathMessages()\` 的递归 CTE、\`messages.parent_message_id\` 和 \`current_message_id\`。\n` +
 `- 注册/登录异常优先看：\`Register validation failed\`、\`Login failed\`，日志会脱敏 email/phone。\n`;
 }
 
@@ -307,10 +307,10 @@ function generateDebugGuide() {
 `- 初始化/迁移：\`npm run db:init\`。\n\n` +
 `### 5. Redis / 缓存异常\n\n` +
 `- \`[redis] REDIS_URL 未设置，使用内存模式\`：开发可接受，生产不建议。\n` +
-`- 消息树缓存异常不应阻塞业务；会记录 warning 并回源 DB。\n\n` +
+`- 会话消息缓存异常不应阻塞业务；会记录 warning 并回源 DB。聊天页首屏已改为轻量读取。\n\n` +
 `## 全流程测试\n\n` +
 `- 入口：\`npm run full-flow:test\`。\n` +
-`- 覆盖：DB/Redis、用户创建与默认套餐、角色创建/编辑、会话消息树、真实 LLM 流式回复与输入优化、聊天页渲染、后台对话/日志查询、删除保护。\n` +
+`- 覆盖：DB/Redis、用户创建与默认套餐、角色创建/编辑、当前显示链、真实 LLM 流式回复与输入优化、聊天页渲染、后台对话/日志查询、删除保护。\n` +
 `- 测试脚本使用唯一临时数据，结束时会尽量删除新增用户、角色、会话、LLM job/usage 记录。若中途被强杀，可按输出的 userId / characterId / conversationId 做人工清理。\n\n` +
 `## 加日志约定\n\n` +
 `- 业务成功：\`logger.info('xxx succeeded', { requestId, ... })\`\n` +

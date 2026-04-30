@@ -23,6 +23,26 @@
 const mysql = require('mysql2/promise');
 const config = require('../src/config');
 
+function getDatabaseNameFromUrl(databaseUrl) {
+  try {
+    const parsed = new URL(databaseUrl);
+    const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, '').split('/')[0] || '').trim();
+    if (!databaseName) {
+      throw new Error('DATABASE_URL must include a database name');
+    }
+    if (!/^[A-Za-z0-9_$-]+$/.test(databaseName)) {
+      throw new Error(`Unsupported database name: ${databaseName}`);
+    }
+    return databaseName;
+  } catch (error) {
+    throw new Error(`Invalid DATABASE_URL: ${error.message}`);
+  }
+}
+
+function quoteIdentifier(identifier) {
+  return `\`${String(identifier).replace(/`/g, '``')}\``;
+}
+
 /**
  * 对 API Key 进行遮盖，避免明文写入数据库展示层。
  * @param {string} apiKey
@@ -54,14 +74,15 @@ async function main() {
   }
 
   console.log('[init-db] 开始 MySQL 数据库初始化...');
+  const databaseName = getDatabaseNameFromUrl(config.databaseUrl);
 
-  // 1. 用管理员连接创建数据库（若不存在）
+  // 1. 用管理员连接创建 DATABASE_URL 指向的数据库（若不存在）
   const adminConnection = await mysql.createConnection(config.databaseAdminUrl);
   await adminConnection.query(
-    'CREATE DATABASE IF NOT EXISTS `SL` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci',
+    `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(databaseName)} DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
   );
   await adminConnection.end();
-  console.log('[init-db] 数据库 SL 已就绪');
+  console.log(`[init-db] 数据库 ${databaseName} 已就绪`);
 
   // 2. 使用业务连接创建/更新表结构
   const connection = await mysql.createConnection(config.databaseUrl);
@@ -306,6 +327,36 @@ async function main() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+
+
+  // ── 站内通知与客服入口表 ─────────────────────────────────────────────────────
+  console.log('[init-db] 初始化 notifications 表...');
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      title VARCHAR(120) NOT NULL,
+      body TEXT NOT NULL,
+      notification_type ENUM('general','new_user','support','error','maintenance') NOT NULL DEFAULT 'general',
+      audience ENUM('all','guest','user','admin') NOT NULL DEFAULT 'all',
+      display_position ENUM('modal','toast','banner') NOT NULL DEFAULT 'modal',
+      display_duration_ms INT NOT NULL DEFAULT 0,
+      force_display TINYINT(1) NOT NULL DEFAULT 0,
+      show_once TINYINT(1) NOT NULL DEFAULT 0,
+      new_user_only TINYINT(1) NOT NULL DEFAULT 0,
+      support_qr_url VARCHAR(500) NULL,
+      action_label VARCHAR(80) NULL,
+      action_url VARCHAR(500) NULL,
+      starts_at DATETIME NULL,
+      ends_at DATETIME NULL,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
+      priority INT NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      INDEX idx_notifications_active_window (is_active, starts_at, ends_at),
+      INDEX idx_notifications_audience (audience, notification_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // ── 角色表 ───────────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 characters 表...');
   await connection.query(`
@@ -345,6 +396,7 @@ async function main() {
       parent_conversation_id   BIGINT NULL,
       branched_from_message_id BIGINT NULL,
       current_message_id       BIGINT NULL,
+      selected_model_mode      ENUM('standard','jailbreak','force_jailbreak') NOT NULL DEFAULT 'standard',
       title                    VARCHAR(200) NULL,
       status                   ENUM('active','archived','deleted') DEFAULT 'active',
       deleted_at               DATETIME NULL,

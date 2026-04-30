@@ -1,6 +1,6 @@
 /**
  * @file src/routes/web-routes.js
- * @description 站点路由注册：公开页、认证、角色、聊天、分支与回放。
+ * @description 站点路由注册：公开页、认证、角色、线性聊天、重写与编辑。
  */
 
 const path = require('path');
@@ -22,6 +22,7 @@ const { createCharacter, updateCharacter, listPublicCharacters, listUserCharacte
 const { listPlans, findPlanById, createPlan, updatePlan, deletePlan, getActiveSubscriptionForUser, getUserQuotaSnapshot, updateUserPlan } = require('../services/plan-service');
 const { listUsersWithPlans, getAdminOverview } = require('../services/admin-service');
 const { listLogEntries } = require('../services/log-service');
+const { DEFAULT_SUPPORT_QR_URL, listNotificationsForAdmin, listActiveNotificationsForUser, createNotification, updateNotification, deleteNotification } = require('../services/notification-service');
 const { getAdminConversationDetail, listAdminConversations, permanentlyDeleteConversation, permanentlyDeleteMessage, restoreConversation, restoreMessage } = require('../services/admin-conversation-service');
 const { listProviders, createProvider, updateProvider } = require('../services/llm-provider-service');
 const {
@@ -41,19 +42,18 @@ const {
   updateConversationModelMode,
   getConversationById,
   listUserConversations,
-  listMessages,
   getMessageById,
+  getLatestMessage,
   addMessage,
-  setConversationCurrentMessage,
   createEditedMessageVariant,
-  buildPathMessages,
-  buildConversationView,
+  fetchPathMessages,
+  buildConversationPathView,
   cloneConversationBranch,
   deleteMessageSafely,
   deleteConversationSafely,
   invalidateConversationCache,
 } = require('../services/conversation-service');
-const { translateHtml } = require('../i18n');
+const { translate, translateHtml } = require('../i18n');
 const { generateReplyViaGateway, streamReplyViaGateway, streamOptimizeUserInputViaGateway, optimizeUserInputViaGateway, getChatModelSelector } = require('../services/llm-gateway-service');
 const { issueEmailCode, issuePhoneCode, verifyEmailCode, verifyPhoneCode } = require('../services/verification-service');
 const { hashPassword, verifyPassword } = require('../services/password-service');
@@ -86,7 +86,6 @@ const {
   isAllowedInternationalEmail,
   isDomesticPhone,
   buildConversationTitle,
-  buildBranchConversationTitle,
   buildNextConversationTitle,
   renderChatPage,
   loadConversationForUserOrFail,
@@ -121,19 +120,22 @@ function buildConversationCharacterPayload(conversation) {
 const CHAT_MESSAGE_PARTIAL = path.join(__dirname, '..', 'views', 'partials', 'chat-message.ejs');
 
 function renderChatMessageHtml(req, conversation, message) {
+  const locale = req.locale || req.res?.locals?.locale || 'zh-CN';
+  const t = req.t || req.res?.locals?.t || ((key, vars) => translate(locale, key, vars));
+
   return new Promise((resolve, reject) => {
-    ejs.renderFile(CHAT_MESSAGE_PARTIAL, { conversation, message }, {}, (error, html) => {
+    ejs.renderFile(CHAT_MESSAGE_PARTIAL, { conversation, message, t, locale }, {}, (error, html) => {
       if (error) {
         reject(error);
         return;
       }
-      resolve(translateHtml(req.locale || 'zh-CN', html));
+      resolve(translateHtml(locale, html));
     });
   });
 }
 
-async function buildChatMessagePacket(req, conversation, allMessages, activeLeafId, messageId) {
-  const view = buildConversationView(allMessages, activeLeafId || messageId);
+async function buildChatMessagePacket(req, conversation, activeLeafId, messageId) {
+  const view = await buildConversationPathView(conversation.id, activeLeafId || messageId);
   const message = view.pathMessages.find((item) => Number(item.id) === Number(messageId));
   if (!message) {
     return null;
@@ -175,6 +177,10 @@ function createNdjsonResponder(req, res) {
   };
 
   req.on('close', () => {
+    if (res.writableEnded) {
+      cleanup();
+      return;
+    }
     cleanup();
     if (!abortController.signal.aborted) {
       abortController.abort();
@@ -219,35 +225,45 @@ async function streamChatReplyToNdjson({
   user = null,
 }) {
   let lineBuffer = '';
-  const streamed = await streamReplyViaGateway({
-    requestId,
-    userId,
-    conversationId,
-    character,
-    messages,
-    userMessage,
-    systemHint,
-    promptKind,
-    modelMode,
-    signal,
-    user,
-    onDelta: async (deltaText, fullContent) => {
-      safeWrite({ type: 'delta', delta: deltaText, full: fullContent });
-      lineBuffer += deltaText;
-      const parts = lineBuffer.split(/\r?\n/);
-      lineBuffer = parts.pop() || '';
-      const committedText = fullContent.slice(0, Math.max(0, fullContent.length - lineBuffer.length));
-      parts.forEach((line) => {
-        safeWrite({
-          type: 'line',
-          line,
-          full: fullContent,
-          committed: committedText,
-          tail: lineBuffer,
+  let latestFullContent = '';
+  let streamed;
+  try {
+    streamed = await streamReplyViaGateway({
+      requestId,
+      userId,
+      conversationId,
+      character,
+      messages,
+      userMessage,
+      systemHint,
+      promptKind,
+      modelMode,
+      signal,
+      user,
+      onDelta: async (deltaText, fullContent) => {
+        latestFullContent = String(fullContent || '');
+        safeWrite({ type: 'delta', delta: deltaText, full: fullContent });
+        lineBuffer += deltaText;
+        const parts = lineBuffer.split(/\r?\n/);
+        lineBuffer = parts.pop() || '';
+        const committedText = fullContent.slice(0, Math.max(0, fullContent.length - lineBuffer.length));
+        parts.forEach((line) => {
+          safeWrite({
+            type: 'line',
+            line,
+            full: fullContent,
+            committed: committedText,
+            tail: lineBuffer,
+          });
         });
-      });
-    },
-  });
+      },
+    });
+  } catch (error) {
+    if (signal && signal.aborted && latestFullContent.trim()) {
+      return latestFullContent;
+    }
+    throw error;
+  }
 
   if (lineBuffer.trim()) {
     safeWrite({
@@ -400,6 +416,7 @@ function registerWebRoutes(app) {
     const checks = {
       ok: true,
       app: config.appName,
+      version: config.appVersion,
       time: new Date().toISOString(),
       dbType: getDbType(),
       redisMode: isRedisReal() ? 'redis' : 'memory',
@@ -865,6 +882,61 @@ function registerWebRoutes(app) {
         overview,
         providers,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/admin/notifications', requireAdmin, async (req, res, next) => {
+    try {
+      const allNotifications = await listNotificationsForAdmin();
+      const supportNotification = allNotifications.find((item) => item.notification_type === 'support') || null;
+      const notifications = allNotifications.filter((item) => item.notification_type !== 'support');
+      renderPage(res, 'admin-notifications', {
+        title: '通知中心',
+        notifications,
+        supportNotification,
+        defaultSupportQrUrl: DEFAULT_SUPPORT_QR_URL,
+        formMessage: req.query.saved ? { type: 'success', text: '配置已经保存。' } : null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/notifications/new', requireAdmin, async (req, res, next) => {
+    try {
+      await createNotification(req.body);
+      res.redirect('/admin/notifications?saved=1');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/notifications/:notificationId', requireAdmin, async (req, res, next) => {
+    try {
+      const notificationId = parseIdParam(req.params.notificationId, '通知 ID');
+      await updateNotification(notificationId, req.body);
+      res.redirect('/admin/notifications?saved=1');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/notifications/:notificationId/delete', requireAdmin, async (req, res, next) => {
+    try {
+      const notificationId = parseIdParam(req.params.notificationId, '通知 ID');
+      await deleteNotification(notificationId);
+      res.redirect('/admin/notifications?saved=1');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/support-notification', async (req, res, next) => {
+    try {
+      const notifications = await listActiveNotificationsForUser(res.locals.currentUser || null, { supportOnly: true });
+      res.json({ notification: notifications[0] || null });
     } catch (error) {
       next(error);
     }
@@ -1389,7 +1461,7 @@ function registerWebRoutes(app) {
         if (error.code === 'CHARACTER_HAS_CONVERSATIONS') {
           return renderPage(res, 'message', {
             title: '暂时不能删除角色',
-            message: `这个角色下面还有 ${error.conversationCount} 条对话记录。为了避免把分支会话整串误删，现在只允许删除“从未开过对话”的角色。你可以先保留角色，或后面再做更细的归档/迁移方案。`,
+            message: `这个角色下面还有 ${error.conversationCount} 条对话记录。为了保护已有内容，现在只允许删除“从未开过对话”的角色。你可以先保留角色，或后面再做更细的归档/迁移方案。`,
           });
         }
         throw error;
@@ -1485,10 +1557,10 @@ function registerWebRoutes(app) {
         return;
       }
 
-      const allMessages = await listMessages(conversationId);
-      const fallbackLeafId = conversation.current_message_id || (allMessages.length ? allMessages[allMessages.length - 1].id : null);
-      const leafId = parseIntegerField(req.query.leaf || fallbackLeafId || '', { fieldLabel: '叶子消息 ID', min: 1, allowEmpty: true }) || fallbackLeafId;
-      const view = buildConversationView(allMessages, leafId);
+      const latestMessage = conversation.current_message_id ? null : await getLatestMessage(conversationId);
+      const fallbackLeafId = conversation.current_message_id || latestMessage?.id || null;
+      const leafId = parseIntegerField(req.query.leaf || fallbackLeafId || '', { fieldLabel: '当前消息 ID', min: 1, allowEmpty: true }) || fallbackLeafId;
+      const view = await buildConversationPathView(conversationId, leafId);
       const beforeIndex = beforeId
         ? view.pathMessages.findIndex((message) => Number(message.id) === Number(beforeId))
         : view.pathMessages.length;
@@ -1542,9 +1614,8 @@ function registerWebRoutes(app) {
         return;
       }
 
-      const allMessages = await listMessages(conversationId);
-      const chatRequest = buildChatRequestContext(req, conversation, allMessages, rawContent, parentMessageId);
-      const { isFirstTurn, content, history, isBranchReply, promptKind } = chatRequest;
+      const chatRequest = await buildChatRequestContext(req, conversation, rawContent, parentMessageId);
+      const { isFirstTurn, content, history, promptKind } = chatRequest;
 
       if (!content) {
         return renderPage(res, 'message', { title: '提示', message: '消息不能为空。' });
@@ -1556,7 +1627,7 @@ function registerWebRoutes(app) {
         content,
         parentMessageId,
         branchFromMessageId: parentMessageId,
-        promptKind: isFirstTurn ? 'conversation-start' : (isBranchReply ? 'branch' : 'normal'),
+        promptKind: isFirstTurn ? 'conversation-start' : 'normal',
         metadataJson: JSON.stringify({
           requestId: req.requestId,
           operation: 'user-message',
@@ -1587,7 +1658,7 @@ function registerWebRoutes(app) {
         content: reply,
         parentMessageId: userMessageId,
         branchFromMessageId: userMessageId,
-        promptKind: isFirstTurn ? 'conversation-start' : (isBranchReply ? 'branch' : 'normal'),
+        promptKind: isFirstTurn ? 'conversation-start' : 'normal',
         metadataJson: JSON.stringify({
           requestId: req.requestId,
           operation: 'assistant-reply',
@@ -1626,9 +1697,8 @@ function registerWebRoutes(app) {
         return;
       }
 
-      const allMessages = await listMessages(conversationId);
-      const chatRequest = buildChatRequestContext(req, conversation, allMessages, rawContent, parentMessageId);
-      const { isFirstTurn, content, history, isBranchReply, promptKind } = chatRequest;
+      const chatRequest = await buildChatRequestContext(req, conversation, rawContent, parentMessageId);
+      const { isFirstTurn, content, history, promptKind } = chatRequest;
 
       if (!content) {
         ndjson.safeWrite({ type: 'error', message: '消息不能为空。' });
@@ -1642,7 +1712,7 @@ function registerWebRoutes(app) {
         content,
         parentMessageId,
         branchFromMessageId: parentMessageId,
-        promptKind: isFirstTurn ? 'conversation-start' : (isBranchReply ? 'branch' : 'normal'),
+        promptKind: isFirstTurn ? 'conversation-start' : 'normal',
         metadataJson: JSON.stringify({
           requestId: req.requestId,
           operation: 'user-message',
@@ -1651,13 +1721,13 @@ function registerWebRoutes(app) {
         }),
       });
 
-      const messagesWithUser = await listMessages(conversationId);
-      const userPacket = await buildChatMessagePacket(req, conversation, messagesWithUser, userMessageId, userMessageId);
+      const userPacket = await buildChatMessagePacket(req, conversation, userMessageId, userMessageId);
       ndjson.safeWrite({
         type: 'user-message',
         conversationId,
         userMessageId,
         content,
+        messageId: userMessageId,
         leafId: userMessageId,
         html: userPacket ? userPacket.html : '',
       });
@@ -1678,6 +1748,36 @@ function registerWebRoutes(app) {
       });
 
       if (ndjson.isClosed() || ndjson.abortController.signal.aborted) {
+        const partialReply = String(replyContent || '').trim();
+        if (partialReply) {
+          const partialReplyMessageId = await addMessage({
+            conversationId,
+            senderType: 'character',
+            content: partialReply,
+            parentMessageId: userMessageId,
+            branchFromMessageId: userMessageId,
+            promptKind: isFirstTurn ? 'conversation-start' : 'normal',
+            status: 'streaming',
+            metadataJson: JSON.stringify({
+              requestId: req.requestId,
+              operation: 'assistant-reply-stream-interrupted',
+              interrupted: true,
+            }),
+          });
+          await updateConversationTitle(conversationId, buildNextConversationTitle(conversation, content));
+          logger.warn('Persisted interrupted assistant stream as partial message', {
+            requestId: req.requestId,
+            conversationId,
+            userMessageId,
+            partialReplyMessageId,
+          });
+        } else {
+          logger.warn('Assistant stream interrupted before any reply content', {
+            requestId: req.requestId,
+            conversationId,
+            userMessageId,
+          });
+        }
         return;
       }
 
@@ -1687,7 +1787,7 @@ function registerWebRoutes(app) {
         content: replyContent,
         parentMessageId: userMessageId,
         branchFromMessageId: userMessageId,
-        promptKind: isFirstTurn ? 'conversation-start' : (isBranchReply ? 'branch' : 'normal'),
+        promptKind: isFirstTurn ? 'conversation-start' : 'normal',
         metadataJson: JSON.stringify({
           requestId: req.requestId,
           operation: 'assistant-reply-stream',
@@ -1696,13 +1796,13 @@ function registerWebRoutes(app) {
 
       await updateConversationTitle(conversationId, buildNextConversationTitle(conversation, content));
       await invalidateConversationCache(conversationId);
-      const messagesWithReply = await listMessages(conversationId);
-      const replyPacket = await buildChatMessagePacket(req, conversation, messagesWithReply, replyMessageId, replyMessageId);
-      const parentPacket = await buildChatMessagePacket(req, conversation, messagesWithReply, replyMessageId, userMessageId);
+      const replyPacket = await buildChatMessagePacket(req, conversation, replyMessageId, replyMessageId);
+      const parentPacket = await buildChatMessagePacket(req, conversation, replyMessageId, userMessageId);
       ndjson.safeWrite({
         type: 'done',
         conversationId,
         replyMessageId,
+        messageId: replyMessageId,
         leafId: replyMessageId,
         full: replyContent,
         mode: 'message',
@@ -1738,7 +1838,6 @@ function registerWebRoutes(app) {
         return;
       }
 
-      const allMessages = await listMessages(conversationId);
       const parentUserMessage = targetMessage.parent_message_id
         ? await getMessageById(conversationId, targetMessage.parent_message_id)
         : null;
@@ -1749,7 +1848,7 @@ function registerWebRoutes(app) {
         return;
       }
 
-      const history = buildPathMessages(allMessages, parentUserMessage.id).slice(0, -1);
+      const history = (await fetchPathMessages(conversationId, parentUserMessage.id)).slice(0, -1);
       ndjson.safeWrite({
         type: 'assistant-start',
         conversationId,
@@ -1793,16 +1892,17 @@ function registerWebRoutes(app) {
       });
 
       await invalidateConversationCache(conversationId);
-      const messagesWithReply = await listMessages(conversationId);
-      const replyPacket = await buildChatMessagePacket(req, conversation, messagesWithReply, newReplyId, newReplyId);
+      const replyPacket = await buildChatMessagePacket(req, conversation, newReplyId, newReplyId);
       ndjson.safeWrite({
         type: 'done',
         conversationId,
         replyMessageId: newReplyId,
+        messageId: newReplyId,
         leafId: newReplyId,
         full: reply,
         mode: 'regenerate',
         html: replyPacket ? replyPacket.html : '',
+        parentMessageId: parentUserMessage.id,
       });
       ndjson.end();
     } catch (error) {
@@ -1827,7 +1927,6 @@ function registerWebRoutes(app) {
         return renderPage(res, 'message', { title: '提示', message: '只能重新生成 AI 回复。' });
       }
 
-      const allMessages = await listMessages(conversationId);
       const parentUserMessage = targetMessage.parent_message_id
         ? await getMessageById(conversationId, targetMessage.parent_message_id)
         : null;
@@ -1836,7 +1935,7 @@ function registerWebRoutes(app) {
         return renderPage(res, 'message', { title: '提示', message: '找不到对应的用户输入。' });
       }
 
-      const history = buildPathMessages(allMessages, parentUserMessage.id).slice(0, -1);
+      const history = (await fetchPathMessages(conversationId, parentUserMessage.id)).slice(0, -1);
       const reply = await generateReplyViaGateway({
         requestId: req.requestId,
         userId: req.session.user.id,
@@ -1891,13 +1990,13 @@ function registerWebRoutes(app) {
         if (error.code === 'MESSAGE_HAS_CHILDREN') {
           return renderChatPage(req, res, conversation, {
             leafId: conversation.current_message_id || null,
-            errorMessage: `这条对话记录下面还有 ${error.childMessageCount} 条后续消息。为了避免把分支链路删断，现在只允许删除末端叶子消息。`,
+            errorMessage: `这条消息后面还有 ${error.childMessageCount} 条内容。请先处理后续内容，再删除这里。`,
           });
         }
         if (error.code === 'MESSAGE_HAS_BRANCH_CONVERSATIONS') {
           return renderChatPage(req, res, conversation, {
             leafId: conversation.current_message_id || null,
-            errorMessage: `这条对话记录已经被拿去开了 ${error.branchConversationCount} 条独立分支会话。为了避免分支引用悬空，现在不能删它。`,
+            errorMessage: `这条消息还被 ${error.branchConversationCount} 条独立对话引用，暂时不能删除。`,
           });
         }
         throw error;
@@ -1950,9 +2049,8 @@ function registerWebRoutes(app) {
         return renderPage(res, 'message', { title: '提示', message: '这里只支持修改用户输入。' });
       }
 
-      const allMessages = await listMessages(conversationId);
       const historyBeforeUser = targetMessage.parent_message_id
-        ? buildPathMessages(allMessages, targetMessage.parent_message_id)
+        ? await fetchPathMessages(conversationId, targetMessage.parent_message_id)
         : [];
 
       const newUserMessageId = await addMessage({
@@ -1965,7 +2063,7 @@ function registerWebRoutes(app) {
         promptKind: 'edit',
         metadataJson: JSON.stringify({
           requestId: req.requestId,
-          operation: 'user-edit-branch',
+          operation: 'user-edit-resend',
           sourceMessageId: messageId,
         }),
       });
@@ -1982,7 +2080,7 @@ function registerWebRoutes(app) {
         },
         messages: historyBeforeUser,
         userMessage: content,
-        systemHint: '这是基于用户改写后的旧输入重新开出的分支，请自然延续，不要提到你被要求重生成。',
+        systemHint: '这是基于用户修改后的输入重新生成回复，请自然延续，不要提到内部操作。',
         promptKind: 'edit',
         modelMode: conversation.selected_model_mode || 'standard',
         user: req.session.user,
@@ -1994,7 +2092,7 @@ function registerWebRoutes(app) {
         content: reply,
         parentMessageId: newUserMessageId,
         branchFromMessageId: newUserMessageId,
-        promptKind: 'branch',
+        promptKind: 'edit',
         metadataJson: JSON.stringify({
           requestId: req.requestId,
           operation: 'assistant-reply-from-user-edit',
@@ -2021,18 +2119,17 @@ function registerWebRoutes(app) {
 
       const targetMessage = await getMessageById(conversationId, messageId);
       if (!targetMessage) {
-        ndjson.safeWrite({ type: 'error', message: '重算起点不存在。' });
+        ndjson.safeWrite({ type: 'error', message: '找不到要重写的位置。' });
         ndjson.end();
         return;
       }
       if (!targetMessage.parent_message_id) {
-        ndjson.safeWrite({ type: 'error', message: '根节点不适合做后续重算。' });
+        ndjson.safeWrite({ type: 'error', message: '这里还没有可重写的后续。' });
         ndjson.end();
         return;
       }
 
-      const allMessages = await listMessages(conversationId);
-      const historyBeforeTarget = buildPathMessages(allMessages, targetMessage.parent_message_id);
+      const historyBeforeTarget = await fetchPathMessages(conversationId, targetMessage.parent_message_id);
       let newLeafId = null;
       let previewUserContent = '';
       let reply = '';
@@ -2048,15 +2145,15 @@ function registerWebRoutes(app) {
           promptKind: 'replay',
           metadataJson: JSON.stringify({
             requestId: req.requestId,
-            operation: 'user-replay-branch',
+            operation: 'user-rewrite-continuation',
             sourceMessageId: messageId,
             delivery: 'stream',
           }),
         });
 
         previewUserContent = targetMessage.content;
-        const userPacket = await buildChatMessagePacket(req, conversation, await listMessages(conversationId), newUserMessageId, newUserMessageId);
-        ndjson.safeWrite({ type: 'user-message', conversationId, userMessageId: newUserMessageId, content: previewUserContent, leafId: newUserMessageId, mode: 'replay', html: userPacket ? userPacket.html : '' });
+        const userPacket = await buildChatMessagePacket(req, conversation, newUserMessageId, newUserMessageId);
+        ndjson.safeWrite({ type: 'user-message', conversationId, userMessageId: newUserMessageId, content: previewUserContent, messageId: newUserMessageId, leafId: newUserMessageId, mode: 'replay', html: userPacket ? userPacket.html : '' });
         ndjson.safeWrite({ type: 'assistant-start', conversationId, parentMessageId: newUserMessageId, sourceMessageId: messageId, mode: 'replay' });
 
         reply = await streamChatReplyToNdjson({
@@ -2066,7 +2163,7 @@ function registerWebRoutes(app) {
           character: buildConversationCharacterPayload(conversation),
           messages: historyBeforeTarget,
           userMessage: targetMessage.content,
-          systemHint: '这是一次从旧节点开始的后续重算，请自然延续并给出新的合理走向。',
+          systemHint: '这是一次从较早位置开始重写后续，请自然延续并给出新的合理内容。',
           promptKind: 'replay',
           modelMode: conversation.selected_model_mode || 'standard',
           signal: ndjson.abortController.signal,
@@ -2101,7 +2198,7 @@ function registerWebRoutes(app) {
         }
 
         const historyBeforeParentUser = parentUserMessage.parent_message_id
-          ? buildPathMessages(allMessages, parentUserMessage.parent_message_id)
+          ? await fetchPathMessages(conversationId, parentUserMessage.parent_message_id)
           : [];
 
         const newUserMessageId = await addMessage({
@@ -2121,8 +2218,8 @@ function registerWebRoutes(app) {
         });
 
         previewUserContent = parentUserMessage.content;
-        const userPacket = await buildChatMessagePacket(req, conversation, await listMessages(conversationId), newUserMessageId, newUserMessageId);
-        ndjson.safeWrite({ type: 'user-message', conversationId, userMessageId: newUserMessageId, content: previewUserContent, leafId: newUserMessageId, mode: 'replay', html: userPacket ? userPacket.html : '' });
+        const userPacket = await buildChatMessagePacket(req, conversation, newUserMessageId, newUserMessageId);
+        ndjson.safeWrite({ type: 'user-message', conversationId, userMessageId: newUserMessageId, content: previewUserContent, messageId: newUserMessageId, leafId: newUserMessageId, mode: 'replay', html: userPacket ? userPacket.html : '' });
         ndjson.safeWrite({ type: 'assistant-start', conversationId, parentMessageId: newUserMessageId, sourceMessageId: messageId, mode: 'replay' });
 
         reply = await streamChatReplyToNdjson({
@@ -2132,7 +2229,7 @@ function registerWebRoutes(app) {
           character: buildConversationCharacterPayload(conversation),
           messages: historyBeforeParentUser,
           userMessage: parentUserMessage.content,
-          systemHint: '这是一次从旧 AI 节点开始的后续重算，请给出与旧回复不同但同样合理的新走向。',
+          systemHint: '这是一次从较早 AI 回复开始重写后续，请给出不同但合理的新内容。',
           promptKind: 'replay',
           modelMode: conversation.selected_model_mode || 'standard',
           signal: ndjson.abortController.signal,
@@ -2161,16 +2258,16 @@ function registerWebRoutes(app) {
       }
 
       await invalidateConversationCache(conversationId);
-      const messagesWithReply = await listMessages(conversationId);
-      const replyPacket = await buildChatMessagePacket(req, conversation, messagesWithReply, newLeafId, newLeafId);
-      const newLeafMessage = messagesWithReply.find((message) => Number(message.id) === Number(newLeafId));
+      const replyPacket = await buildChatMessagePacket(req, conversation, newLeafId, newLeafId);
+      const newLeafMessage = await getMessageById(conversationId, newLeafId);
       const parentPacket = newLeafMessage && newLeafMessage.parent_message_id
-        ? await buildChatMessagePacket(req, conversation, messagesWithReply, newLeafId, newLeafMessage.parent_message_id)
+        ? await buildChatMessagePacket(req, conversation, newLeafId, newLeafMessage.parent_message_id)
         : null;
       ndjson.safeWrite({
         type: 'done',
         conversationId,
         replyMessageId: newLeafId,
+        messageId: newLeafId,
         leafId: newLeafId,
         full: reply,
         mode: 'replay',
@@ -2202,16 +2299,15 @@ function registerWebRoutes(app) {
 
       const targetMessage = await getMessageById(conversationId, messageId);
       if (!targetMessage) {
-        return renderPage(res, 'message', { title: '提示', message: '重算起点不存在。' });
+        return renderPage(res, 'message', { title: '提示', message: '找不到要重写的位置。' });
       }
       if (!targetMessage.parent_message_id) {
-        return renderPage(res, 'message', { title: '提示', message: '根节点不适合做后续重算。' });
+        return renderPage(res, 'message', { title: '提示', message: '这里还没有可重写的后续。' });
       }
 
-      const allMessages = await listMessages(conversationId);
-      const historyBeforeTarget = buildPathMessages(allMessages, targetMessage.parent_message_id);
+      const historyBeforeTarget = await fetchPathMessages(conversationId, targetMessage.parent_message_id);
       let newLeafId = null;
-      let regeneratedPreview = [];
+      let newContinuationPreview = [];
 
       if (targetMessage.sender_type === 'user') {
         const newUserMessageId = await addMessage({
@@ -2224,7 +2320,7 @@ function registerWebRoutes(app) {
           promptKind: 'replay',
           metadataJson: JSON.stringify({
             requestId: req.requestId,
-            operation: 'user-replay-branch',
+            operation: 'user-rewrite-continuation',
             sourceMessageId: messageId,
           }),
         });
@@ -2236,7 +2332,7 @@ function registerWebRoutes(app) {
           character: buildConversationCharacterPayload(conversation),
           messages: historyBeforeTarget,
           userMessage: targetMessage.content,
-          systemHint: '这是一次从旧节点开始的后续重算，请自然延续并给出新的合理走向。',
+          systemHint: '这是一次从较早位置开始重写后续，请自然延续并给出新的合理内容。',
           promptKind: 'replay',
           modelMode: conversation.selected_model_mode || 'standard',
           user: req.session.user,
@@ -2257,7 +2353,7 @@ function registerWebRoutes(app) {
           }),
         });
 
-        regeneratedPreview = [
+        newContinuationPreview = [
           { role: '你', content: targetMessage.content },
           { role: conversation.character_name, content: reply },
         ];
@@ -2268,7 +2364,7 @@ function registerWebRoutes(app) {
         }
 
         const historyBeforeParentUser = parentUserMessage.parent_message_id
-          ? buildPathMessages(allMessages, parentUserMessage.parent_message_id)
+          ? await fetchPathMessages(conversationId, parentUserMessage.parent_message_id)
           : [];
 
         const newUserMessageId = await addMessage({
@@ -2293,7 +2389,7 @@ function registerWebRoutes(app) {
           character: buildConversationCharacterPayload(conversation),
           messages: historyBeforeParentUser,
           userMessage: parentUserMessage.content,
-          systemHint: '这是一次从旧 AI 节点开始的后续重算，请给出与旧回复不同但同样合理的新走向。',
+          systemHint: '这是一次从较早 AI 回复开始重写后续，请给出不同但合理的新内容。',
           promptKind: 'replay',
           modelMode: conversation.selected_model_mode || 'standard',
           user: req.session.user,
@@ -2314,7 +2410,7 @@ function registerWebRoutes(app) {
           }),
         });
 
-        regeneratedPreview = [
+        newContinuationPreview = [
           { role: '你', content: parentUserMessage.content },
           { role: conversation.character_name, content: reply },
         ];
@@ -2322,7 +2418,8 @@ function registerWebRoutes(app) {
 
       await renderChatPage(req, res, conversation, {
         leafId: newLeafId,
-        regeneratedPreview,
+        persistLeaf: true,
+        newContinuationPreview,
       });
     } catch (error) {
       next(error);
@@ -2366,12 +2463,13 @@ function registerWebRoutes(app) {
         return;
       }
 
-      const allMessages = await listMessages(conversationId);
-      const history = buildPathMessages(allMessages, parentMessageId || conversation.current_message_id || null);
+      const latestMessage = parentMessageId || conversation.current_message_id ? null : await getLatestMessage(conversationId);
+      const contextLeafId = parentMessageId || conversation.current_message_id || latestMessage?.id || null;
+      const history = await fetchPathMessages(conversationId, contextLeafId);
       ndjson.safeWrite({
         type: 'assistant-start',
         conversationId,
-        parentMessageId: parentMessageId || conversation.current_message_id || null,
+        parentMessageId: contextLeafId,
         mode: 'optimize-input',
       });
 
@@ -2395,7 +2493,7 @@ function registerWebRoutes(app) {
       ndjson.safeWrite({
         type: 'done',
         conversationId,
-        leafId: parentMessageId || conversation.current_message_id || null,
+        leafId: contextLeafId,
         full: optimizedContent,
         mode: 'optimize-input',
         draftContent: content,
@@ -2423,8 +2521,9 @@ function registerWebRoutes(app) {
         return renderPage(res, 'message', { title: '提示', message: '内容不能为空。' });
       }
 
-      const allMessages = await listMessages(conversationId);
-      const history = buildPathMessages(allMessages, parentMessageId || conversation.current_message_id || null);
+      const latestMessage = parentMessageId || conversation.current_message_id ? null : await getLatestMessage(conversationId);
+      const contextLeafId = parentMessageId || conversation.current_message_id || latestMessage?.id || null;
+      const history = await fetchPathMessages(conversationId, contextLeafId);
       const optimizedContent = await optimizeUserInputViaGateway({
         requestId: req.requestId,
         userId: req.session.user.id,
@@ -2437,7 +2536,8 @@ function registerWebRoutes(app) {
       });
 
       await renderChatPage(req, res, conversation, {
-        leafId: parentMessageId || conversation.current_message_id || null,
+        leafId: contextLeafId,
+        persistLeaf: true,
         draftContent: content,
         optimizedContent,
       });
@@ -2455,16 +2555,12 @@ function registerWebRoutes(app) {
         return;
       }
 
-      const allMessages = await listMessages(conversation.id);
       const targetMessage = await getMessageById(conversationId, messageId);
       if (!targetMessage) {
-        return renderPage(res, 'message', { title: '提示', message: '分支起点不存在。' });
+        return renderPage(res, 'message', { title: '提示', message: '找不到要复制的位置。' });
       }
-      const view = buildConversationView(allMessages, messageId);
 
-      const branchTitle = view.currentBranch
-        ? buildBranchConversationTitle(conversation, view.currentBranch.label, view.currentBranch.summary)
-        : buildConversationTitle(conversation.character_name, targetMessage.content);
+      const branchTitle = buildConversationTitle(conversation.character_name, targetMessage.content);
       const branchResult = await cloneConversationBranch({
         userId: req.session.user.id,
         characterId: conversation.character_id,

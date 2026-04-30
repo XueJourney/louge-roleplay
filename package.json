@@ -1,6 +1,6 @@
 {
   "name": "ai-roleplay-site",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Minimal multi-user AI roleplay website",
   "main": "src/server.js",
   "scripts": {
@@ -16,7 +16,12 @@
     "logs:test": "node scripts/test-log-service.js",
     "admin-logs:test": "node scripts/test-admin-logs-route.js",
     "admin-conversations:test": "node scripts/test-admin-conversations.js",
-    "full-flow:test": "node scripts/full-flow-e2e.js"
+    "conversation-service:test": "node scripts/test-conversation-service.js",
+    "full-flow:test": "node scripts/full-flow-e2e.js",
+    "version:check": "node scripts/version-check.js",
+    "version:bump:patch": "npm version patch --no-git-tag-version",
+    "version:bump:minor": "npm version minor --no-git-tag-version",
+    "version:bump:major": "npm version major --no-git-tag-version"
   },
   "dependencies": {
     "@alicloud/dypnsapi20170525": "^2.0.0",
@@ -34,8 +39,7 @@
     "helmet": "^8.1.0",
     "morgan": "^1.10.1",
     "mysql2": "^3.15.2",
-    "redis": "^5.8.3",
-    "uuid": "^13.0.0"
+    "redis": "^5.8.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

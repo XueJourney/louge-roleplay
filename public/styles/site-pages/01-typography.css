@@ -100,10 +100,7 @@ h1,
 
 .bubble-role,
 .bubble-kind,
-.bubble-time,
-.tree-id,
-.tree-kind,
-.branch-meta {
+.bubble-time {
   font-family: var(--font-mono);
 }
 

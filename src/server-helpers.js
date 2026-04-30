@@ -15,19 +15,22 @@ const { translate, translateHtml } = require('./i18n');
 const { parsePromptItemsFromForm, normalizePromptItems } = require('./services/prompt-engineering-service');
 const {
   getConversationById,
-  listMessages,
+  getLatestMessage,
+  getConversationMessageCount,
   setConversationCurrentMessage,
-  buildPathMessages,
-  buildConversationView,
+  buildConversationPathView,
+  fetchPathMessages,
 } = require('./services/conversation-service');
 const { getChatModelSelector } = require('./services/llm-gateway-service');
+const { getClientNotificationBootstrap } = require('./services/notification-service');
 
 
-function renderPage(res, view, params = {}) {
+async function renderPage(res, view, params = {}) {
   const locale = res.locals.locale || 'zh-CN';
   const t = res.locals.t || ((key, vars) => translate(locale, key, vars));
   const titleSource = params.title || config.appName;
   const title = translateHtml(locale, t(titleSource));
+  const clientNotifications = await getClientNotificationBootstrap(res.locals.currentUser || null);
   res.render(view, params, (viewError, html) => {
     if (viewError) {
       logger.error('[renderPage] View 渲染失败', { view, error: viewError.message });
@@ -43,6 +46,7 @@ function renderPage(res, view, params = {}) {
       locale,
       t,
       clientI18nMessages: res.locals.clientI18nMessages || {},
+      clientNotifications,
       localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
     });
   });
@@ -120,19 +124,24 @@ function writeNdjson(res, payload) {
   }
 }
 
-function buildChatRequestContext(req, conversation, allMessages, rawContent, parentMessageId) {
-  const isFirstTurn = allMessages.length === 0;
+async function buildChatRequestContext(req, conversation, rawContent, parentMessageId, options = {}) {
+  const messageCount = options.messageCount === undefined
+    ? await getConversationMessageCount(conversation.id)
+    : Number(options.messageCount || 0);
+  const isFirstTurn = messageCount === 0;
   const content = String(rawContent || '').trim() || (isFirstTurn ? '[开始一次新的对话]' : '');
-  const fallbackLeafId = conversation.current_message_id || (allMessages.length ? allMessages[allMessages.length - 1].id : null);
-  const history = buildPathMessages(allMessages, parentMessageId || fallbackLeafId || null);
-  const isBranchReply = parentMessageId && Number(parentMessageId) !== Number(conversation.current_message_id || 0);
-
+  let fallbackLeafId = conversation.current_message_id || options.fallbackLeafId || null;
+  if (!fallbackLeafId && !isFirstTurn) {
+    const latestMessage = await getLatestMessage(conversation.id);
+    fallbackLeafId = latestMessage?.id || null;
+  }
+  const history = await fetchPathMessages(conversation.id, parentMessageId || fallbackLeafId || null);
   return {
     isFirstTurn,
     content,
     history,
-    isBranchReply,
-    promptKind: isFirstTurn ? 'conversation-start' : (isBranchReply ? 'branch' : 'chat'),
+    promptKind: isFirstTurn ? 'conversation-start' : 'chat',
+    messageCount,
   };
 }
 
@@ -325,16 +334,7 @@ function isDomesticPhone(value) {
 
 function buildConversationTitle(characterName, content = '') {
   const tail = String(content || '').trim().replace(/\s+/g, ' ').slice(0, 28);
-  return tail ? `${characterName} · ${tail}` : `${characterName} · 新分支`;
-}
-
-function buildBranchConversationTitle(conversation, branchLabel, branchSummary) {
-  const compact = [branchLabel, branchSummary]
-    .filter(Boolean)
-    .join(' · ')
-    .replace(/\s+/g, ' ')
-    .slice(0, 42);
-  return compact ? `${conversation.character_name} · ${compact}` : `${conversation.character_name} · 分支对话`;
+  return tail ? `${characterName} · ${tail}` : `${characterName} · 新对话`;
 }
 
 function buildNextConversationTitle(conversation, userContent) {
@@ -342,19 +342,22 @@ function buildNextConversationTitle(conversation, userContent) {
 }
 
 async function renderChatPage(req, res, conversation, options = {}) {
-  const allMessages = await listMessages(conversation.id);
-  const fallbackLeafId = conversation.current_message_id || (allMessages.length ? allMessages[allMessages.length - 1].id : null);
+  const latestMessage = conversation.current_message_id ? null : await getLatestMessage(conversation.id);
+  const fallbackLeafId = conversation.current_message_id || latestMessage?.id || null;
   const requestedLeafId = Number(options.leafId || req.query.leaf || fallbackLeafId || 0) || null;
   const activeLeafId = requestedLeafId || fallbackLeafId || null;
 
-  if (activeLeafId && Number(conversation.current_message_id || 0) !== Number(activeLeafId)) {
+  if (options.persistLeaf && activeLeafId && Number(conversation.current_message_id || 0) !== Number(activeLeafId)) {
     await setConversationCurrentMessage(conversation.id, activeLeafId);
     conversation.current_message_id = activeLeafId;
   }
 
-  const view = buildConversationView(allMessages, activeLeafId);
-  const initialVisibleCount = Number(options.initialVisibleCount || 3);
-  view.visiblePathMessages = view.pathMessages.slice(-initialVisibleCount);
+  const view = activeLeafId
+    ? await buildConversationPathView(conversation.id, activeLeafId, { messageCount: options.messageCount })
+    : { pathMessages: [], activeLeafId: null, messageCount: options.messageCount === undefined ? await getConversationMessageCount(conversation.id) : Number(options.messageCount || 0) };
+  const initialVisibleCount = Math.max(3, Number(options.initialVisibleCount || 3));
+  const keepFromIndex = Math.max(0, view.pathMessages.length - initialVisibleCount - 1);
+  view.visiblePathMessages = view.pathMessages.slice(keepFromIndex);
   view.hasOlderMessages = view.pathMessages.length > view.visiblePathMessages.length;
   view.oldestVisibleMessageId = view.visiblePathMessages.length ? view.visiblePathMessages[0].id : null;
   const chatModelSelector = await getChatModelSelector();
@@ -365,7 +368,7 @@ async function renderChatPage(req, res, conversation, options = {}) {
     view,
     draftContent: options.draftContent || String(req.query.draft || ''),
     optimizedContent: options.optimizedContent || '',
-    regeneratedPreview: options.regeneratedPreview || null,
+    newContinuationPreview: options.newContinuationPreview || null,
     chatModelSelector,
     errorMessage: options.errorMessage || null,
   });
@@ -403,7 +406,6 @@ module.exports = {
   isAllowedInternationalEmail,
   isDomesticPhone,
   buildConversationTitle,
-  buildBranchConversationTitle,
   buildNextConversationTitle,
   renderChatPage,
   loadConversationForUserOrFail,

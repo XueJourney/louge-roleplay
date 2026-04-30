@@ -148,20 +148,14 @@
                   </div>
                   <div class="subscription-meta">
                     <span class="meta-pill"><%= t('对话 #{id}', { id: conversation.id }) %></span>
-                    <% if (conversation.current_message_id) { %>
-                      <span class="meta-pill"><%= t('当前叶子 #{id}', { id: conversation.current_message_id }) %></span>
-                    <% } %>
                   </div>
                 </div>
                 <div class="dashboard-item-meta">
                   <span><%= t('最近更新：{updatedAt}', { updatedAt: conversation.updated_at }) %></span>
-                  <% if (conversation.parent_conversation_id) { %>
-                    <span><%= t('分支来源：#{id}', { id: conversation.parent_conversation_id }) %></span>
-                  <% } %>
                 </div>
                 <div class="bubble-actions bubble-actions--solid dashboard-actions-row">
                   <a class="quick-link" href="/chat/<%= conversation.id %>"><%= t('进入对话') %></a>
-                  <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有子分支会话的末端对话才能删除。') %>');">
+                  <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>');">
                     <button class="inline-btn is-danger" type="submit">删除对话</button>
                   </form>
                 </div>

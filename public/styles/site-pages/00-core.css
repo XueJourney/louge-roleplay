@@ -257,3 +257,35 @@
   
 
 
+
+.nav-support-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 15px;
+  position: relative;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.nav-support-button:hover {
+  color: var(--text);
+}
+
+.nav-support-button::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--brand);
+  border-radius: 1px;
+  transition: width var(--duration-normal) var(--ease-out);
+}
+
+.nav-support-button:hover::after {
+  width: 100%;
+}

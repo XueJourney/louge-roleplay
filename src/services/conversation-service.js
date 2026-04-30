@@ -4,17 +4,17 @@
  * 会话与消息持久化服务。
  *
  * 目标：
- * 1. 支持树状消息结构（parent_message_id）。
- * 2. 支持重生成、编辑分支、任意节点继续对话。
- * 3. 支持从任意节点克隆出新会话分支。
- * 4. 使用 Redis 缓存整棵消息树，降低高频聊天页读取成本。
+ * 1. 使用 parent_message_id 保存消息之间的衔接关系。
+ * 2. 支持重新生成、编辑后重发、从较早位置重写后续。
+ * 3. 支持把某个位置之前的内容复制成独立对话。
+ * 4. 聊天页优先读取当前显示链；完整消息列表只保留给独立对话复制/诊断脚本。
  */
 
 const { query } = require('../lib/db');
 const { redisClient } = require('../lib/redis');
 const logger = require('../lib/logger');
 
-const MESSAGE_TREE_CACHE_TTL_SECONDS = 60;
+const MESSAGE_LIST_CACHE_TTL_SECONDS = 60;
 
 const MESSAGE_PROMPT_KIND_VALUES = new Set([
   'normal',
@@ -125,6 +125,10 @@ async function listUserConversations(userId) {
 
 async function fetchMessagesFromDatabase(conversationId, options = {}) {
   const includeDeleted = options.includeDeleted === true;
+  const extraWhere = options.extraWhere || '';
+  const extraParams = Array.isArray(options.extraParams) ? options.extraParams : [];
+  const orderAndLimit = options.orderAndLimit || ' ORDER BY sequence_no ASC, id ASC';
+
   return query(
     `SELECT
        id,
@@ -141,9 +145,8 @@ async function fetchMessagesFromDatabase(conversationId, options = {}) {
        metadata_json,
        deleted_at
      FROM messages
-     WHERE conversation_id = ?${includeDeleted ? '' : ' AND deleted_at IS NULL'}
-     ORDER BY sequence_no ASC, id ASC`,
-    [conversationId],
+     WHERE conversation_id = ?${includeDeleted ? '' : ' AND deleted_at IS NULL'}${extraWhere}${orderAndLimit}`,
+    [conversationId, ...extraParams],
   );
 }
 
@@ -177,7 +180,7 @@ async function listMessages(conversationId) {
   });
 
   try {
-    await redisClient.setEx(cacheKey, MESSAGE_TREE_CACHE_TTL_SECONDS, JSON.stringify(rows));
+    await redisClient.setEx(cacheKey, MESSAGE_LIST_CACHE_TTL_SECONDS, JSON.stringify(rows));
   } catch (error) {
     logger.warn('Failed to write conversation cache', {
       conversationId,
@@ -190,8 +193,21 @@ async function listMessages(conversationId) {
 }
 
 async function getMessageById(conversationId, messageId) {
-  const allMessages = await listMessages(conversationId);
-  return allMessages.find((message) => Number(message.id) === Number(messageId)) || null;
+  const rows = await fetchMessagesFromDatabase(conversationId, { extraWhere: ' AND id = ?', extraParams: [messageId] });
+  return rows[0] || null;
+}
+
+async function getLatestMessage(conversationId) {
+  const rows = await fetchMessagesFromDatabase(conversationId, { orderAndLimit: ' ORDER BY sequence_no DESC, id DESC LIMIT 1' });
+  return rows[0] || null;
+}
+
+async function getConversationMessageCount(conversationId) {
+  const rows = await query(
+    'SELECT COUNT(*) AS messageCount FROM messages WHERE conversation_id = ? AND deleted_at IS NULL',
+    [conversationId],
+  );
+  return Number(rows[0]?.messageCount || 0);
 }
 
 async function addMessage(options) {
@@ -214,12 +230,13 @@ async function addMessage(options) {
       edited_from_message_id,
       prompt_kind,
       metadata_json
-    ) VALUES (?, ?, ?, ?, 'success', NOW(), ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)`,
     [
       options.conversationId,
       options.senderType,
       options.content,
       nextSequence,
+      options.status || 'success',
       options.parentMessageId || null,
       options.branchFromMessageId || null,
       options.editedFromMessageId || null,
@@ -234,6 +251,7 @@ async function addMessage(options) {
     conversationId: options.conversationId,
     messageId: result.insertId,
     senderType: options.senderType,
+    status: options.status || 'success',
     parentMessageId: options.parentMessageId || null,
     promptKind: options.promptKind || 'normal',
     sequenceNo: nextSequence,
@@ -294,36 +312,25 @@ function shortText(value, limit = 40) {
   return stripThinkTags(value).replace(/\s+/g, ' ').trim().slice(0, limit);
 }
 
+function normalizeMessageForView(message) {
+  if (!message) {
+    return null;
+  }
+  return {
+    ...message,
+    metadata: safeParseJson(message.metadata_json),
+  };
+}
+
 function buildMessageMaps(allMessages) {
   const byId = new Map();
-  const childrenMap = new Map();
 
   for (const message of allMessages) {
-    const normalized = {
-      ...message,
-      metadata: safeParseJson(message.metadata_json),
-    };
+    const normalized = normalizeMessageForView(message);
     byId.set(Number(message.id), normalized);
-
-    if (message.parent_message_id) {
-      const parentId = Number(message.parent_message_id);
-      if (!childrenMap.has(parentId)) {
-        childrenMap.set(parentId, []);
-      }
-      childrenMap.get(parentId).push(normalized);
-    }
   }
 
-  for (const [, children] of childrenMap) {
-    children.sort((a, b) => {
-      if (a.sequence_no !== b.sequence_no) {
-        return Number(a.sequence_no) - Number(b.sequence_no);
-      }
-      return Number(a.id) - Number(b.id);
-    });
-  }
-
-  return { byId, childrenMap };
+  return { byId };
 }
 
 function buildPathMessages(allMessages, leafMessageId) {
@@ -346,159 +353,99 @@ function buildPathMessages(allMessages, leafMessageId) {
   return path.reverse();
 }
 
-function buildTreeEntries(allMessages, activeIds, childrenMap) {
-  const roots = allMessages
-    .filter((message) => !message.parent_message_id)
-    .sort((a, b) => {
-      if (a.sequence_no !== b.sequence_no) {
-        return Number(a.sequence_no) - Number(b.sequence_no);
-      }
-      return Number(a.id) - Number(b.id);
-    });
-
-  const entries = [];
-  const visited = new Set();
-
-  function walk(message, depth) {
-    const messageId = Number(message.id);
-    if (!messageId || visited.has(messageId)) {
-      return false;
-    }
-    visited.add(messageId);
-
-    const children = childrenMap.get(messageId) || [];
-    const entry = {
-      id: message.id,
-      parentId: message.parent_message_id || null,
-      depth,
-      senderType: message.sender_type,
-      promptKind: message.prompt_kind || 'normal',
-      shortContent: shortText(message.content, 52),
-      isActive: activeIds.has(messageId),
-      isOnActiveTrail: false,
-      childCount: children.length,
-    };
-    entries.push(entry);
-
-    let subtreeHasActive = entry.isActive;
-    for (const child of children) {
-      if (walk(child, depth + 1)) {
-        subtreeHasActive = true;
-      }
-    }
-    entry.isOnActiveTrail = subtreeHasActive;
-    return subtreeHasActive;
+async function fetchPathMessages(conversationId, leafMessageId) {
+  const normalizedLeafId = Number(leafMessageId || 0);
+  if (!normalizedLeafId) {
+    return [];
   }
 
-  roots.forEach((root) => walk(root, 0));
-  return entries;
+  const rows = await query(
+    `WITH RECURSIVE message_path AS (
+       SELECT id,
+              conversation_id,
+              sender_type,
+              content,
+              sequence_no,
+              status,
+              created_at,
+              parent_message_id,
+              branch_from_message_id,
+              edited_from_message_id,
+              prompt_kind,
+              metadata_json,
+              deleted_at,
+              0 AS reverse_depth
+       FROM messages
+       WHERE conversation_id = ? AND id = ? AND deleted_at IS NULL
+       UNION ALL
+       SELECT m.id,
+              m.conversation_id,
+              m.sender_type,
+              m.content,
+              m.sequence_no,
+              m.status,
+              m.created_at,
+              m.parent_message_id,
+              m.branch_from_message_id,
+              m.edited_from_message_id,
+              m.prompt_kind,
+              m.metadata_json,
+              m.deleted_at,
+              mp.reverse_depth + 1 AS reverse_depth
+       FROM messages m
+       JOIN message_path mp ON m.id = mp.parent_message_id
+       WHERE m.conversation_id = ? AND m.deleted_at IS NULL
+     )
+     SELECT id,
+            conversation_id,
+            sender_type,
+            content,
+            sequence_no,
+            status,
+            created_at,
+            parent_message_id,
+            branch_from_message_id,
+            edited_from_message_id,
+            prompt_kind,
+            metadata_json,
+            deleted_at
+     FROM message_path
+     ORDER BY reverse_depth DESC`,
+    [conversationId, normalizedLeafId, conversationId],
+  );
+
+  return rows.map(normalizeMessageForView);
 }
 
-function buildBranchDescriptor(allMessages, leaf, normalizedLeafId, childrenMap) {
-  const branchPath = buildPathMessages(allMessages, leaf.id);
-  const divergenceNode = branchPath.find((message) => {
-    const parentId = message.parent_message_id ? Number(message.parent_message_id) : null;
-    if (!parentId) {
-      return false;
-    }
-    return (childrenMap.get(parentId) || []).length > 1;
-  }) || branchPath[0] || leaf;
-
-  const lastUser = [...branchPath].reverse().find((item) => item.sender_type === 'user');
-  const lastAi = [...branchPath].reverse().find((item) => item.sender_type === 'character');
-  const labelParts = [];
-
-  if (divergenceNode) {
-    labelParts.push(`从 #${divergenceNode.id} 分出`);
-  }
-  if (lastUser) {
-    labelParts.push(`你：${shortText(lastUser.content, 14)}`);
-  } else if (lastAi) {
-    labelParts.push(`AI：${shortText(lastAi.content, 14)}`);
-  }
-
-  const summary = branchPath
-    .slice(-4)
-    .map((item) => `${item.sender_type === 'user' ? '你' : 'AI'}：${shortText(item.content, 18)}`)
-    .join(' · ');
-
-  return {
-    leafId: leaf.id,
-    isActive: Number(leaf.id) === normalizedLeafId,
-    depth: branchPath.length,
-    preview: branchPath
-      .slice(-3)
-      .map((item) => `${item.sender_type === 'user' ? '你' : 'AI'}：${shortText(item.content, 24)}`)
-      .join(' · '),
-    senderType: leaf.sender_type,
-    promptKind: leaf.prompt_kind,
-    label: labelParts.join(' · ') || `分支 #${leaf.id}`,
-    summary: summary || '（空分支）',
-    divergenceMessageId: divergenceNode ? divergenceNode.id : leaf.id,
-  };
-}
-
-function buildConversationView(allMessages, activeLeafId) {
-  const normalizedLeafId = activeLeafId ? Number(activeLeafId) : null;
-  const { byId, childrenMap } = buildMessageMaps(allMessages);
-  const path = buildPathMessages(allMessages, normalizedLeafId);
-  const activeIds = new Set(path.map((message) => Number(message.id)));
-
-  const pathMessages = path.map((message, index) => {
-    const parentId = message.parent_message_id ? Number(message.parent_message_id) : null;
-    const parentMessage = parentId ? byId.get(parentId) || null : null;
-    const siblingVariants = parentId && childrenMap.has(parentId)
-      ? childrenMap.get(parentId).map((item) => ({
-          id: item.id,
-          sender_type: item.sender_type,
-          prompt_kind: item.prompt_kind,
-          short_content: shortText(item.content, 40),
-          is_active: Number(item.id) === Number(message.id),
-        }))
-      : [];
-
-    const directChildren = childrenMap.get(Number(message.id)) || [];
-    const nextChoices = directChildren.map((item) => ({
-      id: item.id,
-      sender_type: item.sender_type,
-      prompt_kind: item.prompt_kind,
-      short_content: shortText(item.content, 40),
-      is_active: activeIds.has(Number(item.id)),
-    }));
-
+function decoratePathMessages(pathMessages) {
+  return pathMessages.map((message, index, messages) => {
+    const parentMessage = index > 0 ? messages[index - 1] : null;
+    const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
     return {
       ...message,
       depth: index,
       visibleContent: stripThinkTags(message.content),
       parentUserPreviewContent: parentMessage && parentMessage.sender_type === 'user' ? parentMessage.content : '',
-      siblingVariants,
-      nextChoices,
-      siblingCount: siblingVariants.length,
-      childCount: nextChoices.length,
+      hasVisibleContinuation: Boolean(nextMessage),
+      siblingVariants: [],
+      nextChoices: [],
+      siblingCount: 0,
+      childCount: 0,
     };
   });
+}
 
-  const nonRootIds = new Set(
-    allMessages
-      .filter((message) => message.parent_message_id)
-      .map((message) => Number(message.parent_message_id)),
-  );
-
-  const leafMessages = allMessages
-    .filter((message) => !nonRootIds.has(Number(message.id)))
-    .sort((a, b) => Number(b.id) - Number(a.id));
-
-  const branches = leafMessages.map((leaf) => buildBranchDescriptor(allMessages, leaf, normalizedLeafId, childrenMap));
-  const currentBranch = branches.find((branch) => branch.isActive) || null;
-  const treeEntries = buildTreeEntries(allMessages, activeIds, childrenMap);
+async function buildConversationPathView(conversationId, activeLeafId, options = {}) {
+  const normalizedLeafId = activeLeafId ? Number(activeLeafId) : null;
+  const pathMessages = decoratePathMessages(await fetchPathMessages(conversationId, normalizedLeafId));
+  const messageCount = options.messageCount === undefined
+    ? await getConversationMessageCount(conversationId)
+    : Number(options.messageCount || 0);
 
   return {
     pathMessages,
-    branches,
-    treeEntries,
-    currentBranch,
     activeLeafId: normalizedLeafId,
-    messageCount: allMessages.length,
+    messageCount,
   };
 }
 
@@ -509,6 +456,7 @@ async function cloneConversationBranch(options) {
   const newConversationId = await createConversation(options.userId, options.characterId, {
     parentConversationId: options.sourceConversationId,
     branchedFromMessageId: options.sourceLeafMessageId,
+    selectedModelMode: options.selectedModelMode || 'standard',
     title: options.title,
   });
 
@@ -523,7 +471,7 @@ async function cloneConversationBranch(options) {
       parentMessageId: sourceMessage.parent_message_id ? idMap.get(Number(sourceMessage.parent_message_id)) || null : null,
       branchFromMessageId: sourceMessage.id,
       editedFromMessageId: sourceMessage.edited_from_message_id || null,
-      promptKind: sourceMessage.prompt_kind === 'normal' ? 'branch' : sourceMessage.prompt_kind,
+      promptKind: sourceMessage.prompt_kind || 'normal',
       metadataJson: JSON.stringify({
         clonedFromConversationId: Number(options.sourceConversationId),
         clonedFromMessageId: Number(sourceMessage.id),
@@ -623,11 +571,14 @@ module.exports = {
   listUserConversations,
   listMessages,
   getMessageById,
+  getLatestMessage,
+  getConversationMessageCount,
   addMessage,
   setConversationCurrentMessage,
   createEditedMessageVariant,
   buildPathMessages,
-  buildConversationView,
+  fetchPathMessages,
+  buildConversationPathView,
   cloneConversationBranch,
   countChildConversations,
   deleteMessageSafely,

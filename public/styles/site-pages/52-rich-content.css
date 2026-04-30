@@ -144,3 +144,26 @@
 .bubble-quote {
   color: #eadfff;
 }
+
+/* Streaming UX refinements */
+.bubble[data-streaming="true"] .bubble-folds,
+.bubble[data-streaming="true"] .bubble-fold {
+  display: none;
+}
+
+.bubble[data-streaming="true"] .bubble-rich {
+  gap: 8px;
+}
+
+.bubble[data-streaming="true"] .bubble-rich p,
+.bubble[data-streaming="true"] .bubble-rich ul,
+.bubble[data-streaming="true"] .bubble-rich ol,
+.bubble[data-streaming="true"] .bubble-rich blockquote,
+.bubble[data-streaming="true"] .bubble-rich pre {
+  animation: streamFadeIn 120ms ease-out;
+}
+
+@keyframes streamFadeIn {
+  from { opacity: 0.72; transform: translateY(1px); }
+  to { opacity: 1; transform: translateY(0); }
+}

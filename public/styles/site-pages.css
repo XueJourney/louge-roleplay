@@ -13,6 +13,7 @@
 @import url("./site-pages/11-home-polish.css");
 @import url("./site-pages/20-admin.css");
 @import url("./site-pages/21-admin-polish.css");
+@import url("./site-pages/25-notifications.css");
 @import url("./site-pages/30-character-editor.css");
 @import url("./site-pages/31-character-polish.css");
 @import url("./site-pages/40-dashboard.css");
@@ -20,6 +21,7 @@
 @import url("./site-pages/50-chat.css");
 @import url("./site-pages/51-chat-polish.css");
 @import url("./site-pages/52-rich-content.css");
+@import url("./site-pages/53-mobile-chat.css");
 @import url("./site-pages/60-auth.css");
 @import url("./site-pages/61-register.css");
 @import url("./site-pages/70-shared-utilities.css");

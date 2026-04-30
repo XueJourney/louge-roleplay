@@ -292,8 +292,6 @@ button:hover::before,
 
 .inline-btn.primary,
 .chip.active,
-.tree-node.active .inline-btn,
-.branch-item.active .inline-btn,
 .quick-link.is-active {
   background: rgba(155, 124, 255, 0.18);
   border-color: rgba(155, 124, 255, 0.34);

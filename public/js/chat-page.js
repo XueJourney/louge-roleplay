@@ -1,7 +1,7 @@
 /**
  * @file public/js/chat-page.js
- * @description 对话页脚本。
- * 实现：流式消息发送、富文本渲染、思考块折叠与草稿恢复。
+ * @description 线性聊天页脚本。
+ * 实现：流式消息发送、历史加载、重写/重新生成反馈、富文本渲染与草稿恢复。
  * DEBUG：若流式发送异常，优先检查 #chat-compose-form 的 data-* 参数和 window.renderRichContent 是否可用。
  */
 
@@ -14,25 +14,111 @@
     const streamEndpoint = form.dataset.streamEndpoint || form.action;
     const optimizeStreamEndpoint = form.dataset.optimizeStreamEndpoint || '';
     const conversationId = form.dataset.conversationId || '';
-    const pathContainer = document.querySelector('.conversation-path');
+    const chatContainer = document.querySelector('.chat-transcript');
     let isSubmitting = false;
     let streamingRenderScheduled = false;
     let streamingRenderFrame = null;
     let activeAbortController = null;
+    let autoFollowStreaming = true;
 
-    function updateActiveLeafState(leafId) {
-      const normalizedLeafId = String(leafId || '').trim();
-      if (!normalizedLeafId) return;
-      document.querySelectorAll('input[name="parentMessageId"]').forEach((input) => {
-        input.value = normalizedLeafId;
+    function isNearPageBottom(threshold) {
+      const margin = Number(threshold || 180);
+      const doc = document.documentElement;
+      const scrollTop = window.scrollY || doc.scrollTop || 0;
+      const viewportBottom = scrollTop + window.innerHeight;
+      const pageHeight = Math.max(doc.scrollHeight, document.body ? document.body.scrollHeight : 0);
+      return pageHeight - viewportBottom <= margin;
+    }
+
+    function beginStreamingAutoFollow() {
+      autoFollowStreaming = isNearPageBottom(260);
+    }
+
+    function releaseStreamingAutoFollow() {
+      if (isSubmitting) {
+        autoFollowStreaming = false;
+      }
+    }
+
+    function maybeFollowStreamingBubble(streamBubble, behavior) {
+      if (!autoFollowStreaming || !streamBubble || !streamBubble.article) {
+        return;
+      }
+      streamBubble.article.scrollIntoView({ block: 'end', behavior: behavior || 'smooth' });
+    }
+
+    window.addEventListener('wheel', releaseStreamingAutoFollow, { passive: true });
+    window.addEventListener('touchmove', releaseStreamingAutoFollow, { passive: true });
+    window.addEventListener('keydown', (event) => {
+      if (['ArrowUp', 'PageUp', 'Home', 'Space'].includes(event.key)) {
+        releaseStreamingAutoFollow();
+      }
+    });
+
+    function closeMessageMenus(scope) {
+      const root = scope || document;
+      root.querySelectorAll('.message-menu[open], .more-menu[open], .message-menu-details[open]').forEach((menu) => {
+        menu.removeAttribute('open');
       });
+    }
+
+    function closeSiblingMessageMenus(currentMenu) {
+      document.querySelectorAll('.message-menu[open], .more-menu[open]').forEach((menu) => {
+        if (menu !== currentMenu && !menu.contains(currentMenu)) {
+          menu.removeAttribute('open');
+        }
+      });
+    }
+
+    function showToast(message) {
+      const text = String(message || '').trim();
+      if (!text) return;
+      const toast = document.createElement('div');
+      toast.className = 'chat-toast';
+      toast.textContent = text;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('show'));
+      window.setTimeout(() => {
+        toast.classList.remove('show');
+        window.setTimeout(() => toast.remove(), 260);
+      }, 2600);
+    }
+
+    function reloadToMessage(messageId, notice) {
+      const normalizedMessageId = String(messageId || '').trim();
+      if (!normalizedMessageId) return;
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('leaf', normalizedMessageId);
+      if (notice) {
+        nextUrl.searchParams.set('notice', notice);
+      }
+      window.setTimeout(() => {
+        window.location.assign(nextUrl.toString());
+      }, 450);
+    }
+
+    function updateHiddenParentInputs(messageId) {
+      const normalizedMessageId = String(messageId || '').trim();
+      if (!normalizedMessageId) return;
+      document.querySelectorAll('input[name="parentMessageId"]').forEach((input) => {
+        input.value = normalizedMessageId;
+      });
+    }
+
+    function updateCurrentMessageState(messageId) {
+      const normalizedMessageId = String(messageId || '').trim();
+      if (!normalizedMessageId) return;
+      updateHiddenParentInputs(normalizedMessageId);
       form.dataset.messageCount = String(Math.max(Number(form.dataset.messageCount || '0'), 1));
-      const activeLeafMeta = document.querySelector('[data-active-leaf-label]');
-      if (activeLeafMeta) {
-        activeLeafMeta.textContent = t('当前叶子 #{id}', { id: normalizedLeafId });
+      if (chatContainer) {
+        const currentCount = Number(chatContainer.dataset.visibleCount || '0') || chatContainer.querySelectorAll('article.bubble[data-message-id]').length;
+        const totalCount = Number(chatContainer.dataset.totalCount || '0') || currentCount;
+        chatContainer.dataset.visibleCount = String(Math.max(currentCount, chatContainer.querySelectorAll('article.bubble[data-message-id]').length));
+        chatContainer.dataset.totalCount = String(Math.max(totalCount, chatContainer.querySelectorAll('article.bubble[data-message-id]').length));
+        chatContainer.querySelectorAll('.empty-chat-state').forEach((node) => node.remove());
       }
       const nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.set('leaf', normalizedLeafId);
+      nextUrl.searchParams.set('leaf', normalizedMessageId);
       window.history.replaceState({}, '', nextUrl.toString());
     }
 
@@ -41,6 +127,18 @@
       if (currentMessageCount === 0 && !textarea.value.trim()) {
         textarea.value = t('[开始一次新的对话]');
       }
+    }
+
+    function removeStaleLinearTail(messageId) {
+      const normalizedMessageId = String(messageId || '').trim();
+      if (!normalizedMessageId || !chatContainer) return;
+      const articles = Array.from(chatContainer.querySelectorAll('article.bubble[data-message-id]'));
+      const index = articles.findIndex((article) => String(article.dataset.messageId || '') === normalizedMessageId);
+      if (index < 0) return;
+      articles.slice(index + 1).forEach((article) => article.remove());
+      chatContainer.dataset.visibleCount = String(chatContainer.querySelectorAll('article.bubble[data-message-id]').length);
+      chatContainer.dataset.totalCount = String(Math.max(Number(chatContainer.dataset.totalCount || '0'), Number(chatContainer.dataset.visibleCount || '0')));
+      updateHiddenParentInputs(normalizedMessageId);
     }
 
     function removeLivePair(streamBubble) {
@@ -71,21 +169,12 @@
       role.className = 'bubble-role';
       role.textContent = roleLabel;
 
-      const kindWrap = document.createElement('span');
-      kindWrap.className = 'bubble-kind-wrap';
+      const status = document.createElement('span');
+      status.className = 'bubble-status';
+      status.textContent = kindLabel || '';
 
-      const kind = document.createElement('span');
-      kind.className = 'bubble-kind';
-      kind.textContent = kindLabel;
-
-      const stamp = document.createElement('span');
-      stamp.className = 'bubble-time';
-      stamp.textContent = options && options.timeLabel ? options.timeLabel : '';
-
-      kindWrap.appendChild(kind);
-      kindWrap.appendChild(stamp);
       header.appendChild(role);
-      header.appendChild(kindWrap);
+      header.appendChild(status);
 
       const rich = document.createElement('div');
       rich.className = 'bubble-rich';
@@ -104,8 +193,8 @@
     }
 
     function appendStreamingPair(userContent, options) {
-      if (!pathContainer) return null;
-      const mode = Object.assign({ userLabel: t('你'), userKind: '草稿 · user', aiLabel: 'AI', aiKind: t('生成中…'), userSenderClass: 'user', aiSenderClass: 'character' }, options || {});
+      if (!chatContainer) return null;
+      const mode = Object.assign({ userLabel: t('你'), userKind: '', aiLabel: 'AI', aiKind: t('生成中…'), userSenderClass: 'user', aiSenderClass: 'character' }, options || {});
       const userBubble = createBubble(mode.userLabel, mode.userKind, mode.userSenderClass, userContent, {
         isPending: true,
         timeLabel: t('刚刚'),
@@ -119,14 +208,16 @@
       userBubble.article.classList.add('bubble-live');
       aiBubble.article.classList.add('bubble-live');
 
-      pathContainer.appendChild(userBubble.article);
-      pathContainer.appendChild(aiBubble.article);
-      aiBubble.article.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      beginStreamingAutoFollow();
+      chatContainer.querySelectorAll('.empty-chat-state').forEach((node) => node.remove());
+      chatContainer.appendChild(userBubble.article);
+      chatContainer.appendChild(aiBubble.article);
+      maybeFollowStreamingBubble(aiBubble, 'smooth');
       return { userBubble, aiBubble };
     }
 
     function appendSingleStreamingBubble(roleLabel, kindLabel, senderClass, options) {
-      if (!pathContainer) return null;
+      if (!chatContainer) return null;
       const bubble = createBubble(roleLabel, kindLabel, senderClass, '', {
         isStreaming: true,
         isPending: true,
@@ -139,8 +230,10 @@
           note.textContent = options.noteText;
         }
       }
-      pathContainer.appendChild(bubble.article);
-      bubble.article.scrollIntoView({ block: 'end', behavior: 'smooth' });
+      beginStreamingAutoFollow();
+      chatContainer.querySelectorAll('.empty-chat-state').forEach((node) => node.remove());
+      chatContainer.appendChild(bubble.article);
+      maybeFollowStreamingBubble(bubble, 'smooth');
       return bubble;
     }
 
@@ -153,7 +246,6 @@
       container.dataset.lineMode = 'false';
       container.dataset.finalPass = 'false';
     }
-
 
     function createFragmentFromHtml(html) {
       const template = document.createElement('template');
@@ -209,7 +301,19 @@
       streamingRenderFrame = requestAnimationFrame(() => {
         streamingRenderScheduled = false;
         streamingRenderFrame = null;
-        renderStreamingPlainText(streamBubble.rich, fullText);
+        if (typeof window.renderRichContent === 'function') {
+          window.renderRichContent(streamBubble.rich, fullText, {
+            streaming: true,
+            finalPass: false,
+            lineMode: true,
+            committed: committedText,
+            tail: tailText,
+            hideFolds: true,
+          });
+        } else {
+          renderStreamingPlainText(streamBubble.rich, fullText);
+        }
+        maybeFollowStreamingBubble(streamBubble, 'auto');
         const note = streamBubble.article.querySelector('.bubble-live-note');
         if (note) note.textContent = String(fullText || '').trim() ? t('AI 正在输出…') : t('AI 正在思考…');
       });
@@ -234,15 +338,15 @@
         streamingRenderFrame = null;
       }
       streamingRenderScheduled = false;
-      const state = Object.assign({ mode: 'message', leafId: '', kindText: '', error: false, plainText: false }, options || {});
+      const state = Object.assign({ mode: 'message', messageId: '', kindText: '', error: false, plainText: false }, options || {});
       streamBubble.article.dataset.streaming = 'false';
       streamBubble.article.classList.remove('bubble-pending');
       if (state.error) {
         streamBubble.article.classList.add('bubble-system');
       }
-      const kind = streamBubble.article.querySelector('.bubble-kind');
-      if (kind) {
-        kind.textContent = state.kindText || `#${state.leafId || t('新回复')} · normal`;
+      const status = streamBubble.article.querySelector('.bubble-status');
+      if (status) {
+        status.textContent = state.error ? t('执行失败') : '';
       }
       const tools = streamBubble.article.querySelector('.bubble-actions--live');
       if (tools) {
@@ -299,7 +403,7 @@
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let finalLeafId = '';
+      let finalMessageId = '';
       let fullText = '';
       let committedText = '';
       let tailText = '';
@@ -315,14 +419,11 @@
         if (packet.type === 'delta') {
           fullText = String(packet.full || '');
           gotRenderableContent = gotRenderableContent || Boolean(fullText);
-          if (!committedText && !tailText) {
-            const preview = splitStreamingSegments(fullText);
-            committedText = preview.committed;
-            tailText = preview.tail;
-          }
+          const preview = splitStreamingSegments(fullText);
+          committedText = preview.committed;
+          tailText = preview.tail;
           if (settings.streamBubble) {
             scheduleStreamingRender(settings.streamBubble, fullText, committedText, tailText);
-            settings.streamBubble.article.scrollIntoView({ block: 'end', behavior: 'smooth' });
           }
           return;
         }
@@ -346,13 +447,16 @@
           gotDonePacket = true;
           donePacket = packet;
           fullText = String(packet.full || fullText || '');
-          finalLeafId = String(packet.leafId || packet.replyMessageId || '');
+          finalMessageId = String(packet.messageId || packet.leafId || packet.replyMessageId || '');
           if (settings.streamBubble) {
+            if (packet.parentMessageId && ['message', 'regenerate', 'replay'].includes(String(packet.mode || ''))) {
+              removeStaleLinearTail(packet.parentMessageId);
+            }
             if (packet.parentHtml) {
               replacePreviousLiveUserBubble(settings.streamBubble, packet.parentHtml);
               const parentId = String(packet.parentMessageId || '').trim();
-              if (parentId && pathContainer) {
-                const currentParent = Array.from(pathContainer.querySelectorAll('article.bubble[data-message-id]'))
+              if (parentId && chatContainer) {
+                const currentParent = Array.from(chatContainer.querySelectorAll('article.bubble[data-message-id]'))
                   .find((article) => String(article.dataset.messageId || '') === parentId);
                 if (currentParent && !currentParent.classList.contains('bubble-live')) {
                   const fragment = createFragmentFromHtml(packet.parentHtml);
@@ -365,12 +469,15 @@
               }
             }
             if (packet.html) {
-              replaceBubbleWithHtml(settings.streamBubble, packet.html);
+              const renderedArticle = replaceBubbleWithHtml(settings.streamBubble, packet.html);
+              if (renderedArticle && finalMessageId) {
+                renderedArticle.dataset.messageId = finalMessageId;
+              }
             } else {
               setBubbleFinalState(settings.streamBubble, fullText, {
                 mode: String(packet.mode || 'message'),
-                leafId: finalLeafId,
-                kindText: packet.mode === 'optimize-input' ? t('优化结果') : `#${finalLeafId || t('新回复')} · ${packet.mode || 'normal'}`,
+                messageId: finalMessageId,
+                kindText: packet.mode === 'optimize-input' ? t('润色结果') : '',
               });
             }
           }
@@ -381,10 +488,13 @@
           if (settings.streamBubble) {
             setBubbleFinalState(settings.streamBubble, message, {
               mode: 'error',
-              leafId: '',
+              messageId: '',
               kindText: t('执行失败'),
               error: true,
             });
+          }
+          if (window.LougeNotifications && typeof window.LougeNotifications.showSupport === 'function') {
+            window.LougeNotifications.showSupport({ reason: 'chat-error' });
           }
           throw new Error(message);
         }
@@ -417,7 +527,7 @@
         if (gotRenderableContent && fullText) {
           setBubbleFinalState(settings.streamBubble, fullText, {
             mode: 'partial',
-            leafId: '',
+            messageId: '',
             kindText: t('连接中断'),
             error: true,
             plainText: true,
@@ -430,7 +540,7 @@
       }
 
       return {
-        finalLeafId,
+        finalMessageId,
         fullText,
         packet: donePacket,
       };
@@ -450,7 +560,7 @@
       const draftContent = String(payload.get('content') || '').trim();
       const streamPair = appendStreamingPair(draftContent, {
         userLabel: t('你'),
-        userKind: '草稿 · user',
+        userKind: '',
         aiLabel: 'AI',
         aiKind: t('生成中…'),
       });
@@ -493,8 +603,8 @@
           abortController,
         });
 
-        if (result.finalLeafId) {
-          updateActiveLeafState(result.finalLeafId);
+        if (result.finalMessageId) {
+          updateCurrentMessageState(result.finalMessageId);
         }
 
         textarea.value = '';
@@ -502,8 +612,11 @@
         console.error(error);
         const isAbortError = error && (error.name === 'AbortError' || /aborted/i.test(String(error.message || '')));
         const fallbackMessage = isAbortError
-          ? t('这次生成已中断。')
+          ? t('生成中断，已保留这段回复。')
           : (error && error.message ? String(t(error.message)) : t('AI 回复失败，请稍后重试。'));
+        if (!isAbortError && window.LougeNotifications && typeof window.LougeNotifications.showSupport === 'function') {
+          window.LougeNotifications.showSupport({ reason: 'chat-exception' });
+        }
         if (streamBubble && streamBubble.rich) {
           setBubbleFinalState(streamBubble, fallbackMessage, {
             mode: 'error',
@@ -517,6 +630,7 @@
       } finally {
         isSubmitting = false;
         textarea.disabled = false;
+        window.removeEventListener('beforeunload', handlePageAbort);
         if (submitButton) {
           submitButton.disabled = false;
           submitButton.textContent = previousButtonText || t('发送消息');
@@ -528,6 +642,18 @@
     }
 
     form.addEventListener('submit', handleMainComposeSubmit);
+
+    textarea.addEventListener('keydown', (event) => {
+      if (event.isComposing || event.key !== 'Enter' || event.shiftKey) {
+        return;
+      }
+      event.preventDefault();
+      if (!isSubmitting && typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else if (!isSubmitting) {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }
+    });
 
     const optimizeForm = document.getElementById('chat-optimize-form');
     if (optimizeForm && optimizeStreamEndpoint) {
@@ -550,6 +676,11 @@
           if (streamBubble && streamBubble.article) {
             streamBubble.article.remove();
           }
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = previousButtonText || t('润色输入');
+          }
+          showToast(t('请先输入要润色的内容。'));
           return;
         }
 
@@ -570,6 +701,10 @@
 
           const optimizedContent = String(result.packet && result.packet.optimizedContent || result.fullText || '').trim();
           if (optimizedContent) {
+            if (streamBubble && streamBubble.article) {
+              streamBubble.article.remove();
+            }
+            showToast(t('已润色并放回输入框。'));
             const targetTextarea = document.getElementById('optimizeContent');
             if (targetTextarea) {
               targetTextarea.value = optimizedContent;
@@ -626,13 +761,14 @@
       const senderClass = String(actionForm.dataset.streamSenderClass || 'character').trim() || 'character';
       const previewContent = String(actionForm.dataset.streamPreviewContent || '').trim();
       const payload = new FormData(actionForm);
+      closeMessageMenus();
       const abortController = (typeof AbortController === 'function') ? new AbortController() : null;
 
       let streamBubble = null;
       if (mode === 'replay') {
         const pair = appendStreamingPair(previewContent, {
           userLabel: t('你'),
-          userKind: '重算起点 · user',
+          userKind: '',
           aiLabel: roleLabel,
           aiKind: kindLabel,
           userSenderClass: 'user',
@@ -645,7 +781,7 @@
 
       if (submitButton) {
         submitButton.disabled = true;
-        submitButton.textContent = mode === 'replay' ? t('重算中…') : t('生成中…');
+        submitButton.textContent = mode === 'replay' ? t('重写中…') : t('生成中…');
       }
 
       try {
@@ -658,12 +794,21 @@
           abortController,
         });
 
-        if (result.finalLeafId) {
-          updateActiveLeafState(result.finalLeafId);
+        if (result.finalMessageId) {
+          updateCurrentMessageState(result.finalMessageId);
+          if (mode === 'replay') {
+            showToast(t('已生成新的结果，旧内容已保留。'));
+            reloadToMessage(result.finalMessageId, 'updated');
+          } else if (mode === 'regenerate') {
+            showToast(t('已显示新的结果。'));
+          }
         }
       } catch (error) {
         console.error(error);
         const fallbackMessage = error && error.message ? String(t(error.message)) : t('操作失败，请稍后重试。');
+        if (window.LougeNotifications && typeof window.LougeNotifications.showSupport === 'function') {
+          window.LougeNotifications.showSupport({ reason: 'chat-action-exception' });
+        }
         if (streamBubble) {
           setBubbleFinalState(streamBubble, fallbackMessage, {
             mode: 'error',
@@ -684,11 +829,11 @@
 
 
     async function loadOlderMessages(button) {
-      if (!button || button.disabled || !pathContainer) return;
-      const beforeId = String(button.dataset.beforeId || pathContainer.dataset.oldestVisibleId || '').trim();
+      if (!button || button.disabled || !chatContainer) return;
+      const beforeId = String(button.dataset.beforeId || chatContainer.dataset.oldestVisibleId || '').trim();
       if (!beforeId) return;
       const previousText = button.textContent;
-      const anchor = pathContainer.firstElementChild;
+      const anchor = chatContainer.firstElementChild;
       const anchorTop = anchor ? anchor.getBoundingClientRect().top : 0;
       button.disabled = true;
       button.textContent = t('加载中…');
@@ -696,9 +841,9 @@
         const url = new URL(button.dataset.endpoint || `/chat/${conversationId}/messages/history`, window.location.origin);
         url.searchParams.set('beforeId', beforeId);
         url.searchParams.set('limit', '10');
-        const currentLeaf = new URLSearchParams(window.location.search).get('leaf');
-        if (currentLeaf) {
-          url.searchParams.set('leaf', currentLeaf);
+        const currentMessage = new URLSearchParams(window.location.search).get('leaf');
+        if (currentMessage) {
+          url.searchParams.set('leaf', currentMessage);
         }
         const response = await fetch(url.toString(), {
           headers: {
@@ -713,8 +858,14 @@
         if (payload.html) {
           const fragment = createFragmentFromHtml(payload.html);
           const nodes = Array.from(fragment.children);
-          nodes.reverse().forEach((node) => pathContainer.prepend(node));
-          hydrateRichContent(pathContainer);
+          nodes.forEach((node) => {
+            if (anchor && anchor.parentNode === chatContainer) {
+              chatContainer.insertBefore(node, anchor);
+            } else {
+              chatContainer.prepend(node);
+            }
+          });
+          hydrateRichContent(chatContainer);
           if (anchor) {
             const nextTop = anchor.getBoundingClientRect().top;
             window.scrollBy({ top: nextTop - anchorTop, behavior: 'instant' });
@@ -722,19 +873,19 @@
         }
         if (payload.nextBeforeId) {
           button.dataset.beforeId = String(payload.nextBeforeId);
-          pathContainer.dataset.oldestVisibleId = String(payload.nextBeforeId);
+          chatContainer.dataset.oldestVisibleId = String(payload.nextBeforeId);
         }
         if (!payload.hasMore || !payload.count) {
           const loader = button.closest('[data-history-loader]');
           if (loader) loader.remove();
         } else {
           button.disabled = false;
-          button.textContent = previousText || t('加载之前的对话');
+          button.textContent = previousText || t('查看更早的消息');
         }
       } catch (error) {
         console.error(error);
         button.disabled = false;
-        button.textContent = previousText || t('加载之前的对话');
+        button.textContent = previousText || t('查看更早的消息');
         alert(error && error.message ? error.message : t('历史消息加载失败。'));
       }
     }
@@ -746,14 +897,42 @@
       loadOlderMessages(button);
     });
 
+
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+      const menu = target && target.closest ? target.closest('.message-menu, .more-menu') : null;
+      if (menu) {
+        window.setTimeout(() => {
+          if (menu.open) {
+            closeSiblingMessageMenus(menu);
+          }
+        }, 0);
+        return;
+      }
+      closeMessageMenus();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeMessageMenus();
+      }
+    });
+
     window.addEventListener('load', () => {
-      const target = document.querySelector('.conversation-path article:last-child');
+      const target = document.querySelector('.chat-transcript article:last-child');
       if (target) {
         target.scrollIntoView({ block: 'end', behavior: 'auto' });
       }
     });
 
     const params = new URLSearchParams(window.location.search);
+    const notice = params.get('notice');
+    if (notice === 'updated') {
+      showToast(t('已显示新的结果，旧内容已保留。'));
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete('notice');
+      window.history.replaceState({}, '', nextUrl.toString());
+    }
     const draft = params.get('draft');
     if (draft && !textarea.value.trim()) {
       textarea.value = draft;
@@ -808,14 +987,19 @@
       return details;
     }
 
-    function collectFoldBlocks(raw) {
+    function collectFoldBlocks(raw, options) {
+      const mode = Object.assign({ hideFolds: false }, options || {});
       const folds = [];
       let foldIndex = 0;
       let text = String(raw || '');
 
       text = text.replace(THINK_BLOCK_RE, (_, _tagName, inner) => {
+        const body = String(inner || '').trim();
+        if (mode.hideFolds || !body) {
+          return '';
+        }
         const key = `__FOLD_BLOCK_${foldIndex++}__`;
-        folds.push({ key, title: t('思考内容'), body: String(inner || '').trim(), open: false });
+        folds.push({ key, title: t('思考内容'), body, open: false, kind: 'think' });
         return key;
       });
 
@@ -828,12 +1012,15 @@
         if (!plainInner) {
           return full;
         }
+        if (mode.hideFolds) {
+          return '';
+        }
         const key = `__FOLD_BLOCK_${foldIndex++}__`;
-        folds.push({ key, title: t('标签内容：<{tag}>', { tag: normalizedTag }), body: plainInner, open: false });
+        folds.push({ key, title: t('标签内容：<{tag}>', { tag: normalizedTag }), body: plainInner, open: false, kind: normalizedTag });
         return key;
       });
 
-      return { text, folds };
+      return { text: text.replace(/\n{3,}/g, '\n\n').trim(), folds };
     }
 
     function sanitizeCss(cssText, scopeSelector) {
@@ -1019,15 +1206,25 @@
       };
     }
 
+    function markdownToPartialHtml(text) {
+      const normalized = normalizeMarkdownLines(text);
+      const lines = normalized.split('\n');
+      let inFence = false;
+      lines.forEach((line) => {
+        if (/^```/.test(String(line || '').trim())) {
+          inFence = !inFence;
+        }
+      });
+      const balanced = inFence ? `${normalized}\n\`\`\`` : normalized;
+      return markdownToHtml(balanced);
+    }
+
     function buildStreamingPreviewHtml(text) {
-      const safe = escapeHtml(text || '');
-      if (!safe) {
+      const source = String(text || '').trim();
+      if (!source) {
         return '';
       }
-      return safe
-        .split(/\n/)
-        .map((line) => `<div class="bubble-text">${line || '&nbsp;'}</div>`)
-        .join('');
+      return markdownToPartialHtml(source);
     }
 
     function sanitizeNodeTree(root, scopeSelector) {
@@ -1098,27 +1295,18 @@
     function renderRichContent(container, input, options) {
       const textNode = container.querySelector('.bubble-text');
       const raw = input !== undefined ? String(input || '') : String((textNode && textNode.textContent) || '');
-      const mode = Object.assign({ streaming: false, finalPass: true, lineMode: false, committed: '', tail: '' }, options || {});
+      const mode = Object.assign({ streaming: false, finalPass: true, lineMode: false, committed: '', tail: '', hideFolds: false }, options || {});
       const sourceText = mode.lineMode
         ? `${String(mode.committed || '')}${mode.committed && mode.tail ? '\n' : ''}${String(mode.tail || '')}`
         : raw;
-      const { text, folds } = collectFoldBlocks(sourceText);
+      const { text, folds } = collectFoldBlocks(sourceText, { hideFolds: mode.hideFolds || mode.streaming });
       const safeHtmlSeed = text.replace(SCRIPTISH_TAG_RE, '');
       const scopeId = container.dataset.renderScope || `render-scope-${Date.now()}-${++scopeSeed}`;
       const scopeSelector = `[data-render-scope="${scopeId}"]`;
 
       let html = '';
       if (mode.streaming && mode.lineMode) {
-        const committedText = String(mode.committed || '');
-        const tailText = String(mode.tail || '');
-        const committedSafeSeed = committedText.replace(SCRIPTISH_TAG_RE, '');
-        const committedHtml = committedText
-          ? (HTML_TAG_RE.test(committedSafeSeed)
-            ? committedSafeSeed
-            : markdownToHtml(committedText))
-          : '';
-        const tailHtml = tailText ? `<div class="bubble-text bubble-text-streaming-tail">${escapeHtml(tailText)}</div>` : '';
-        html = `${committedHtml}${tailHtml}` || buildStreamingPreviewHtml(sourceText);
+        html = buildStreamingPreviewHtml(safeHtmlSeed);
       } else {
         html = markdownToHtml(safeHtmlSeed);
         if (HTML_TAG_RE.test(safeHtmlSeed)) {

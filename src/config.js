@@ -6,6 +6,7 @@
 const path = require('path');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
+const packageInfo = require('../package.json');
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
@@ -50,6 +51,7 @@ const exposeAliyunPhoneAuthAppKey = readBool('ALIYUN_PHONE_AUTH_EXPOSE_APP_KEY',
 const config = {
   port: Number(process.env.PORT || 3217),
   appName: readString('APP_NAME', '楼阁'),
+  appVersion: readString('APP_VERSION', packageInfo.version || '0.0.0'),
   appUrl: readString('APP_URL', 'http://127.0.0.1:3217'),
   sessionSecret,
   sessionSecretIsEphemeral,
@@ -80,6 +82,7 @@ const config = {
     return {
       port: this.port,
       appName: this.appName,
+      appVersion: this.appVersion,
       appUrl: this.appUrl,
       trustProxy: this.trustProxy,
       cookieSecure: this.cookieSecure,

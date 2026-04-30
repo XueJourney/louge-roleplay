@@ -113,7 +113,7 @@
     <% if (mode === 'edit' && character) { %>
       <section class="danger-zone">
         <h3>危险操作</h3>
-        <p>删除角色会先走后端安全校验。现在只允许删除“还没有任何对话记录”的角色；只要这个角色已经开过对话，就会被拦住，避免把分支会话整串误删。</p>
+        <p>为了保护已有故事，现在只允许删除从未开始过对话的角色。已经聊过的角色会先保留，避免误删整段内容。</p>
         <div class="prompt-actions">
           <form method="POST" action="/characters/<%= character.id %>/delete" onsubmit="return confirm('确认删除这个角色吗？只有从未开过对话的角色才能删除。');">
             <button type="submit" class="ghost-btn danger-btn">删除这个角色</button>

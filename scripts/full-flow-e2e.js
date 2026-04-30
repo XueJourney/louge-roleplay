@@ -28,11 +28,10 @@ const {
   createConversation,
   getConversationById,
   addMessage,
-  listMessages,
   getMessageById,
   setConversationCurrentMessage,
-  buildPathMessages,
-  buildConversationView,
+  fetchPathMessages,
+  buildConversationPathView,
   createEditedMessageVariant,
   cloneConversationBranch,
   deleteMessageSafely,
@@ -174,8 +173,8 @@ async function main() {
   await setConversationCurrentMessage(conversationId, seedCharacterId);
 
   const userMessageId = await addMessage({ conversationId, senderType: 'user', content: '请简单回复一次全流程测试。', parentMessageId: seedCharacterId, promptKind: 'chat' });
-  const messagesBeforeReply = await listMessages(conversationId);
-  assert.ok(messagesBeforeReply.length >= 3, 'conversation should have seed and user messages');
+  const messagesBeforeReply = await fetchPathMessages(conversationId, userMessageId);
+  assert.ok(messagesBeforeReply.length >= 3, 'conversation path should have seed and user messages');
 
   let replyDelta = '';
   const replyResult = await streamReplyViaGateway({
@@ -183,7 +182,7 @@ async function main() {
     userId,
     conversationId,
     character: editedCharacter,
-    messages: buildPathMessages(messagesBeforeReply, userMessageId),
+    messages: messagesBeforeReply,
     userMessage: '请简单回复一次全流程测试。',
     user,
     onDelta(delta) { replyDelta += delta; },
@@ -197,16 +196,15 @@ async function main() {
     userId,
     conversationId,
     character: editedCharacter,
-    messages: buildPathMessages(await listMessages(conversationId), replyMessageId),
+    messages: await fetchPathMessages(conversationId, replyMessageId),
     userInput: '帮我把这句改自然。',
     user,
   });
   assert.ok(optimized.content.length > 0, 'optimize stream should return content');
-  const allMessages = await listMessages(conversationId);
-  const pathMessages = buildPathMessages(allMessages, replyMessageId);
-  const view = buildConversationView(allMessages, replyMessageId);
+  const pathMessages = await fetchPathMessages(conversationId, replyMessageId);
+  const view = await buildConversationPathView(conversationId, replyMessageId);
   assert.ok(pathMessages.length >= 4, 'path messages should include full chain');
-  assert.equal(Number(view.activeLeafId), Number(replyMessageId), 'conversation view should mark active leaf');
+  assert.equal(Number(view.activeLeafId), Number(replyMessageId), 'conversation path view should mark active leaf');
   const loadedReply = await getMessageById(conversationId, replyMessageId);
   assert.equal(Number(loadedReply.id), Number(replyMessageId), 'message lookup should work');
 

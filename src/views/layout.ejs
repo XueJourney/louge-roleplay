@@ -15,8 +15,12 @@
       locale: <%- JSON.stringify(locale || 'zh-CN') %>,
       messages: <%- JSON.stringify(clientI18nMessages || {}) %>
     };
+    window.AI_ROLEPLAY_NOTIFICATIONS = {
+      items: <%- JSON.stringify(clientNotifications || []) %>
+    };
   </script>
   <script src="/public/js/i18n-runtime.js"></script>
+  <script src="/public/js/notification-client.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -31,10 +35,12 @@
         <a href="/admin"><%= t('管理后台') %></a>
       <% } %>
         <a href="/characters/new"><%= t('创建角色') %></a>
+        <button type="button" class="nav-support-button" data-open-support><%= t('联系客服') %></button>
         <a href="/logout"><%= t('退出（{username}）', { username: currentUser.username }) %></a>
       <% } else { %>
         <a href="/login"><%= t('登录') %></a>
         <a href="/register"><%= t('注册') %></a>
+        <button type="button" class="nav-support-button" data-open-support><%= t('联系客服') %></button>
       <% } %>
       <span class="nav-locale-switch">
         <span><%= t('语言') %>:</span>

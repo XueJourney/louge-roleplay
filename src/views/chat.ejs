@@ -7,185 +7,150 @@
     <%= errorMessage %>
   </div>
 <% } %>
-<div class="chat-shell">
+<div class="chat-shell chat-shell--linear">
   <div class="chat-main">
-    <section class="chat-head">
-      <h1><%= conversation.character_name %></h1>
-      <p><%= conversation.character_summary %></p>
-      <div class="chat-head-actions">
-        <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有子分支会话的末端对话才能删除。') %>');">
-          <button class="inline-btn danger" type="submit">删除这条对话</button>
-        </form>
+    <section class="chat-head chat-head--clean">
+      <div>
+        <p class="eyebrow"><%= t('正在和') %></p>
+        <h1><%= conversation.character_name %></h1>
+        <p><%= conversation.character_summary %></p>
       </div>
-      <% if (conversation.composed_system_prompt) { %>
-        <div class="chat-meta chat-meta--spaced">
-          <span class="meta-pill">后台控制模型</span>
-          <span class="meta-pill">已启用提示词拼接</span>
-        </div>
-      <% } %>
-      <div class="chat-meta">
-        <span class="meta-pill"><%= t('对话 #{id}', { id: conversation.id }) %></span>
-        <span class="meta-pill" data-active-leaf-label><%= t('当前叶子 #{id}', { id: view.activeLeafId || '—' }) %></span>
-        <span class="meta-pill"><%= t('消息 {count} 条', { count: view.messageCount }) %></span>
-        <% if (view.currentBranch && view.currentBranch.label) { %>
-          <span class="meta-pill"><%= view.currentBranch.label %></span>
-        <% } %>
-        <% if (conversation.parent_conversation_id) { %>
-          <span class="meta-pill"><%= t('分支自对话 #{id}', { id: conversation.parent_conversation_id }) %></span>
-        <% } %>
+      <div class="chat-head-actions">
+        <details class="more-menu chat-more-menu">
+          <summary class="inline-btn"><%= t('更多') %></summary>
+          <div class="more-menu-body">
+            <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>');">
+              <button class="inline-btn danger" type="submit"><%= t('删除这条对话') %></button>
+            </form>
+            <p class="mini-note"><%= t('删除只适用于没有后续关联的对话，避免误删已有内容。') %></p>
+          </div>
+        </details>
       </div>
     </section>
 
-    <section class="panel">
-      <h2 class="panel-title">当前分支</h2>
-      <p class="section-subtitle">先把这一条线顺着读完。分支、重算、改写都收在每条消息下面，不抢正文。</p>
+    <section class="panel chat-transcript-panel">
       <% if (view.hasOlderMessages) { %>
         <div class="history-loader" data-history-loader>
-          <button class="inline-btn" type="button" data-load-older-messages data-endpoint="/chat/<%= conversation.id %>/messages/history" data-before-id="<%= view.oldestVisibleMessageId || '' %>"><%= t('加载之前的对话') %></button>
-          <span class="mini-note"><%= t('默认只显示最新 3 条，之前的内容按需加载。') %></span>
+          <button class="inline-btn" type="button" data-load-older-messages data-endpoint="/chat/<%= conversation.id %>/messages/history" data-before-id="<%= view.oldestVisibleMessageId || '' %>"><%= t('查看更早的消息') %></button>
+          <span class="mini-note"><%= t('为了打开更快，较早内容会在需要时加载。') %></span>
         </div>
       <% } %>
-      <div class="conversation-path" data-visible-count="<%= view.visiblePathMessages.length %>" data-total-count="<%= view.pathMessages.length %>" data-oldest-visible-id="<%= view.oldestVisibleMessageId || '' %>">
+      <div class="chat-transcript" data-visible-count="<%= view.visiblePathMessages.length %>" data-total-count="<%= view.pathMessages.length %>" data-oldest-visible-id="<%= view.oldestVisibleMessageId || '' %>">
+        <% if (!view.visiblePathMessages.length) { %>
+          <div class="empty-chat-state">
+            <h2><%= t('开始和 {name} 对话', { name: conversation.character_name }) %></h2>
+            <p><%= t('直接输入想说的话，或者点发送让角色先开口。') %></p>
+          </div>
+        <% } %>
         <% view.visiblePathMessages.forEach(message => { %>
           <%- include('partials/chat-message', { conversation, message }) %>
         <% }) %>
       </div>
     </section>
 
-    <section class="compose-card">
-      <h2>继续写这一支</h2>
-      <p class="section-subtitle">高频动作只留发送，模型切换和输入优化收起来，别把页面挤成控制台。</p>
-      <% if (chatModelSelector && chatModelSelector.options && chatModelSelector.options.length) { %>
-        <details class="compose-details">
-          <summary>模型模式</summary>
-          <div class="compose-details-body">
-            <div class="mini-note"><%= t('你可以自由切换 1-3 模式。这里只显示模式名称，不显示真实模型 ID。当前 Provider 上下文上限 {maxContextTokens}，超出后会裁到 {trimContextTokens} 并自动用第 4 模型压缩历史。', { maxContextTokens: chatModelSelector.maxContextTokens, trimContextTokens: chatModelSelector.trimContextTokens }) %></div>
-            <form method="POST" action="/chat/<%= conversation.id %>/model">
-              <div class="mode-option-list">
-                <% chatModelSelector.options.forEach((option, index) => { %>
-                  <label class="mode-option <%= (conversation.selected_model_mode || 'standard') === option.mode ? 'active' : '' %>">
-                    <input type="radio" name="modelMode" value="<%= option.mode %>" <%= (conversation.selected_model_mode || 'standard') === option.mode ? 'checked' : '' %> />
-                    <div>
-                      <div><strong><%= index + 1 %>. <%= option.label %></strong></div>
-                      <div class="mini-note">已绑定可用模型，前台不展示具体 model ID。</div>
-                    </div>
-                  </label>
-                <% }) %>
-              </div>
-              <button class="inline-btn primary" type="submit">切换模型模式</button>
-            </form>
-          </div>
-        </details>
-      <% } %>
-
+    <section class="compose-card compose-card--linear">
       <form method="POST" action="/chat/<%= conversation.id %>/message" id="chat-compose-form" data-conversation-id="<%= conversation.id %>" data-character-name="<%= conversation.character_name %>" data-stream-endpoint="/chat/<%= conversation.id %>/message/stream" data-optimize-stream-endpoint="/chat/<%= conversation.id %>/optimize-input/stream" data-message-count="<%= view.messageCount %>">
         <input type="hidden" name="parentMessageId" value="<%= view.activeLeafId || '' %>" />
-        <label for="content">从当前节点往下写</label>
-        <textarea id="content" name="content" maxlength="4000" placeholder="<%= t(view.messageCount === 0 ? '第一次可以直接点发送开始对话；也可以先输入你想说的话。' : '把你现在想说的话发出去。') %>"><%= draftContent || '' %></textarea>
-        <button class="submit-btn" type="submit"><%= t(view.messageCount === 0 ? '开始 / 发送' : '发送消息') %></button>
+        <label class="sr-only" for="content"><%= t('输入消息') %></label>
+        <textarea id="content" name="content" maxlength="4000" placeholder="<%= t(view.messageCount === 0 ? '第一次可以直接点发送开始对话；也可以先输入你想说的话。' : '输入你想说的话…') %>"><%= draftContent || '' %></textarea>
+        <div class="compose-actions compose-actions--linear">
+          <span class="mini-note"><%= t('Enter 发送，Shift+Enter 换行。') %></span>
+          <button class="submit-btn" type="submit"><%= t(view.messageCount === 0 ? '开始 / 发送' : '发送') %></button>
+        </div>
       </form>
 
-      <details class="compose-details">
-        <summary>优化输入</summary>
+      <details class="compose-details compose-details--compact">
+        <summary><%= t('润色输入') %></summary>
         <div class="compose-details-body">
           <form method="POST" action="/chat/<%= conversation.id %>/optimize-input" class="editor-form" id="chat-optimize-form">
             <input type="hidden" name="parentMessageId" value="<%= view.activeLeafId || '' %>" />
-            <label for="optimizeContent">先优化输入</label>
-            <textarea id="optimizeContent" name="content" maxlength="4000" required placeholder="想润色一下，就把原话贴这儿。"><%= draftContent || '' %></textarea>
-            <button class="submit-btn" type="submit">优化输入</button>
+            <label for="optimizeContent"><%= t('先润色这句话') %></label>
+            <textarea id="optimizeContent" name="content" maxlength="4000" required placeholder="<%= t('把想润色的话放这里。') %>"><%= draftContent || '' %></textarea>
+            <button class="inline-btn primary" type="submit"><%= t('润色输入') %></button>
           </form>
-
-          <% if (optimizedContent) { %>
-            <div class="draft-box">
-              <label>优化结果</label>
-              <div class="rich-preview" data-message-content><div class="bubble-text"><%= optimizedContent %></div></div>
-              <div class="bubble-actions bubble-actions--solid">
-                <form class="inline-form" method="GET" action="/chat/<%= conversation.id %>">
-                  <input type="hidden" name="leaf" value="<%= view.activeLeafId || '' %>" />
-                  <input type="hidden" name="draft" value="<%= optimizedContent %>" />
-                  <button class="inline-btn" type="submit">带回输入框</button>
-                </form>
-                <form class="inline-form" method="POST" action="/chat/<%= conversation.id %>/message">
-                  <input type="hidden" name="parentMessageId" value="<%= view.activeLeafId || '' %>" />
-                  <input type="hidden" name="content" value="<%= optimizedContent %>" />
-                  <button class="inline-btn primary" type="submit">一键采用并发送</button>
-                </form>
-              </div>
-            </div>
-          <% } %>
         </div>
       </details>
 
-      <% if (regeneratedPreview && regeneratedPreview.length) { %>
+      <% if (optimizedContent) { %>
         <div class="draft-box">
-          <label>本次重算生成的新片段</label>
+          <label><%= t('润色结果') %></label>
+          <div class="rich-preview" data-message-content><div class="bubble-text"><%= optimizedContent %></div></div>
+          <div class="bubble-actions bubble-actions--solid">
+            <form class="inline-form" method="GET" action="/chat/<%= conversation.id %>">
+              <input type="hidden" name="leaf" value="<%= view.activeLeafId || '' %>" />
+              <input type="hidden" name="draft" value="<%= optimizedContent %>" />
+              <button class="inline-btn" type="submit"><%= t('放回输入框') %></button>
+            </form>
+            <form class="inline-form" method="POST" action="/chat/<%= conversation.id %>/message">
+              <input type="hidden" name="parentMessageId" value="<%= view.activeLeafId || '' %>" />
+              <input type="hidden" name="content" value="<%= optimizedContent %>" />
+              <button class="inline-btn primary" type="submit"><%= t('采用并发送') %></button>
+            </form>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (newContinuationPreview && newContinuationPreview.length) { %>
+        <div class="draft-box">
+          <label><%= t('新的内容已生成') %></label>
           <div class="rich-preview">
-            <% regeneratedPreview.forEach(item => { %>
+            <% newContinuationPreview.forEach(item => { %>
               <div>
                 <strong><%= item.role %>：</strong>
                 <div data-message-content><div class="bubble-text"><%= item.content %></div></div>
               </div>
             <% }) %>
           </div>
+          <p class="mini-note"><%= t('当前页面已切到新的内容。') %></p>
         </div>
       <% } %>
     </section>
   </div>
-  <aside class="chat-side">
-    <section class="sidebar-card compact">
-      <h2>分支导航</h2>
-      <p class="mini-note">右边只保留导航用途：先看当前路径，再决定要不要切树、切叶子。</p>
+
+  <aside class="chat-side chat-side--assistant">
+    <section class="sidebar-card character-card">
+      <p class="eyebrow"><%= t('角色') %></p>
+      <h2><%= conversation.character_name %></h2>
+      <p><%= conversation.character_summary %></p>
+      <% if (conversation.composed_system_prompt) { %>
+        <div class="chat-meta chat-meta--spaced">
+          <span class="meta-pill"><%= t('已启用角色规则') %></span>
+        </div>
+      <% } %>
     </section>
 
-    <section class="sidebar-card">
-      <h2>对话树</h2>
-      <p class="mini-note">高亮的是你当前这条线，树节点支持两行摘要，切换时不用盯着一排编号猜内容。</p>
-      <div class="tree-list">
-        <% view.treeEntries.forEach(node => { %>
-          <div class="tree-node <%= node.isActive ? 'active' : '' %> <%= node.isOnActiveTrail ? 'trail' : '' %>" style="margin-left: <%= node.depth * 16 %>px;">
-            <span class="tree-line"></span>
-            <span class="tree-id">#<%= node.id %></span>
-            <span class="tree-kind"><%= node.senderType === 'user' ? t('你') : 'AI' %></span>
-            <span class="tree-content"><%= node.shortContent || t('（空）') %></span>
-            <form class="inline-form" method="GET" action="/chat/<%= conversation.id %>">
-              <input type="hidden" name="leaf" value="<%= node.id %>" />
-              <button class="inline-btn <%= node.isActive ? 'primary' : '' %>" type="submit"><%= t(node.isActive ? '当前' : '切换') %></button>
-            </form>
-          </div>
-        <% }) %>
-      </div>
-    </section>
-
-    <section class="sidebar-card">
-      <h2>叶子分支</h2>
-      <p class="mini-note">这里只保留“切到哪一支”的信息，避免把主阅读区打散。</p>
-      <% view.branches.forEach(branch => { %>
-        <div class="branch-item <%= branch.isActive ? 'active' : '' %>">
-          <div class="branch-meta"><%= t('叶子 #{leafId} · 深度 {depth} · {promptKind}', { leafId: branch.leafId, depth: branch.depth, promptKind: branch.promptKind }) %></div>
-          <div class="branch-preview"><strong><%= branch.label %></strong></div>
-          <div class="mini-note"><%= branch.summary %></div>
-          <form class="inline-form" method="GET" action="/chat/<%= conversation.id %>">
-            <input type="hidden" name="leaf" value="<%= branch.leafId %>" />
-            <button class="inline-btn <%= branch.isActive ? 'primary' : '' %>" type="submit">
-              <%= t(branch.isActive ? '当前分支' : '切换到这支') %>
-            </button>
+    <% if (chatModelSelector && chatModelSelector.options && chatModelSelector.options.length) { %>
+      <details class="sidebar-details">
+        <summary><%= t('回应风格') %></summary>
+        <div class="sidebar-details-body">
+          <p class="mini-note"><%= t('选择不同回应风格。真实模型 ID 不会展示在前台。') %></p>
+          <form method="POST" action="/chat/<%= conversation.id %>/model">
+            <div class="mode-option-list">
+              <% chatModelSelector.options.forEach((option, index) => { %>
+                <label class="mode-option <%= (conversation.selected_model_mode || 'standard') === option.mode ? 'active' : '' %>">
+                  <input type="radio" name="modelMode" value="<%= option.mode %>" <%= (conversation.selected_model_mode || 'standard') === option.mode ? 'checked' : '' %> />
+                  <div>
+                    <div><strong><%= index + 1 %>. <%= option.label %></strong></div>
+                    <div class="mini-note"><%= t('当前可用') %></div>
+                  </div>
+                </label>
+              <% }) %>
+            </div>
+            <button class="inline-btn primary" type="submit"><%= t('保存回应风格') %></button>
           </form>
         </div>
-      <% }) %>
-    </section>
+      </details>
+    <% } %>
 
-    <details class="sidebar-details">
-      <summary>使用方式</summary>
-      <div class="sidebar-details-body mini-note">
-        <div>1. 第一次进入空白对话时，可以直接点发送，系统会自动用“[开始一次新的对话]”起头一次。</div>
-        <div>2. 重新生成：给同一条用户输入再生一个 AI 候选。</div>
-        <div>3. 保存为新 AI 分支：手动改写 AI 回复，但不覆盖旧版本。</div>
-        <div>4. 修改用户输入并重开分支：从旧用户节点重新长出一条新线。</div>
-        <div>5. 从这里重算后续：保持前文不变，从当前节点重开新的后续走向。</div>
-        <div>6. 新建独立分支对话：把当前节点之前的主线复制成一个新会话。</div>
-        <div>7. 优化输入：先润色，再一键采用并发送。</div>
-      </div>
-    </details>
+    <section class="sidebar-card compact help-card">
+      <h2><%= t('怎么用') %></h2>
+      <ul>
+        <li><%= t('想继续：直接输入并发送。') %></li>
+        <li><%= t('不满意回复：点 AI 消息旁边的“重新生成”。') %></li>
+        <li><%= t('刚才说错了：点你的消息旁边的“修改并重发”。') %></li>
+        <li><%= t('需要改一段后续：在对应消息的“⋯”里选择“从这里重写”。') %></li>
+      </ul>
+    </section>
   </aside>
 </div>
-<script src="/public/js/chat-page.js?v=stream-timeout-idle-v2"></script>
+<script src="/public/js/chat-page.js?v=stream-ux-v3"></script>
