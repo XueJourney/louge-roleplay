@@ -15,8 +15,12 @@
       locale: <%- JSON.stringify(locale || 'zh-CN') %>,
       messages: <%- JSON.stringify(clientI18nMessages || {}) %>
     };
+    window.AI_ROLEPLAY_NOTIFICATIONS = {
+      items: <%- JSON.stringify(clientNotifications || []) %>
+    };
   </script>
   <script src="/public/js/i18n-runtime.js"></script>
+  <script src="/public/js/notification-client.js" defer></script>
 </head>
 <body>
   <div class="container">

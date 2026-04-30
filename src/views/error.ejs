@@ -14,5 +14,17 @@
         <div class="feedback-request-id"><strong>请求编号</strong><%= requestId %></div>
       <% } %>
     </div>
+    <div class="feedback-actions">
+      <button type="button" class="feedback-back-link" data-open-support>微信扫码联系客服</button>
+      <a class="feedback-back-link" href="/">回到首页</a>
+    </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener('click', function (event) {
+    if (event.target && event.target.matches('[data-open-support]') && window.LougeNotifications) {
+      window.LougeNotifications.showSupport({ reason: 'error-page' });
+    }
+  });
+</script>

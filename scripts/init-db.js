@@ -327,6 +327,36 @@ async function main() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+
+
+  // ── 站内通知与客服入口表 ─────────────────────────────────────────────────────
+  console.log('[init-db] 初始化 notifications 表...');
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      title VARCHAR(120) NOT NULL,
+      body TEXT NOT NULL,
+      notification_type ENUM('general','new_user','support','error','maintenance') NOT NULL DEFAULT 'general',
+      audience ENUM('all','guest','user','admin') NOT NULL DEFAULT 'all',
+      display_position ENUM('modal','toast','banner') NOT NULL DEFAULT 'modal',
+      display_duration_ms INT NOT NULL DEFAULT 0,
+      force_display TINYINT(1) NOT NULL DEFAULT 0,
+      show_once TINYINT(1) NOT NULL DEFAULT 0,
+      new_user_only TINYINT(1) NOT NULL DEFAULT 0,
+      support_qr_url VARCHAR(500) NULL,
+      action_label VARCHAR(80) NULL,
+      action_url VARCHAR(500) NULL,
+      starts_at DATETIME NULL,
+      ends_at DATETIME NULL,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
+      priority INT NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      INDEX idx_notifications_active_window (is_active, starts_at, ends_at),
+      INDEX idx_notifications_audience (audience, notification_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // ── 角色表 ───────────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 characters 表...');
   await connection.query(`

@@ -22,6 +22,7 @@ const { createCharacter, updateCharacter, listPublicCharacters, listUserCharacte
 const { listPlans, findPlanById, createPlan, updatePlan, deletePlan, getActiveSubscriptionForUser, getUserQuotaSnapshot, updateUserPlan } = require('../services/plan-service');
 const { listUsersWithPlans, getAdminOverview } = require('../services/admin-service');
 const { listLogEntries } = require('../services/log-service');
+const { DEFAULT_SUPPORT_QR_URL, listNotificationsForAdmin, listActiveNotificationsForUser, createNotification, updateNotification, deleteNotification } = require('../services/notification-service');
 const { getAdminConversationDetail, listAdminConversations, permanentlyDeleteConversation, permanentlyDeleteMessage, restoreConversation, restoreMessage } = require('../services/admin-conversation-service');
 const { listProviders, createProvider, updateProvider } = require('../services/llm-provider-service');
 const {
@@ -881,6 +882,61 @@ function registerWebRoutes(app) {
         overview,
         providers,
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/admin/notifications', requireAdmin, async (req, res, next) => {
+    try {
+      const allNotifications = await listNotificationsForAdmin();
+      const supportNotification = allNotifications.find((item) => item.notification_type === 'support') || null;
+      const notifications = allNotifications.filter((item) => item.notification_type !== 'support');
+      renderPage(res, 'admin-notifications', {
+        title: '通知中心',
+        notifications,
+        supportNotification,
+        defaultSupportQrUrl: DEFAULT_SUPPORT_QR_URL,
+        formMessage: req.query.saved ? { type: 'success', text: '配置已经保存。' } : null,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/notifications/new', requireAdmin, async (req, res, next) => {
+    try {
+      await createNotification(req.body);
+      res.redirect('/admin/notifications?saved=1');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/notifications/:notificationId', requireAdmin, async (req, res, next) => {
+    try {
+      const notificationId = parseIdParam(req.params.notificationId, '通知 ID');
+      await updateNotification(notificationId, req.body);
+      res.redirect('/admin/notifications?saved=1');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/admin/notifications/:notificationId/delete', requireAdmin, async (req, res, next) => {
+    try {
+      const notificationId = parseIdParam(req.params.notificationId, '通知 ID');
+      await deleteNotification(notificationId);
+      res.redirect('/admin/notifications?saved=1');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/api/support-notification', async (req, res, next) => {
+    try {
+      const notifications = await listActiveNotificationsForUser(res.locals.currentUser || null, { supportOnly: true });
+      res.json({ notification: notifications[0] || null });
     } catch (error) {
       next(error);
     }

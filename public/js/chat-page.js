@@ -493,6 +493,9 @@
               error: true,
             });
           }
+          if (window.LougeNotifications && typeof window.LougeNotifications.showSupport === 'function') {
+            window.LougeNotifications.showSupport({ reason: 'chat-error' });
+          }
           throw new Error(message);
         }
       };
@@ -611,6 +614,9 @@
         const fallbackMessage = isAbortError
           ? t('生成中断，已保留这段回复。')
           : (error && error.message ? String(t(error.message)) : t('AI 回复失败，请稍后重试。'));
+        if (!isAbortError && window.LougeNotifications && typeof window.LougeNotifications.showSupport === 'function') {
+          window.LougeNotifications.showSupport({ reason: 'chat-exception' });
+        }
         if (streamBubble && streamBubble.rich) {
           setBubbleFinalState(streamBubble, fallbackMessage, {
             mode: 'error',
@@ -800,6 +806,9 @@
       } catch (error) {
         console.error(error);
         const fallbackMessage = error && error.message ? String(t(error.message)) : t('操作失败，请稍后重试。');
+        if (window.LougeNotifications && typeof window.LougeNotifications.showSupport === 'function') {
+          window.LougeNotifications.showSupport({ reason: 'chat-action-exception' });
+        }
         if (streamBubble) {
           setBubbleFinalState(streamBubble, fallbackMessage, {
             mode: 'error',

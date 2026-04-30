@@ -22,13 +22,15 @@ const {
   fetchPathMessages,
 } = require('./services/conversation-service');
 const { getChatModelSelector } = require('./services/llm-gateway-service');
+const { getClientNotificationBootstrap } = require('./services/notification-service');
 
 
-function renderPage(res, view, params = {}) {
+async function renderPage(res, view, params = {}) {
   const locale = res.locals.locale || 'zh-CN';
   const t = res.locals.t || ((key, vars) => translate(locale, key, vars));
   const titleSource = params.title || config.appName;
   const title = translateHtml(locale, t(titleSource));
+  const clientNotifications = await getClientNotificationBootstrap(res.locals.currentUser || null);
   res.render(view, params, (viewError, html) => {
     if (viewError) {
       logger.error('[renderPage] View 渲染失败', { view, error: viewError.message });
@@ -44,6 +46,7 @@ function renderPage(res, view, params = {}) {
       locale,
       t,
       clientI18nMessages: res.locals.clientI18nMessages || {},
+      clientNotifications,
       localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
     });
   });
