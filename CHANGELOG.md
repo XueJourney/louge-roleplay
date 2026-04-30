@@ -2,6 +2,13 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)：`MAJOR.MINOR.PATCH`。
 
+## [1.1.1] - 2026-05-01
+
+### Changed
+
+- 前台取消导航栏“联系客服”按钮，避免页面常驻客服入口。
+- 客服弹窗取消外链按钮，只保留二维码扫码入口与关闭按钮。
+
 ## [1.1.0] - 2026-05-01
 
 ### Added

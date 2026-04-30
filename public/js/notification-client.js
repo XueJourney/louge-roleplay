@@ -147,7 +147,9 @@
     const actions = document.createElement('div');
     actions.className = 'site-notification-actions';
 
-    if (text(notification.actionUrl)) {
+    const isSupportModal = Boolean(options && options.supportMode) || text(notification.notificationType) === 'support';
+
+    if (!isSupportModal && text(notification.actionUrl)) {
       const action = document.createElement('a');
       action.className = 'site-notification-action';
       action.href = text(notification.actionUrl);
