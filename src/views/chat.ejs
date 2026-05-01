@@ -1,5 +1,5 @@
 <!-- @file src/views/chat.ejs
-     @description 聊天主页面模板。调用说明：GET /chat/:conversationId 渲染，public/js/chat-page.js 接管流式发送、历史加载和富文本渲染。
+     @description 聊天主页面模板。调用说明：GET /chat/:conversationId 渲染，public/js/chat/controller.js 接管流式发送、历史加载和富文本渲染。
 -->
 <link rel="stylesheet" href="/public/styles/site-pages.css" />
 <% if (typeof errorMessage !== 'undefined' && errorMessage) { %>
@@ -153,4 +153,5 @@
     </section>
   </aside>
 </div>
-<script src="/public/js/chat-page.js?v=stream-ux-v3"></script>
+<script src="/public/js/chat/rich-renderer.js?v=stream-ux-v4"></script>
+<script src="/public/js/chat/controller.js?v=stream-ux-v4"></script>

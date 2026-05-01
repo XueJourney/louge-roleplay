@@ -5,14 +5,14 @@
   <section class="hero-card admin-hero">
     <div class="admin-hero-copy">
       <p class="section-kicker">Logs</p>
-      <h1>日志查询</h1>
-      <p class="muted-text">这里放运行日志、错误日志和访问日志。按天拆文件后不再全塞一个大文件，想查哪天、哪类、哪个函数，直接筛。</p>
+      <h1><%= t('日志查询') %></h1>
+      <p class="muted-text"><%= t('这里放运行日志、错误日志和访问日志。按天拆文件后不再全塞一个大文件，想查哪天、哪类、哪个函数，直接筛。') %></p>
     </div>
 
     <div class="metrics metrics--compact">
-      <div class="metric"><strong><%= logResult.total %></strong><span>匹配记录</span></div>
-      <div class="metric"><strong><%= logResult.scannedFiles.length %></strong><span>扫描文件</span></div>
-      <div class="metric"><strong><%= logResult.page %> / <%= logResult.totalPages %></strong><span>当前页</span></div>
+      <div class="metric"><strong><%= logResult.total %></strong><span><%= t('匹配记录') %></span></div>
+      <div class="metric"><strong><%= logResult.scannedFiles.length %></strong><span><%= t('扫描文件') %></span></div>
+      <div class="metric"><strong><%= logResult.page %> / <%= logResult.totalPages %></strong><span><%= t('当前页') %></span></div>
     </div>
   </section>
 
@@ -22,7 +22,7 @@
       <a class="quick-link" href="/admin/providers">LLM 配置</a>
       <a class="quick-link" href="/admin/plans">套餐配置</a>
       <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
-      <a class="quick-link" href="/admin/notifications">通知中心</a>
+      <a class="quick-link" href="/admin/notifications"><%= t('通知中心') %></a>
       <a class="quick-link is-active" href="/admin/logs">日志查询</a>
       <a class="quick-link" href="/admin/conversations">对话记录</a>
     </div>
@@ -30,39 +30,39 @@
     <div class="section-heading">
       <div>
         <p class="section-kicker">Filters</p>
-        <h2>筛选条件</h2>
-        <p class="muted-text">等级、文件报错、类型报错、函数报错、日期都在这。留空就是不过滤。</p>
+        <h2><%= t('筛选条件') %></h2>
+        <p class="muted-text"><%= t('等级、文件报错、类型报错、函数报错、日期都在这。留空就是不过滤。') %></p>
       </div>
     </div>
 
     <form class="admin-log-filter" method="get" action="/admin/logs">
       <label>
-        日期
+        <%= t('日期') %>
         <input type="date" name="date" value="<%= logResult.filters.date %>" />
       </label>
       <label>
-        等级
+        <%= t('等级') %>
         <select name="level">
-          <option value="">全部等级</option>
+          <option value=""><%= t('全部等级') %></option>
           <% logResult.levels.forEach(level => { %>
             <option value="<%= level %>" <%= logResult.filters.level === level ? 'selected' : '' %>><%= level %></option>
           <% }) %>
         </select>
       </label>
       <label>
-        文件报错
-        <input list="log-source-files" type="search" name="file" value="<%= logResult.filters.file %>" placeholder="如 src/routes/web-routes.js" />
+        <%= t('文件报错') %>
+        <input list="log-source-files" type="search" name="file" value="<%= logResult.filters.file %>" placeholder="<%= t('如 src/routes/web-routes.js') %>" />
       </label>
       <label>
-        类型报错
-        <input list="log-error-types" type="search" name="errorType" value="<%= logResult.filters.errorType %>" placeholder="如 TypeError / SyntaxError" />
+        <%= t('类型报错') %>
+        <input list="log-error-types" type="search" name="errorType" value="<%= logResult.filters.errorType %>" placeholder="<%= t('如 TypeError / SyntaxError') %>" />
       </label>
       <label>
-        函数报错
-        <input list="log-function-names" type="search" name="functionName" value="<%= logResult.filters.functionName %>" placeholder="如 renderPage" />
+        <%= t('函数报错') %>
+        <input list="log-function-names" type="search" name="functionName" value="<%= logResult.filters.functionName %>" placeholder="<%= t('如 renderPage') %>" />
       </label>
       <label>
-        每页
+        <%= t('每页') %>
         <select name="pageSize">
           <% [25, 50, 100, 200].forEach(size => { %>
             <option value="<%= size %>" <%= Number(logResult.pageSize) === size ? 'selected' : '' %>><%= size %></option>
@@ -70,8 +70,8 @@
         </select>
       </label>
       <div class="toolbar-row toolbar-row--admin admin-log-filter-actions">
-        <button type="submit">查询日志</button>
-        <a class="quick-link" href="/admin/logs">清空筛选</a>
+        <button type="submit"><%= t('查询日志') %></button>
+        <a class="quick-link" href="/admin/logs"><%= t('清空筛选') %></a>
       </div>
     </form>
 
@@ -86,7 +86,7 @@
     </datalist>
 
     <details class="admin-fold">
-      <summary>扫描到的日志文件</summary>
+      <summary><%= t('扫描到的日志文件') %></summary>
       <div class="admin-fold-body">
         <div class="admin-log-file-list">
           <% logResult.scannedFiles.forEach(file => { %>
@@ -94,11 +94,11 @@
               <strong><%= file.name %></strong>
               <%= file.type %>
               · <%= Math.ceil(file.size / 1024) %> KB
-              <%= file.truncated ? '· 已按尾部截取' : '' %>
+              <%= file.truncated ? t('· 已按尾部截取') : '' %>
             </span>
           <% }) %>
           <% if (!logResult.scannedFiles.length) { %>
-            <span class="muted-text">还没有日志文件。</span>
+            <span class="muted-text"><%= t('还没有日志文件。') %></span>
           <% } %>
         </div>
       </div>
@@ -109,23 +109,23 @@
     <div class="toolbar-row toolbar-row--between">
       <div>
         <p class="section-kicker">Result</p>
-        <h2>日志列表</h2>
+        <h2><%= t('日志列表') %></h2>
       </div>
       <div class="admin-pagination">
         <% if (logResult.page > 1) { %>
-          <a class="quick-link" href="<%= buildPageUrl(logResult.page - 1) %>">上一页</a>
+          <a class="quick-link" href="<%= buildPageUrl(logResult.page - 1) %>"><%= t('上一页') %></a>
         <% } %>
         <span class="meta-chip"><strong><%= logResult.page %></strong> / <%= logResult.totalPages %></span>
         <% if (logResult.page < logResult.totalPages) { %>
-          <a class="quick-link" href="<%= buildPageUrl(logResult.page + 1) %>">下一页</a>
+          <a class="quick-link" href="<%= buildPageUrl(logResult.page + 1) %>"><%= t('下一页') %></a>
         <% } %>
       </div>
     </div>
 
     <% if (!logResult.entries.length) { %>
       <div class="empty-state">
-        <strong>没查到日志</strong>
-        <span class="muted-text">换个日期或放宽筛选条件试试。</span>
+        <strong><%= t('没查到日志') %></strong>
+        <span class="muted-text"><%= t('换个日期或放宽筛选条件试试。') %></span>
       </div>
     <% } %>
 
@@ -145,10 +145,10 @@
           </summary>
           <div class="admin-item-body">
             <div class="admin-log-meta-grid">
-              <span><strong>文件</strong><%= entry.sourceFile || entry.logFile %></span>
-              <span><strong>函数</strong><%= entry.functionName || '—' %></span>
-              <span><strong>类型</strong><%= entry.errorType || '—' %></span>
-              <span><strong>位置</strong><%= entry.line ? `${entry.line}:${entry.column || 0}` : '—' %></span>
+              <span><strong><%= t('文件') %></strong><%= entry.sourceFile || entry.logFile %></span>
+              <span><strong><%= t('函数') %></strong><%= entry.functionName || '—' %></span>
+              <span><strong><%= t('类型') %></strong><%= entry.errorType || '—' %></span>
+              <span><strong><%= t('位置') %></strong><%= entry.line ? `${entry.line}:${entry.column || 0}` : '—' %></span>
             </div>
             <% if (entry.metaText) { %>
               <pre class="admin-log-pre"><%= entry.metaText %></pre>

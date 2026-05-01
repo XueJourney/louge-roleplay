@@ -5,6 +5,9 @@
 
 (function () {
   const bootstrap = window.AI_ROLEPLAY_NOTIFICATIONS || { items: [] };
+  const t = window.AI_ROLEPLAY_I18N && typeof window.AI_ROLEPLAY_I18N.t === 'function'
+    ? window.AI_ROLEPLAY_I18N.t.bind(window.AI_ROLEPLAY_I18N)
+    : (key) => key;
   const notifications = Array.isArray(bootstrap.items) ? bootstrap.items : [];
   const storagePrefix = 'louge.notification.seen.';
   let activeOverlay = null;
@@ -58,13 +61,13 @@
     wrap.className = 'site-notification-qr';
 
     const img = document.createElement('img');
-    img.alt = '微信扫码联系客服';
+    img.alt = t('微信扫码联系客服');
     img.loading = 'lazy';
     img.src = qrImageUrl(value);
 
     const hint = document.createElement('div');
     hint.className = 'site-notification-qr__hint';
-    hint.textContent = '微信扫码联系客服';
+    hint.textContent = t('微信扫码联系客服');
 
     wrap.appendChild(img);
     wrap.appendChild(hint);
@@ -74,8 +77,9 @@
   function renderToast(notification) {
     const toast = document.createElement('div');
     toast.className = 'site-notification-toast';
-    toast.innerHTML = '<strong></strong><span></span><button type="button" aria-label="关闭通知">×</button>';
-    toast.querySelector('strong').textContent = text(notification.title) || '通知';
+    toast.innerHTML = '<strong></strong><span></span><button type="button">×</button>';
+    toast.querySelector('button').setAttribute('aria-label', t('关闭通知'));
+    toast.querySelector('strong').textContent = text(notification.title) || t('通知');
     toast.querySelector('span').textContent = text(notification.body);
     toast.querySelector('button').addEventListener('click', () => {
       toast.remove();
@@ -98,11 +102,11 @@
     banner.className = 'site-notification-banner';
     const copy = document.createElement('div');
     copy.innerHTML = '<strong></strong><span></span>';
-    copy.querySelector('strong').textContent = text(notification.title) || '通知';
+    copy.querySelector('strong').textContent = text(notification.title) || t('通知');
     copy.querySelector('span').textContent = text(notification.body);
     const close = document.createElement('button');
     close.type = 'button';
-    close.textContent = '知道了';
+    close.textContent = t('知道了');
     close.addEventListener('click', () => {
       banner.remove();
       markSeen(notification);
@@ -134,10 +138,10 @@
 
     const kicker = document.createElement('div');
     kicker.className = 'site-notification-kicker';
-    kicker.textContent = options && options.supportMode ? 'Customer Support' : 'Notice';
+    kicker.textContent = options && options.supportMode ? t('联系客服') : t('通知');
 
     const title = document.createElement('h2');
-    title.textContent = text(notification.title) || '通知';
+    title.textContent = text(notification.title) || t('通知');
 
     const body = document.createElement('p');
     body.textContent = text(notification.body);
@@ -155,13 +159,13 @@
       action.href = text(notification.actionUrl);
       action.target = '_blank';
       action.rel = 'noopener noreferrer';
-      action.textContent = text(notification.actionLabel) || '打开链接';
+      action.textContent = text(notification.actionLabel) || t('打开链接');
       actions.appendChild(action);
     }
 
     const close = document.createElement('button');
     close.type = 'button';
-    close.textContent = notification.forceDisplay ? '暂时关闭' : '知道了';
+    close.textContent = notification.forceDisplay ? t('暂时关闭') : t('知道了');
     close.addEventListener('click', () => closeActiveOverlay(notification));
     actions.appendChild(close);
 
@@ -230,8 +234,8 @@
     }
     return showNotification({
       id: 'support-fallback',
-      title: '需要客服协助？',
-      body: '如果页面报错或当前状态不对，可以使用微信扫码联系客服。',
+      title: t('需要客服协助？'),
+      body: t('如果页面报错或当前状态不对，可以使用微信扫码联系客服。'),
       notificationType: 'support',
       displayPosition: 'modal',
       supportQrUrl: 'https://work.weixin.qq.com/u/vc4a43a573988025fe?v=5.0.7.68221&bb=66637a4084',

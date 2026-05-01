@@ -4,8 +4,8 @@
 <%
   const support = supportNotification || {
     id: '',
-    title: '需要客服协助？',
-    body: '如果遇到报错、额度异常或页面状态不对，可以使用微信扫码联系客服。',
+    title: t('需要客服协助？'),
+    body: t('如果遇到报错、额度异常或页面状态不对，可以使用微信扫码联系客服。'),
     notification_type: 'support',
     audience: 'all',
     display_position: 'modal',
@@ -14,7 +14,7 @@
     show_once: 0,
     new_user_only: 0,
     support_qr_url: defaultSupportQrUrl,
-    action_label: '联系客服',
+    action_label: t('联系客服'),
     action_url: defaultSupportQrUrl,
     starts_at_input: '',
     ends_at_input: '',
@@ -27,8 +27,8 @@
   <section class="hero-card admin-hero">
     <div class="admin-hero-copy">
       <p class="section-kicker">Notification Center</p>
-      <h1>通知中心</h1>
-      <p class="muted-text">把“客服入口”和“站内通知”分开管理。客服是全站支持入口，通知是运营公告与规则弹窗，不再混在同一张烂表单里。</p>
+      <h1><%= t('通知中心') %></h1>
+      <p class="muted-text"><%= t('把“客服入口”和“站内通知”分开管理。客服是全站支持入口，通知是运营公告与规则弹窗，不再混在同一张烂表单里。') %></p>
     </div>
   </section>
 
@@ -38,7 +38,7 @@
       <a class="quick-link" href="/admin/providers">LLM 配置</a>
       <a class="quick-link" href="/admin/plans">套餐配置</a>
       <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
-      <a class="quick-link is-active" href="/admin/notifications">通知中心</a>
+      <a class="quick-link is-active" href="/admin/notifications"><%= t('通知中心') %></a>
       <a class="quick-link" href="/admin/logs">日志查询</a>
       <a class="quick-link" href="/admin/conversations">对话记录</a>
     </div>
@@ -52,11 +52,11 @@
     <div class="section-heading">
       <div>
         <p class="section-kicker">Support Entry</p>
-        <h2>客服入口</h2>
-        <p class="muted-text">这是应用的外部支持资源配置。聊天报错、错误页、用户主动求助都会调用这里；前台会把链接生成“微信扫码联系客服”的展示。</p>
+        <h2><%= t('客服入口') %></h2>
+        <p class="muted-text"><%= t('这是应用的外部支持资源配置。聊天报错、错误页、用户主动求助都会调用这里；前台会把链接生成“微信扫码联系客服”的展示。') %></p>
       </div>
       <div class="section-actions">
-        <span class="pill <%= support.is_active ? 'pill--level-info' : 'pill--level-raw' %>"><%= support.is_active ? '当前启用' : '当前停用' %></span>
+        <span class="pill <%= support.is_active ? 'pill--level-info' : 'pill--level-raw' %>"><%= support.is_active ? t('当前启用') : t('当前停用') %></span>
       </div>
     </div>
 
@@ -67,36 +67,36 @@
         <input type="hidden" name="displayPosition" value="modal" />
         <input type="hidden" name="displayDurationMs" value="0" />
         <input type="hidden" name="priority" value="100" />
-        <input type="hidden" name="actionLabel" value="联系客服" />
+        <input type="hidden" name="actionLabel" value="<%= t('联系客服') %>" />
 
-        <label>入口名称
+        <label><%= t('入口名称') %>
           <input name="title" maxlength="120" value="<%= support.title %>" required />
         </label>
-        <label class="support-admin-form__wide">引导文案
+        <label class="support-admin-form__wide"><%= t('引导文案') %>
           <textarea name="body" rows="3" maxlength="4000" required><%= support.body %></textarea>
         </label>
-        <label class="support-admin-form__wide">企业微信客服链接 / 外部支持链接
+        <label class="support-admin-form__wide"><%= t('企业微信客服链接 / 外部支持链接') %>
           <input name="supportQrUrl" maxlength="500" value="<%= support.support_qr_url || defaultSupportQrUrl %>" placeholder="https://work.weixin.qq.com/..." required />
         </label>
-        <label class="support-admin-form__wide">备用打开链接
-          <input name="actionUrl" maxlength="500" value="<%= support.action_url || support.support_qr_url || defaultSupportQrUrl %>" placeholder="通常与上方链接一致" />
+        <label class="support-admin-form__wide"><%= t('备用打开链接') %>
+          <input name="actionUrl" maxlength="500" value="<%= support.action_url || support.support_qr_url || defaultSupportQrUrl %>" placeholder="<%= t('通常与上方链接一致') %>" />
         </label>
         <div class="admin-check-list support-admin-form__wide">
-          <label><input type="checkbox" name="isActive" value="1" <%= support.is_active ? 'checked' : '' %> /> 启用客服入口</label>
-          <label><input type="checkbox" name="forceDisplay" value="1" <%= support.force_display ? 'checked' : '' %> /> 报错时优先弹出</label>
+          <label><input type="checkbox" name="isActive" value="1" <%= support.is_active ? 'checked' : '' %> /> <%= t('启用客服入口') %></label>
+          <label><input type="checkbox" name="forceDisplay" value="1" <%= support.force_display ? 'checked' : '' %> /> <%= t('报错时优先弹出') %></label>
         </div>
         <div class="toolbar-row toolbar-row--admin support-admin-form__wide">
-          <button type="submit">保存客服入口</button>
+          <button type="submit"><%= t('保存客服入口') %></button>
         </div>
       </form>
 
       <aside class="support-preview-card">
-        <span class="pill pill--brand">前台预览</span>
+        <span class="pill pill--brand"><%= t('前台预览') %></span>
         <h3><%= support.title %></h3>
         <p><%= support.body %></p>
         <div class="support-preview-qr">
-          <img alt="客服入口二维码预览" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=<%= encodeURIComponent(support.support_qr_url || defaultSupportQrUrl) %>" />
-          <span>用户看到的是扫码入口；后台维护的是外部资源链接。</span>
+          <img alt="<%= t('客服入口二维码预览') %>" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&data=<%= encodeURIComponent(support.support_qr_url || defaultSupportQrUrl) %>" />
+          <span><%= t('用户看到的是扫码入口；后台维护的是外部资源链接。') %></span>
         </div>
       </aside>
     </div>
@@ -106,70 +106,70 @@
     <div class="section-heading">
       <div>
         <p class="section-kicker">Broadcasts</p>
-        <h2>新增站内通知</h2>
-        <p class="muted-text">用于运营公告、新人提示、维护提醒等。这里不再配置客服入口。</p>
+        <h2><%= t('新增站内通知') %></h2>
+        <p class="muted-text"><%= t('用于运营公告、新人提示、维护提醒等。这里不再配置客服入口。') %></p>
       </div>
     </div>
 
     <details class="admin-fold">
-      <summary>创建一条通知</summary>
+      <summary><%= t('创建一条通知') %></summary>
       <div class="admin-fold-body">
         <form method="post" action="/admin/notifications/new" class="admin-form-grid admin-form-grid--notifications">
-          <label>标题
-            <input name="title" maxlength="120" placeholder="例如：新人使用说明 / 系统维护通知" required />
+          <label><%= t('标题') %>
+            <input name="title" maxlength="120" placeholder="<%= t('例如：新人使用说明 / 系统维护通知') %>" required />
           </label>
-          <label>通知类型
+          <label><%= t('通知类型') %>
             <select name="notificationType">
-              <option value="general">普通通知</option>
-              <option value="new_user">新人通知</option>
-              <option value="error">报错提示</option>
-              <option value="maintenance">维护公告</option>
+              <option value="general"><%= t('普通通知') %></option>
+              <option value="new_user"><%= t('新人通知') %></option>
+              <option value="error"><%= t('报错提示') %></option>
+              <option value="maintenance"><%= t('维护公告') %></option>
             </select>
           </label>
-          <label>面向用户
+          <label><%= t('面向用户') %>
             <select name="audience">
-              <option value="all">全部</option>
-              <option value="guest">未登录访客</option>
-              <option value="user">已登录用户</option>
+              <option value="all"><%= t('全部') %></option>
+              <option value="guest"><%= t('未登录访客') %></option>
+              <option value="user"><%= t('已登录用户') %></option>
               <option value="admin">管理员</option>
             </select>
           </label>
-          <label>显示位置
+          <label><%= t('显示位置') %>
             <select name="displayPosition">
-              <option value="modal">弹窗</option>
-              <option value="banner">顶部横幅</option>
-              <option value="toast">轻提示</option>
+              <option value="modal"><%= t('弹窗') %></option>
+              <option value="banner"><%= t('顶部横幅') %></option>
+              <option value="toast"><%= t('轻提示') %></option>
             </select>
           </label>
-          <label>开始时间
+          <label><%= t('开始时间') %>
             <input type="datetime-local" name="startsAt" />
           </label>
-          <label>结束时间
+          <label><%= t('结束时间') %>
             <input type="datetime-local" name="endsAt" />
           </label>
-          <label>显示时长（毫秒，0 为手动关闭）
+          <label><%= t('显示时长（毫秒，0 为手动关闭）') %>
             <input type="number" name="displayDurationMs" min="0" step="500" value="0" />
           </label>
-          <label>优先级
+          <label><%= t('优先级') %>
             <input type="number" name="priority" value="0" />
           </label>
-          <label class="admin-form-grid__wide">内容
-            <textarea name="body" rows="4" maxlength="4000" placeholder="写给用户看的通知内容" required></textarea>
+          <label class="admin-form-grid__wide"><%= t('内容') %>
+            <textarea name="body" rows="4" maxlength="4000" placeholder="<%= t('写给用户看的通知内容') %>" required></textarea>
           </label>
-          <label>按钮文字
-            <input name="actionLabel" maxlength="80" placeholder="例如：查看详情" />
+          <label><%= t('按钮文字') %>
+            <input name="actionLabel" maxlength="80" placeholder="<%= t('例如：查看详情') %>" />
           </label>
-          <label class="admin-form-grid__wide">按钮链接 / 外部资源链接
-            <input name="actionUrl" maxlength="500" placeholder="可选，留空则只展示通知内容" />
+          <label class="admin-form-grid__wide"><%= t('按钮链接 / 外部资源链接') %>
+            <input name="actionUrl" maxlength="500" placeholder="<%= t('可选，留空则只展示通知内容') %>" />
           </label>
           <div class="admin-check-list admin-form-grid__wide">
             <label><input type="checkbox" name="isActive" value="1" checked /> 启用</label>
-            <label><input type="checkbox" name="forceDisplay" value="1" /> 强制显示（用户关闭后刷新仍会出现，除非下架/过期）</label>
-            <label><input type="checkbox" name="showOnce" value="1" /> 只显示一次（浏览器本地记忆）</label>
-            <label><input type="checkbox" name="newUserOnly" value="1" /> 仅新人通知（注册 7 天内）</label>
+            <label><input type="checkbox" name="forceDisplay" value="1" /> <%= t('强制显示（用户关闭后刷新仍会出现，除非下架/过期）') %></label>
+            <label><input type="checkbox" name="showOnce" value="1" /> <%= t('只显示一次（浏览器本地记忆）') %></label>
+            <label><input type="checkbox" name="newUserOnly" value="1" /> <%= t('仅新人通知（注册 7 天内）') %></label>
           </div>
           <div class="toolbar-row toolbar-row--admin admin-form-grid__wide">
-            <button type="submit">新增通知</button>
+            <button type="submit"><%= t('新增通知') %></button>
           </div>
         </form>
       </div>
@@ -180,14 +180,14 @@
     <div class="section-heading">
       <div>
         <p class="section-kicker">Rules</p>
-        <h2>现有站内通知</h2>
-        <p class="muted-text">按启用状态、优先级和创建顺序排序。客服入口已从列表中拆出去单独管理。</p>
+        <h2><%= t('现有站内通知') %></h2>
+        <p class="muted-text"><%= t('按启用状态、优先级和创建顺序排序。客服入口已从列表中拆出去单独管理。') %></p>
       </div>
     </div>
 
     <div class="admin-list">
       <% if (!notifications.length) { %>
-        <p class="muted-text">还没有站内通知。</p>
+        <p class="muted-text"><%= t('还没有站内通知。') %></p>
       <% } %>
       <% notifications.forEach(notification => { %>
         <details class="admin-item admin-item--notification">
@@ -197,72 +197,72 @@
               <span><%= notification.body.slice(0, 90) %><%= notification.body.length > 90 ? '…' : '' %></span>
             </div>
             <div class="admin-item-meta">
-              <span class="pill <%= notification.is_active ? 'pill--level-info' : 'pill--level-raw' %>"><%= notification.is_active ? '启用' : '停用' %></span>
+              <span class="pill <%= notification.is_active ? 'pill--level-info' : 'pill--level-raw' %>"><%= notification.is_active ? t('启用') : t('停用') %></span>
               <span class="pill pill--brand"><%= notification.notification_type %></span>
-              <% if (notification.force_display) { %><span class="pill pill--level-warn">强制</span><% } %>
-              <% if (notification.show_once) { %><span class="pill pill--level-debug">只一次</span><% } %>
-              <% if (notification.new_user_only) { %><span class="pill pill--level-access">新人</span><% } %>
+              <% if (notification.force_display) { %><span class="pill pill--level-warn"><%= t('强制') %></span><% } %>
+              <% if (notification.show_once) { %><span class="pill pill--level-debug"><%= t('只一次') %></span><% } %>
+              <% if (notification.new_user_only) { %><span class="pill pill--level-access"><%= t('新人') %></span><% } %>
             </div>
           </summary>
           <div class="admin-item-body">
             <form method="post" action="/admin/notifications/<%= notification.id %>" class="admin-form-grid admin-form-grid--notifications">
-              <label>标题
+              <label><%= t('标题') %>
                 <input name="title" maxlength="120" value="<%= notification.title %>" required />
               </label>
-              <label>通知类型
+              <label><%= t('通知类型') %>
                 <select name="notificationType">
                   <% ['general','new_user','error','maintenance'].forEach(type => { %>
                     <option value="<%= type %>" <%= notification.notification_type === type ? 'selected' : '' %>><%= type %></option>
                   <% }) %>
                 </select>
               </label>
-              <label>面向用户
+              <label><%= t('面向用户') %>
                 <select name="audience">
                   <% [['all','全部'],['guest','未登录访客'],['user','已登录用户'],['admin','管理员']].forEach(item => { %>
-                    <option value="<%= item[0] %>" <%= notification.audience === item[0] ? 'selected' : '' %>><%= item[1] %></option>
+                    <option value="<%= item[0] %>" <%= notification.audience === item[0] ? 'selected' : '' %>><%= t(item[1]) %></option>
                   <% }) %>
                 </select>
               </label>
-              <label>显示位置
+              <label><%= t('显示位置') %>
                 <select name="displayPosition">
                   <% [['modal','弹窗'],['banner','顶部横幅'],['toast','轻提示']].forEach(item => { %>
-                    <option value="<%= item[0] %>" <%= notification.display_position === item[0] ? 'selected' : '' %>><%= item[1] %></option>
+                    <option value="<%= item[0] %>" <%= notification.display_position === item[0] ? 'selected' : '' %>><%= t(item[1]) %></option>
                   <% }) %>
                 </select>
               </label>
-              <label>开始时间
+              <label><%= t('开始时间') %>
                 <input type="datetime-local" name="startsAt" value="<%= notification.starts_at_input %>" />
               </label>
-              <label>结束时间
+              <label><%= t('结束时间') %>
                 <input type="datetime-local" name="endsAt" value="<%= notification.ends_at_input %>" />
               </label>
               <label>显示时长（毫秒）
                 <input type="number" name="displayDurationMs" min="0" step="500" value="<%= notification.display_duration_ms %>" />
               </label>
-              <label>优先级
+              <label><%= t('优先级') %>
                 <input type="number" name="priority" value="<%= notification.priority %>" />
               </label>
-              <label class="admin-form-grid__wide">内容
+              <label class="admin-form-grid__wide"><%= t('内容') %>
                 <textarea name="body" rows="4" maxlength="4000" required><%= notification.body %></textarea>
               </label>
-              <label>按钮文字
+              <label><%= t('按钮文字') %>
                 <input name="actionLabel" maxlength="80" value="<%= notification.action_label || '' %>" />
               </label>
-              <label class="admin-form-grid__wide">按钮链接 / 外部资源链接
+              <label class="admin-form-grid__wide"><%= t('按钮链接 / 外部资源链接') %>
                 <input name="actionUrl" maxlength="500" value="<%= notification.action_url || '' %>" />
               </label>
               <div class="admin-check-list admin-form-grid__wide">
                 <label><input type="checkbox" name="isActive" value="1" <%= notification.is_active ? 'checked' : '' %> /> 启用</label>
-                <label><input type="checkbox" name="forceDisplay" value="1" <%= notification.force_display ? 'checked' : '' %> /> 强制显示</label>
-                <label><input type="checkbox" name="showOnce" value="1" <%= notification.show_once ? 'checked' : '' %> /> 只显示一次</label>
-                <label><input type="checkbox" name="newUserOnly" value="1" <%= notification.new_user_only ? 'checked' : '' %> /> 仅新人通知</label>
+                <label><input type="checkbox" name="forceDisplay" value="1" <%= notification.force_display ? 'checked' : '' %> /> <%= t('强制显示') %></label>
+                <label><input type="checkbox" name="showOnce" value="1" <%= notification.show_once ? 'checked' : '' %> /> <%= t('只显示一次') %></label>
+                <label><input type="checkbox" name="newUserOnly" value="1" <%= notification.new_user_only ? 'checked' : '' %> /> <%= t('仅新人通知') %></label>
               </div>
               <div class="toolbar-row toolbar-row--between toolbar-row--admin admin-form-grid__wide">
-                <button type="submit">保存通知</button>
+                <button type="submit"><%= t('保存通知') %></button>
               </div>
             </form>
-            <form method="post" action="/admin/notifications/<%= notification.id %>/delete" onsubmit="return confirm('确定删除这条通知吗？');">
-              <button type="submit" class="danger-button">删除通知</button>
+            <form method="post" action="/admin/notifications/<%= notification.id %>/delete" onsubmit="return confirm('<%= t('确定删除这条通知吗？') %>');">
+              <button type="submit" class="danger-button"><%= t('删除通知') %></button>
             </form>
           </div>
         </details>

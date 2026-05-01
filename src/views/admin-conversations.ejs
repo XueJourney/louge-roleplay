@@ -22,7 +22,7 @@
       <a class="quick-link" href="/admin/providers">LLM 配置</a>
       <a class="quick-link" href="/admin/plans">套餐配置</a>
       <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
-      <a class="quick-link" href="/admin/notifications">通知中心</a>
+      <a class="quick-link" href="/admin/notifications"><%= t('通知中心') %></a>
       <a class="quick-link" href="/admin/logs"><%= t('日志查询') %></a>
       <a class="quick-link is-active" href="/admin/conversations"><%= t('对话记录') %></a>
     </div>
@@ -63,10 +63,10 @@
         <input type="date" name="date" value="<%= conversationResult.filters.date %>" />
       </label>
       <label>
-        状态
+        <%= t('状态') %>
         <select name="status">
           <% [
-            ['all', '全部状态'],
+            ['all', t('全部状态')],
             ['active', 'active'],
             ['archived', 'archived'],
             ['deleted', 'deleted']
@@ -135,7 +135,7 @@
             <span><strong><%= t('角色卡') %></strong><%= conversation.character_name %></span>
             <span><strong><%= t('创建时间') %></strong><%= conversation.display_created_at %></span>
             <span><strong><%= t('最后消息') %></strong><%= conversation.display_last_message_at %></span>
-            <span><strong>删除时间</strong><%= conversation.display_deleted_at %></span>
+            <span><strong><%= t('删除时间') %></strong><%= conversation.display_deleted_at %></span>
           </div>
           <p class="admin-conversation-preview">
             <span><%= conversation.latest_sender_type || '—' %></span>
@@ -144,10 +144,10 @@
           <div class="toolbar-row toolbar-row--admin">
             <% if (conversation.status === 'deleted') { %>
               <form method="POST" action="/admin/conversations/<%= conversation.id %>/restore">
-                <button type="submit">恢复会话</button>
+                <button type="submit"><%= t('恢复会话') %></button>
               </form>
-              <form method="POST" action="/admin/conversations/<%= conversation.id %>/permanent-delete" onsubmit="return confirm('确认永久删除这条会话及其所有消息吗？这个操作不可恢复。');">
-                <button type="submit" class="danger">永久删除</button>
+              <form method="POST" action="/admin/conversations/<%= conversation.id %>/permanent-delete" onsubmit="return confirm('<%= t('确认永久删除这条会话及其所有消息吗？这个操作不可恢复。') %>');">
+                <button type="submit" class="danger"><%= t('永久删除') %></button>
               </form>
             <% } %>
           </div>
