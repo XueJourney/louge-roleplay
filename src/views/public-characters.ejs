@@ -1,0 +1,169 @@
+<!-- @file src/views/public-characters.ejs
+     @description 公开角色专页。调用说明：GET /characters/public 支持 q、sort、page、pageSize 查询参数。
+-->
+<link rel="stylesheet" href="/public/styles/site-pages.css" />
+
+<%
+  const characterList = Array.isArray(characters) ? characters : [];
+  const commentMap = commentsByCharacter || {};
+  const pager = pagination || { page: 1, pageSize: 12, total: characterList.length, totalPages: 1, hasPrev: false, hasNext: false };
+  const currentFilters = filters || { keyword: '', sort: 'heat' };
+  const buildPageUrl = (page) => {
+    const params = new URLSearchParams();
+    if (currentFilters.keyword) params.set('q', currentFilters.keyword);
+    if (currentFilters.sort && currentFilters.sort !== 'heat') params.set('sort', currentFilters.sort);
+    if (pager.pageSize && Number(pager.pageSize) !== 12) params.set('pageSize', String(pager.pageSize));
+    params.set('page', String(page));
+    return `/characters/public?${params.toString()}`;
+  };
+  const sortOptions = [
+    ['heat', '综合热度'],
+    ['likes', '点赞最多'],
+    ['comments', '评论最多'],
+    ['usage', '使用最多'],
+    ['newest', '最新优先'],
+    ['oldest', '最早优先'],
+    ['random', '随机看看'],
+  ];
+%>
+
+<div class="public-characters-shell">
+  <section class="public-hero-card">
+    <div>
+      <div class="section-kicker">Public Characters</div>
+      <h1>公开角色</h1>
+      <p>公开角色支持点赞、评论、使用量统计和综合热度排序。想找热门角色，直接按热度或互动数据筛。</p>
+      <div class="public-hero-meta">
+        <span><strong><%= pager.total %></strong> 个公开角色</span>
+        <span>每页 <strong><%= pager.pageSize %></strong> 个</span>
+        <span>第 <strong><%= pager.page %></strong> / <strong><%= pager.totalPages %></strong> 页</span>
+      </div>
+    </div>
+    <div class="public-hero-actions">
+      <% if (currentUser) { %>
+        <a class="quick-link" href="/characters/new">创建新角色</a>
+      <% } else { %>
+        <a class="quick-link" href="/register">注册并创建角色</a>
+      <% } %>
+      <a class="quick-link" href="/">回首页</a>
+    </div>
+  </section>
+
+  <section class="panel public-filter-panel">
+    <form method="GET" action="/characters/public" class="public-filter-form">
+      <div class="field-group">
+        <label for="publicCharacterKeyword">搜索角色</label>
+        <input id="publicCharacterKeyword" name="q" value="<%= currentFilters.keyword || '' %>" maxlength="80" placeholder="搜索角色名、简介或创建者" />
+      </div>
+      <div class="field-group">
+        <label for="publicCharacterSort">排序</label>
+        <select id="publicCharacterSort" name="sort">
+          <% sortOptions.forEach(([value, label]) => { %>
+            <option value="<%= value %>" <%= currentFilters.sort === value ? 'selected' : '' %>><%= label %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field-group">
+        <label for="publicCharacterPageSize">每页数量</label>
+        <select id="publicCharacterPageSize" name="pageSize">
+          <% [12, 24, 36, 48].forEach(size => { %>
+            <option value="<%= size %>" <%= Number(pager.pageSize) === size ? 'selected' : '' %>><%= size %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="public-filter-actions">
+        <button class="btn-brand" type="submit">筛选</button>
+        <% if (currentFilters.keyword || currentFilters.sort !== 'heat' || Number(pager.pageSize) !== 12) { %>
+          <a class="quick-link" href="/characters/public">清空</a>
+        <% } %>
+      </div>
+    </form>
+  </section>
+
+  <% if (characterList.length === 0) { %>
+    <section class="empty-card public-empty-state">
+      <h2>没有找到公开角色</h2>
+      <p>换个关键词试试，或者创建一个新的公开角色。</p>
+      <div class="dashboard-empty-actions">
+        <a class="quick-link" href="/characters/public">查看全部</a>
+        <% if (currentUser) { %>
+          <a class="quick-link" href="/characters/new">创建新角色</a>
+        <% } %>
+      </div>
+    </section>
+  <% } else { %>
+    <section class="public-character-grid">
+      <% characterList.forEach(character => { %>
+        <% const comments = commentMap[character.id] || []; %>
+        <article class="public-character-card">
+          <div class="public-character-head">
+            <div class="character-avatar"><%= character.name.charAt(0) %></div>
+            <div>
+              <h2><%= character.name %></h2>
+              <p>由 <%= character.username %> 创建</p>
+            </div>
+          </div>
+          <p class="public-character-summary"><%= character.summary || '这个角色还没有写简介。' %></p>
+          <div class="public-character-stats">
+            <span>🔥 热度 <strong><%= character.heat_score || 0 %></strong></span>
+            <span>♥ 点赞 <strong><%= character.like_count || 0 %></strong></span>
+            <span>💬 评论 <strong><%= character.comment_count || 0 %></strong></span>
+            <span>↗ 使用 <strong><%= character.usage_count || 0 %></strong></span>
+          </div>
+          <div class="public-character-meta">
+            <span class="meta-pill">公开</span>
+            <span class="meta-pill"><%= character.created_at %></span>
+          </div>
+          <div class="public-character-actions public-character-actions--split">
+            <% if (currentUser) { %>
+              <form method="POST" action="/conversations/start/<%= character.id %>">
+                <button class="btn-brand" type="submit">开始聊天</button>
+              </form>
+              <form method="POST" action="/characters/public/<%= character.id %>/like">
+                <button class="inline-btn" type="submit">点赞</button>
+              </form>
+            <% } else { %>
+              <a class="quick-link" href="/login">登录后开始聊天</a>
+            <% } %>
+          </div>
+
+          <div class="public-comments">
+            <div class="public-comments-head">最新评论</div>
+            <% if (comments.length === 0) { %>
+              <p class="public-comment-empty">还没有评论，来写第一句吧。</p>
+            <% } else { %>
+              <% comments.forEach(comment => { %>
+                <div class="public-comment-item">
+                  <strong><%= comment.username %></strong>
+                  <span><%= comment.body %></span>
+                </div>
+              <% }) %>
+            <% } %>
+            <% if (currentUser) { %>
+              <form method="POST" action="/characters/public/<%= character.id %>/comments" class="public-comment-form">
+                <input name="commentBody" maxlength="500" placeholder="写一句评论，最多 500 字" />
+                <button class="btn-soft" type="submit">评论</button>
+              </form>
+            <% } %>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+  <% } %>
+
+  <% if (pager.totalPages > 1) { %>
+    <nav class="public-pagination" aria-label="公开角色分页">
+      <% if (pager.hasPrev) { %>
+        <a class="quick-link" href="<%= buildPageUrl(pager.page - 1) %>">上一页</a>
+      <% } else { %>
+        <span class="quick-link is-disabled">上一页</span>
+      <% } %>
+      <span class="public-pagination-current">第 <%= pager.page %> / <%= pager.totalPages %> 页</span>
+      <% if (pager.hasNext) { %>
+        <a class="quick-link" href="<%= buildPageUrl(pager.page + 1) %>">下一页</a>
+      <% } else { %>
+        <span class="quick-link is-disabled">下一页</span>
+      <% } %>
+    </nav>
+  <% } %>
+</div>

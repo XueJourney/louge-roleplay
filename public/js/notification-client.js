@@ -143,7 +143,8 @@
     const title = document.createElement('h2');
     title.textContent = text(notification.title) || t('通知');
 
-    const body = document.createElement('p');
+    const body = document.createElement('div');
+    body.className = 'site-notification-body';
     body.textContent = text(notification.body);
 
     const qr = buildSupportQr(notification);
@@ -169,10 +170,14 @@
     close.addEventListener('click', () => closeActiveOverlay(notification));
     actions.appendChild(close);
 
+    const scrollArea = document.createElement('div');
+    scrollArea.className = 'site-notification-scroll';
+    scrollArea.appendChild(body);
+    if (qr) scrollArea.appendChild(qr);
+
     card.appendChild(kicker);
     card.appendChild(title);
-    card.appendChild(body);
-    if (qr) card.appendChild(qr);
+    card.appendChild(scrollArea);
     card.appendChild(actions);
     overlay.appendChild(card);
     document.body.appendChild(overlay);

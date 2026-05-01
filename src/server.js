@@ -14,6 +14,7 @@ const morgan = require('morgan');
 
 const config = require('./config');
 const logger = require('./lib/logger');
+const { csrfProtection } = require('./middleware/csrf');
 const { appendDailyLog } = require('./services/log-service');
 const { waitReady: waitDbReady, getDbType } = require('./lib/db');
 const { initRedis, redisClient, isRedisReal } = require('./lib/redis');
@@ -24,8 +25,76 @@ const { renderPage } = require('./server-helpers');
 const { registerWebRoutes } = require('./routes/web-routes');
 
 const app = express();
+let server;
+
+function shutdown(signal) {
+  logger.warn('Application shutdown requested', { signal });
+  if (server) {
+    server.close(() => {
+      logger.info('HTTP server closed', { signal });
+      process.exit(0);
+    });
+    setTimeout(() => {
+      logger.error('Forced shutdown after timeout', { signal });
+      process.exit(1);
+    }, 10000).unref();
+    return;
+  }
+  process.exit(0);
+}
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception; exiting process', { error: error.message, stack: error.stack });
+  process.exit(1);
+});
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+function buildCspDirectives() {
+  const nonceValue = (req, res) => `'nonce-${res.locals.cspNonce}'`;
+  let appOrigin = "'self'";
+  try {
+    appOrigin = config.appUrl ? new URL(config.appUrl).origin : "'self'";
+  } catch (_) {
+    appOrigin = "'self'";
+  }
+  return {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    objectSrc: ["'none'"],
+    frameAncestors: ["'self'"],
+    formAction: ["'self'"],
+    scriptSrc: ["'self'", nonceValue],
+    scriptSrcAttr: ["'none'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    styleSrcAttr: ["'unsafe-inline'"],
+    imgSrc: ["'self'", 'data:', 'blob:', 'https://api.qrserver.com'],
+    fontSrc: ["'self'", 'data:'],
+    connectSrc: ["'self'", appOrigin],
+    mediaSrc: ["'self'", 'blob:', 'data:'],
+    workerSrc: ["'self'", 'blob:'],
+    upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+  };
+}
 
 async function bootstrap() {
+  if (process.env.NODE_ENV === 'production' && config.productionFailFast) {
+    if (config.sessionSecretIsEphemeral) {
+      throw new Error('SESSION_SECRET is required in production');
+    }
+    if (!config.cookieSecure) {
+      throw new Error('COOKIE_SECURE=true is required in production');
+    }
+  }
+
   await waitDbReady();
   logger.info('[bootstrap] 数据库已就绪', { dbType: getDbType() });
 
@@ -40,7 +109,6 @@ async function bootstrap() {
   app.set('views', path.join(__dirname, 'views'));
 
   app.use('/public', express.static(path.join(__dirname, '..', 'public')));
-  app.use(helmet({ contentSecurityPolicy: false }));
   app.use(compression({
     filter: (req, res) => {
       const contentType = String(res.getHeader('Content-Type') || '').toLowerCase();
@@ -74,6 +142,7 @@ async function bootstrap() {
     secret: config.sessionSecret,
     resave: false,
     saveUninitialized: false,
+    name: 'louge.sid',
     cookie: {
       httpOnly: true,
       secure: config.cookieSecure,
@@ -83,7 +152,14 @@ async function bootstrap() {
   }));
 
   app.use(requestContext);
+  app.use(csrfProtection);
   app.use(attachI18n);
+  app.use(helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: buildCspDirectives(),
+    },
+  }));
   registerWebRoutes(app);
 
   app.use((req, res) => {
@@ -98,11 +174,9 @@ async function bootstrap() {
 
   app.use(errorHandler);
 
-  app.listen(config.port, '0.0.0.0', () => {
+  server = app.listen(config.port, '0.0.0.0', () => {
     logger.info('Application started successfully', {
-      port: config.port,
-      appName: config.appName,
-      appVersion: config.appVersion,
+      ...config.getPrivacySafeSummary(),
       debugFeatures: [
         'requestId logging',
         'linear chat loading',

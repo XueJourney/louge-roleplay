@@ -6,21 +6,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="<%= csrfToken || '' %>" />
   <title><%= title %> - <%= appName %></title>
   <link rel="preconnect" href="/" />
   <link rel="stylesheet" href="/fonts/google.css?v=latin-v2" />
   <link rel="stylesheet" href="/public/styles/site-pages.css" />
-  <script>
-    window.AI_ROLEPLAY_I18N = {
-      locale: <%- JSON.stringify(locale || 'zh-CN') %>,
-      messages: <%- JSON.stringify(clientI18nMessages || {}) %>
-    };
-    window.AI_ROLEPLAY_NOTIFICATIONS = {
-      items: <%- JSON.stringify(clientNotifications || []) %>
-    };
-  </script>
-  <script src="/public/js/i18n-runtime.js"></script>
-  <script src="/public/js/notification-client.js" defer></script>
+  <script id="app-bootstrap-data" type="application/json" nonce="<%= cspNonce || '' %>"><%- JSON.stringify({
+    i18n: { locale: locale || 'zh-CN', messages: clientI18nMessages || {} },
+    notifications: { items: clientNotifications || [] },
+    csrfToken: csrfToken || ''
+  }) %></script>
+  <script nonce="<%= cspNonce || '' %>" src="/public/js/layout-bootstrap.js"></script>
+  <script nonce="<%= cspNonce || '' %>" src="/public/js/i18n-runtime.js"></script>
+  <script nonce="<%= cspNonce || '' %>" src="/public/js/csrf.js"></script>
+  <script nonce="<%= cspNonce || '' %>" src="/public/js/form-guards.js"></script>
+  <script nonce="<%= cspNonce || '' %>" src="/public/js/notification-client.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -36,7 +36,7 @@
       <% } %>
         <a href="/characters/new"><%= t('创建角色') %></a>
         <button type="button" class="nav-support-button" data-open-support><%= t('联系客服') %></button>
-        <a href="/logout"><%= t('退出（{username}）', { username: currentUser.username }) %></a>
+        <form method="POST" action="/logout" class="inline-form nav-logout-form"><input type="hidden" name="_csrf" value="<%= csrfToken || '' %>" /><button type="submit" class="nav-link-button"><%= t('退出（{username}）', { username: currentUser.username }) %></button></form>
       <% } else { %>
         <a href="/login"><%= t('登录') %></a>
         <a href="/register"><%= t('注册') %></a>

@@ -3,7 +3,56 @@
  * @description 角色创建、编辑、列表查询与详情读取服务。
  */
 
-const { query } = require('../lib/db');
+const { query, getDbType } = require('../lib/db');
+
+function getPublicCharacterSortSql(sort) {
+  const dbType = getDbType();
+  const heatExpr = '(COALESCE(like_stats.like_count, 0) * 3 + COALESCE(comment_stats.comment_count, 0) * 4 + COALESCE(usage_stats.usage_count, 0) * 2)';
+  const randomSql = dbType === 'mysql' ? 'RAND()' : 'RANDOM()';
+  const sortMap = {
+    newest: 'c.id DESC',
+    oldest: 'c.id ASC',
+    likes: 'like_count DESC, c.id DESC',
+    comments: 'comment_count DESC, c.id DESC',
+    usage: 'usage_count DESC, c.id DESC',
+    heat: `${heatExpr} DESC, c.id DESC`,
+    random: randomSql,
+  };
+  return sortMap[sort] || sortMap.newest;
+}
+
+function normalizePublicCharacterSort(sort) {
+  const value = String(sort || 'newest').trim();
+  return ['newest', 'oldest', 'likes', 'comments', 'usage', 'heat', 'random'].includes(value) ? value : 'newest';
+}
+
+function getPublicCharacterStatsJoinSql() {
+  return `
+     LEFT JOIN (
+       SELECT character_id, COUNT(*) AS like_count
+       FROM character_likes
+       GROUP BY character_id
+     ) like_stats ON like_stats.character_id = c.id
+     LEFT JOIN (
+       SELECT character_id, COUNT(*) AS comment_count
+       FROM character_comments
+       WHERE status = 'visible'
+       GROUP BY character_id
+     ) comment_stats ON comment_stats.character_id = c.id
+     LEFT JOIN (
+       SELECT character_id, COUNT(*) AS usage_count
+       FROM character_usage_events
+       GROUP BY character_id
+     ) usage_stats ON usage_stats.character_id = c.id`;
+}
+
+function getPublicCharacterSelectFields() {
+  return `c.id, c.name, c.summary, c.visibility, c.created_at, c.updated_at, u.username,
+            COALESCE(like_stats.like_count, 0) AS like_count,
+            COALESCE(comment_stats.comment_count, 0) AS comment_count,
+            COALESCE(usage_stats.usage_count, 0) AS usage_count,
+            (COALESCE(like_stats.like_count, 0) * 3 + COALESCE(comment_stats.comment_count, 0) * 4 + COALESCE(usage_stats.usage_count, 0) * 2) AS heat_score`;
+}
 
 function stringifyPromptProfile(payload) {
   if (!payload || payload === '[]') {
@@ -68,13 +117,70 @@ async function updateCharacter(characterId, userId, payload) {
   );
 }
 
-async function listPublicCharacters() {
-  return query(
-    `SELECT c.id, c.name, c.summary, c.personality, c.first_message, c.prompt_profile_json, c.visibility, c.created_at, u.username
+async function listPublicCharacters(options = {}) {
+  const page = Math.max(1, Number.parseInt(options.page || 1, 10));
+  const pageSize = Math.min(48, Math.max(6, Number.parseInt(options.pageSize || 12, 10)));
+  const offset = (page - 1) * pageSize;
+  const keyword = String(options.keyword || '').trim();
+  const sort = normalizePublicCharacterSort(options.sort);
+  const sortSql = getPublicCharacterSortSql(sort);
+  const where = ["c.visibility = 'public'", "c.status = 'published'"];
+  const params = [];
+
+  if (keyword) {
+    where.push('(c.name LIKE ? OR c.summary LIKE ? OR u.username LIKE ?)');
+    const likeKeyword = `%${keyword}%`;
+    params.push(likeKeyword, likeKeyword, likeKeyword);
+  }
+
+  const whereSql = where.join(' AND ');
+  const rows = await query(
+    `SELECT ${getPublicCharacterSelectFields()}
      FROM characters c
      JOIN users u ON u.id = c.user_id
+     ${getPublicCharacterStatsJoinSql()}
+     WHERE ${whereSql}
+     ORDER BY ${sortSql}
+     LIMIT ${pageSize} OFFSET ${offset}`,
+    params,
+  );
+  const countRows = await query(
+    `SELECT COUNT(*) AS total
+     FROM characters c
+     JOIN users u ON u.id = c.user_id
+     WHERE ${whereSql}`,
+    params,
+  );
+  const total = Number(countRows[0]?.total || 0);
+
+  return {
+    characters: rows,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      hasPrev: page > 1,
+      hasNext: page * pageSize < total,
+    },
+    filters: {
+      keyword,
+      sort,
+    },
+  };
+}
+
+async function listFeaturedPublicCharacters(limit = 6) {
+  const safeLimit = Math.min(12, Math.max(1, Number.parseInt(limit || 6, 10)));
+  const limitSql = Number(safeLimit);
+  return query(
+    `SELECT ${getPublicCharacterSelectFields()}
+     FROM characters c
+     JOIN users u ON u.id = c.user_id
+     ${getPublicCharacterStatsJoinSql()}
      WHERE c.visibility = 'public' AND c.status = 'published'
-     ORDER BY c.id DESC`,
+     ORDER BY heat_score DESC, c.id DESC
+     LIMIT ${limitSql}`,
   );
 }
 
@@ -129,6 +235,7 @@ module.exports = {
   createCharacter,
   updateCharacter,
   listPublicCharacters,
+  listFeaturedPublicCharacters,
   listUserCharacters,
   getCharacterById,
   countCharacterConversations,

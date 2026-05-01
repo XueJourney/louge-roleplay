@@ -213,12 +213,19 @@ async function initialize() {
       logger.info('[db] MySQL 连接成功，使用 MySQL 模式');
       return;
     } catch (error) {
+      if (process.env.NODE_ENV === 'production' && config.productionFailFast && !config.allowProductionSqliteFallback) {
+        logger.error('[db] MySQL 连接失败，生产模式拒绝降级到 SQLite', { error: error.message });
+        throw error;
+      }
       logger.warn('[db] MySQL 连接失败，自动降级到 SQLite', {
         error: error.message,
         hint: '如需使用 MySQL，请检查 DATABASE_URL 与网络/防火墙配置',
       });
     }
   } else {
+    if (process.env.NODE_ENV === 'production' && config.productionFailFast && !config.allowProductionSqliteFallback) {
+      throw new Error('DATABASE_URL is required in production unless ALLOW_PRODUCTION_SQLITE_FALLBACK=true');
+    }
     logger.info('[db] DATABASE_URL 未设置，使用 SQLite 本地数据库（开发模式）');
   }
 

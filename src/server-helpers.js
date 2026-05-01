@@ -48,6 +48,8 @@ async function renderPage(res, view, params = {}) {
         appUrl: config.appUrl,
         locale,
         t,
+        csrfToken: res.locals.csrfToken || '',
+        cspNonce: res.locals.cspNonce || '',
         clientI18nMessages: res.locals.clientI18nMessages || {},
         clientNotifications,
         localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
@@ -110,10 +112,11 @@ function buildRegisterLogMeta(req, payload = {}) {
 }
 
 function buildLoginLogMeta(req, payload = {}) {
+  const login = String(payload.login || '').trim();
   return {
     requestId: req.requestId,
     ip: getClientIp(req),
-    login: String(payload.login || '').trim(),
+    login: isEmail(login) ? maskEmail(login) : (isDomesticPhone(login) ? maskPhone(login) : login.slice(0, 3) + (login.length > 3 ? '***' : '')),
   };
 }
 

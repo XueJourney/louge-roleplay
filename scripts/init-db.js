@@ -429,6 +429,47 @@ async function main() {
   `);
   console.log('[init-db]   ~ characters.visibility ENUM 已确认完整');
 
+  // ── 角色公开互动表 ─────────────────────────────────────────────────────────────
+  console.log('[init-db] 初始化 character_likes / comments / usage 表...');
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS character_likes (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      character_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      created_at DATETIME NOT NULL,
+      UNIQUE KEY uniq_character_like_user (character_id, user_id),
+      INDEX idx_character_likes_character (character_id),
+      CONSTRAINT fk_character_likes_character FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+      CONSTRAINT fk_character_likes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS character_comments (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      character_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      body VARCHAR(500) NOT NULL,
+      status ENUM('visible','hidden','deleted') NOT NULL DEFAULT 'visible',
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      INDEX idx_character_comments_character (character_id, status, id),
+      CONSTRAINT fk_character_comments_character FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+      CONSTRAINT fk_character_comments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS character_usage_events (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      character_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      created_at DATETIME NOT NULL,
+      INDEX idx_character_usage_character (character_id),
+      INDEX idx_character_usage_user (user_id, created_at),
+      CONSTRAINT fk_character_usage_character FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+      CONSTRAINT fk_character_usage_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // ── 会话表 ───────────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 conversations 表...');
   await connection.query(`

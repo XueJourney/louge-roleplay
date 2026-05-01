@@ -55,10 +55,10 @@
       <div class="field-group">
         <label for="visibility">是否公开</label>
         <select id="visibility" name="visibility">
-          <option value="public" <%= (form?.visibility || 'public') === 'public' ? 'selected' : '' %>>公开（会出现在首页公开角色列表）</option>
+          <option value="public" <%= (form?.visibility || 'public') === 'public' ? 'selected' : '' %>>公开（会出现在公开角色页）</option>
           <option value="private" <%= (form?.visibility || 'public') === 'private' ? 'selected' : '' %>>私有（只有我自己能看到和使用）</option>
         </select>
-        <div class="mini-note">公开角色会显示在首页；私有角色只保留在你的控制台里，别人不能直接开始对话。</div>
+        <div class="mini-note">公开角色会显示在公开角色页；私有角色只保留在你的控制台里，别人不能直接开始对话。</div>
       </div>
 
       <div class="field-group large">
@@ -115,7 +115,7 @@
         <h3>危险操作</h3>
         <p>为了保护已有故事，现在只允许删除从未开始过对话的角色。已经聊过的角色会先保留，避免误删整段内容。</p>
         <div class="prompt-actions">
-          <form method="POST" action="/characters/<%= character.id %>/delete" onsubmit="return confirm('确认删除这个角色吗？只有从未开过对话的角色才能删除。');">
+          <form method="POST" action="/characters/<%= character.id %>/delete" data-confirm-message="确认删除这个角色吗？只有从未开过对话的角色才能删除。">
             <button type="submit" class="ghost-btn danger-btn">删除这个角色</button>
           </form>
         </div>
@@ -123,4 +123,4 @@
     <% } %>
   </div>
 </div>
-<script src="/public/js/character-editor-page.js"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/character-editor-page.js"></script>

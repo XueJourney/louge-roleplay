@@ -9,6 +9,10 @@ function registerPublicRoutes(app, ctx) {
     refreshCaptcha,
     getCaptchaImage,
     listPublicCharacters,
+    listFeaturedPublicCharacters,
+    toggleCharacterLike,
+    addCharacterComment,
+    listCharacterComments,
     CSS_CACHE_TTL_MS,
     FONT_CACHE_TTL_MS,
     getGoogleFontCss,
@@ -21,8 +25,23 @@ function registerPublicRoutes(app, ctx) {
     redisClient,
     isRedisReal,
     renderPage,
-    renderRegisterPage
+    renderRegisterPage,
+    parseIdParam,
+    getClientIp,
+    hitLimit
   } = ctx;
+
+  function getSameOriginBackUrl(req, fallback = '/characters/public') {
+    const referer = String(req.get('referer') || '').trim();
+    if (!referer) return fallback;
+    try {
+      const parsed = new URL(referer, `${req.protocol}://${req.get('host')}`);
+      if (parsed.host === req.get('host')) {
+        return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+    } catch (_) {}
+    return fallback;
+  }
 
   app.get('/fonts/google.css', async (req, res) => {
     try {
@@ -53,9 +72,71 @@ function registerPublicRoutes(app, ctx) {
 
   app.get('/', async (req, res, next) => {
     try {
-      const characters = await listPublicCharacters();
+      const characters = await listFeaturedPublicCharacters(6);
       renderPage(res, 'home', { title: '首页', characters });
     } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get('/characters/public', async (req, res, next) => {
+    try {
+      const page = Number.parseInt(req.query.page || '1', 10);
+      const pageSize = Number.parseInt(req.query.pageSize || '12', 10);
+      const keyword = String(req.query.q || '').trim();
+      const sort = ['newest', 'oldest', 'likes', 'comments', 'usage', 'heat', 'random'].includes(String(req.query.sort || '').trim())
+        ? String(req.query.sort || '').trim()
+        : 'heat';
+      const result = await listPublicCharacters({ page, pageSize, keyword, sort });
+      const commentsByCharacter = {};
+      await Promise.all(result.characters.map(async (character) => {
+        commentsByCharacter[character.id] = await listCharacterComments(character.id, 3);
+      }));
+      renderPage(res, 'public-characters', {
+        title: '公开角色',
+        characters: result.characters,
+        pagination: result.pagination,
+        filters: result.filters,
+        commentsByCharacter,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/characters/public/:characterId/like', async (req, res, next) => {
+    try {
+      if (!req.session?.user?.id) {
+        return res.redirect('/login');
+      }
+      const characterId = parseIdParam(req.params.characterId, '角色 ID');
+      const limited = await hitLimit(`rate:character-like:${req.session.user.id}`, 60, 60);
+      if (limited) {
+        return res.status(429).send('too many requests');
+      }
+      await toggleCharacterLike(characterId, req.session.user.id);
+      return res.redirect(getSameOriginBackUrl(req, '/characters/public'));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/characters/public/:characterId/comments', async (req, res, next) => {
+    try {
+      if (!req.session?.user?.id) {
+        return res.redirect('/login');
+      }
+      const characterId = parseIdParam(req.params.characterId, '角色 ID');
+      const limited = await hitLimit(`rate:character-comment:${req.session.user.id}:${getClientIp(req)}`, 60, 12);
+      if (limited) {
+        return res.status(429).send('too many requests');
+      }
+      await addCharacterComment(characterId, req.session.user.id, req.body.commentBody);
+      return res.redirect(getSameOriginBackUrl(req, '/characters/public'));
+    } catch (error) {
+      if (error.code === 'COMMENT_EMPTY') {
+        return res.redirect(getSameOriginBackUrl(req, '/characters/public'));
+      }
       next(error);
     }
   });

@@ -16,6 +16,8 @@ function registerChatMessageRoutes(app, ctx) {
     buildChatRequestContext,
     parseIntegerField,
     parseIdParam,
+    getClientIp,
+    hitLimit,
     buildNextConversationTitle,
     renderChatPage,
     loadConversationForUserOrFail,
@@ -30,6 +32,10 @@ function registerChatMessageRoutes(app, ctx) {
     try {
       conversationId = parseIdParam(req.params.conversationId, '会话 ID');
       const rawContent = String(req.body.content || '');
+      const limited = await hitLimit(`rate:chat-message:${req.session.user.id}:${getClientIp(req)}`, 60, 30);
+      if (limited) {
+        return renderPage(res, 'message', { title: '提示', message: '发送太频繁，请稍后再试。' });
+      }
       const parentMessageId = parseIntegerField(req.body.parentMessageId, { fieldLabel: '父消息 ID', min: 1, allowEmpty: true });
 
       const conversation = await loadConversationForUserOrFail(req, res, conversationId);
@@ -112,6 +118,12 @@ function registerChatMessageRoutes(app, ctx) {
     try {
       conversationId = parseIdParam(req.params.conversationId, '会话 ID');
       const rawContent = String(req.body.content || '');
+      const limited = await hitLimit(`rate:chat-stream:${req.session.user.id}:${getClientIp(req)}`, 60, 30);
+      if (limited) {
+        ndjson.safeWrite({ type: 'error', message: '发送太频繁，请稍后再试。' });
+        ndjson.end();
+        return;
+      }
       const parentMessageId = parseIntegerField(req.body.parentMessageId, { fieldLabel: '父消息 ID', min: 1, allowEmpty: true });
 
       const conversation = await loadConversationForUserOrFail(req, res, conversationId);

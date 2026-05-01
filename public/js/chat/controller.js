@@ -9,6 +9,20 @@
     const textarea = document.getElementById('content');
     if (!form || !textarea) return;
 
+    const {
+      isNearPageBottom,
+      closeMessageMenus,
+      closeSiblingMessageMenus,
+      showToast,
+      renderStreamingPlainText,
+      createFragmentFromHtml,
+      hydrateRichContent,
+    } = window.LougeChatDomUtils || {};
+    if (!window.LougeChatDomUtils) {
+      console.warn('[chat] LougeChatDomUtils missing; controller skipped.');
+      return;
+    }
+
     const streamEndpoint = form.dataset.streamEndpoint || form.action;
     const optimizeStreamEndpoint = form.dataset.optimizeStreamEndpoint || '';
     const conversationId = form.dataset.conversationId || '';
@@ -19,14 +33,27 @@
     let activeAbortController = null;
     let autoFollowStreaming = true;
 
-    function isNearPageBottom(threshold) {
-      const margin = Number(threshold || 180);
-      const doc = document.documentElement;
-      const scrollTop = window.scrollY || doc.scrollTop || 0;
-      const viewportBottom = scrollTop + window.innerHeight;
-      const pageHeight = Math.max(doc.scrollHeight, document.body ? document.body.scrollHeight : 0);
-      return pageHeight - viewportBottom <= margin;
+    const bubbleToolkit = window.LougeChatBubbles && window.LougeChatBubbles.create({
+      t,
+      chatContainer,
+      beginStreamingAutoFollow: () => beginStreamingAutoFollow(),
+      maybeFollowStreamingBubble: (streamBubble, behavior) => maybeFollowStreamingBubble(streamBubble, behavior),
+      createFragmentFromHtml,
+      hydrateRichContent,
+    });
+    if (!bubbleToolkit) {
+      console.warn('[chat] LougeChatBubbles missing; controller skipped.');
+      return;
     }
+    const {
+      appendStreamingPair,
+      appendSingleStreamingBubble,
+      removeLivePair,
+      replaceBubbleWithHtml,
+      replacePreviousLiveUserBubble,
+    } = bubbleToolkit;
+
+    let streamClient = null;
 
     function beginStreamingAutoFollow() {
       autoFollowStreaming = isNearPageBottom(260);
@@ -52,35 +79,6 @@
         releaseStreamingAutoFollow();
       }
     });
-
-    function closeMessageMenus(scope) {
-      const root = scope || document;
-      root.querySelectorAll('.message-menu[open], .more-menu[open], .message-menu-details[open]').forEach((menu) => {
-        menu.removeAttribute('open');
-      });
-    }
-
-    function closeSiblingMessageMenus(currentMenu) {
-      document.querySelectorAll('.message-menu[open], .more-menu[open]').forEach((menu) => {
-        if (menu !== currentMenu && !menu.contains(currentMenu)) {
-          menu.removeAttribute('open');
-        }
-      });
-    }
-
-    function showToast(message) {
-      const text = String(message || '').trim();
-      if (!text) return;
-      const toast = document.createElement('div');
-      toast.className = 'chat-toast';
-      toast.textContent = text;
-      document.body.appendChild(toast);
-      requestAnimationFrame(() => toast.classList.add('show'));
-      window.setTimeout(() => {
-        toast.classList.remove('show');
-        window.setTimeout(() => toast.remove(), 260);
-      }, 2600);
-    }
 
     function reloadToMessage(messageId, notice) {
       const normalizedMessageId = String(messageId || '').trim();
@@ -137,157 +135,6 @@
       chatContainer.dataset.visibleCount = String(chatContainer.querySelectorAll('article.bubble[data-message-id]').length);
       chatContainer.dataset.totalCount = String(Math.max(Number(chatContainer.dataset.totalCount || '0'), Number(chatContainer.dataset.visibleCount || '0')));
       updateHiddenParentInputs(normalizedMessageId);
-    }
-
-    function removeLivePair(streamBubble) {
-      if (!streamBubble || !streamBubble.article || !streamBubble.article.parentNode) {
-        return;
-      }
-      const previous = streamBubble.article.previousElementSibling;
-      if (previous && previous.classList && previous.classList.contains('bubble-live')) {
-        previous.remove();
-      }
-      streamBubble.article.remove();
-    }
-
-    function createBubble(roleLabel, kindLabel, senderClass, content, options) {
-      const article = document.createElement('article');
-      article.className = `bubble bubble-${senderClass}`;
-      if (options && options.isStreaming) {
-        article.dataset.streaming = 'true';
-      }
-      if (options && options.isPending) {
-        article.classList.add('bubble-pending');
-      }
-
-      const header = document.createElement('div');
-      header.className = 'bubble-header';
-
-      const role = document.createElement('span');
-      role.className = 'bubble-role';
-      role.textContent = roleLabel;
-
-      const status = document.createElement('span');
-      status.className = 'bubble-status';
-      status.textContent = kindLabel || '';
-
-      header.appendChild(role);
-      header.appendChild(status);
-
-      const rich = document.createElement('div');
-      rich.className = 'bubble-rich';
-      rich.setAttribute('data-message-content', '');
-      rich.innerHTML = '<div class="bubble-text"></div>';
-      rich.querySelector('.bubble-text').textContent = content || '';
-
-      const tools = document.createElement('div');
-      tools.className = 'message-tools';
-      tools.innerHTML = `<div class="bubble-actions bubble-actions--stacked bubble-actions--live"><span class="bubble-ghost-dot"></span><span class="mini-note bubble-live-note">${t('等待生成中…')}</span></div>`;
-
-      article.appendChild(header);
-      article.appendChild(rich);
-      article.appendChild(tools);
-      return { article, rich, tools };
-    }
-
-    function appendStreamingPair(userContent, options) {
-      if (!chatContainer) return null;
-      const mode = Object.assign({ userLabel: t('你'), userKind: '', aiLabel: 'AI', aiKind: t('生成中…'), userSenderClass: 'user', aiSenderClass: 'character' }, options || {});
-      const userBubble = createBubble(mode.userLabel, mode.userKind, mode.userSenderClass, userContent, {
-        isPending: true,
-        timeLabel: t('刚刚'),
-      });
-      const aiBubble = createBubble(mode.aiLabel, mode.aiKind, mode.aiSenderClass, '', {
-        isStreaming: true,
-        isPending: true,
-        timeLabel: t('生成中…'),
-      });
-
-      userBubble.article.classList.add('bubble-live');
-      aiBubble.article.classList.add('bubble-live');
-
-      beginStreamingAutoFollow();
-      chatContainer.querySelectorAll('.empty-chat-state').forEach((node) => node.remove());
-      chatContainer.appendChild(userBubble.article);
-      chatContainer.appendChild(aiBubble.article);
-      maybeFollowStreamingBubble(aiBubble, 'smooth');
-      return { userBubble, aiBubble };
-    }
-
-    function appendSingleStreamingBubble(roleLabel, kindLabel, senderClass, options) {
-      if (!chatContainer) return null;
-      const bubble = createBubble(roleLabel, kindLabel, senderClass, '', {
-        isStreaming: true,
-        isPending: true,
-        timeLabel: t('生成中…'),
-      });
-      bubble.article.classList.add('bubble-live');
-      if (options && options.noteText) {
-        const note = bubble.article.querySelector('.bubble-live-note');
-        if (note) {
-          note.textContent = options.noteText;
-        }
-      }
-      beginStreamingAutoFollow();
-      chatContainer.querySelectorAll('.empty-chat-state').forEach((node) => node.remove());
-      chatContainer.appendChild(bubble.article);
-      maybeFollowStreamingBubble(bubble, 'smooth');
-      return bubble;
-    }
-
-    function renderStreamingPlainText(container, text) {
-      if (!container) return;
-      const block = document.createElement('div');
-      block.className = 'bubble-text';
-      block.textContent = String(text || '');
-      container.replaceChildren(block);
-      container.dataset.lineMode = 'false';
-      container.dataset.finalPass = 'false';
-    }
-
-    function createFragmentFromHtml(html) {
-      const template = document.createElement('template');
-      template.innerHTML = String(html || '').trim();
-      return template.content;
-    }
-
-    function hydrateRichContent(root) {
-      if (typeof window.renderRichContent !== 'function') {
-        return;
-      }
-      (root || document).querySelectorAll('[data-message-content]').forEach((node) => window.renderRichContent(node));
-    }
-
-    function replaceBubbleWithHtml(streamBubble, html) {
-      if (!streamBubble || !streamBubble.article || !streamBubble.article.parentNode || !html) {
-        return null;
-      }
-      const fragment = createFragmentFromHtml(html);
-      const nextArticle = fragment.querySelector('article.bubble');
-      if (!nextArticle) {
-        return null;
-      }
-      streamBubble.article.replaceWith(nextArticle);
-      hydrateRichContent(nextArticle);
-      return nextArticle;
-    }
-
-    function replacePreviousLiveUserBubble(streamBubble, html) {
-      if (!streamBubble || !streamBubble.article || !html) {
-        return null;
-      }
-      const previous = streamBubble.article.previousElementSibling;
-      if (!previous || !previous.classList || !previous.classList.contains('bubble-live')) {
-        return null;
-      }
-      const fragment = createFragmentFromHtml(html);
-      const nextArticle = fragment.querySelector('article.bubble');
-      if (!nextArticle) {
-        return null;
-      }
-      previous.replaceWith(nextArticle);
-      hydrateRichContent(nextArticle);
-      return nextArticle;
     }
 
     function scheduleStreamingRender(streamBubble, fullText, committedText, tailText) {
@@ -357,192 +204,23 @@
       window.renderRichContent(streamBubble.rich, fullText, { streaming: false, finalPass: true, lineMode: false });
     }
 
-    async function consumeNdjsonStream(options) {
-      const settings = Object.assign({
-        endpoint: '',
-        payload: null,
-        submitButton: null,
-        previousButtonText: '',
-        textareaNode: null,
-        streamBubble: null,
-        abortController: null,
-        onDone: null,
-        onError: null,
-      }, options || {});
-
-      const response = await fetch(settings.endpoint, {
-        method: 'POST',
-        body: new URLSearchParams(settings.payload),
-        signal: settings.abortController ? settings.abortController.signal : undefined,
-        headers: {
-          'Accept': 'application/x-ndjson',
-          'X-Requested-With': 'fetch',
-        },
-      });
-
-      const responseType = String(response.headers.get('content-type') || '').toLowerCase();
-      if (!response.ok || !response.body || !responseType.includes('application/x-ndjson')) {
-        const bodyText = await response.text().catch(() => '');
-        const message = (() => {
-          if (bodyText && /<html|<!doctype html/i.test(bodyText)) {
-            return t('服务端返回了 HTML 错误页，流式请求没有正常完成。');
-          }
-          if (bodyText && bodyText.trim()) {
-            return bodyText.trim().slice(0, 300);
-          }
-          if (!response.ok) {
-            return t('请求失败：HTTP {status}', { status: response.status });
-          }
-          return t('流式请求失败，请稍后重试。');
-        })();
-        throw new Error(message);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let finalMessageId = '';
-      let fullText = '';
-      let committedText = '';
-      let tailText = '';
-      let gotDonePacket = false;
-      let gotRenderableContent = false;
-      let donePacket = null;
-
-      const handlePacket = (packet) => {
-        if (!packet) return;
-        if (packet.type === 'ping') {
-          return;
-        }
-        if (packet.type === 'delta') {
-          fullText = String(packet.full || '');
-          gotRenderableContent = gotRenderableContent || Boolean(fullText);
-          const preview = splitStreamingSegments(fullText);
-          committedText = preview.committed;
-          tailText = preview.tail;
-          if (settings.streamBubble) {
-            scheduleStreamingRender(settings.streamBubble, fullText, committedText, tailText);
-          }
-          return;
-        }
-        if (packet.type === 'line') {
-          fullText = String(packet.full || fullText || '');
-          committedText = String(packet.committed || '');
-          tailText = String(packet.tail || '');
-          gotRenderableContent = gotRenderableContent || Boolean(fullText || committedText || tailText);
-          if (settings.streamBubble) {
-            scheduleStreamingRender(settings.streamBubble, fullText, committedText, tailText);
-          }
-          return;
-        }
-        if (packet.type === 'user-message') {
-          if (settings.streamBubble && packet.html) {
-            replacePreviousLiveUserBubble(settings.streamBubble, packet.html);
-          }
-          return;
-        }
-        if (packet.type === 'done') {
-          gotDonePacket = true;
-          donePacket = packet;
-          fullText = String(packet.full || fullText || '');
-          finalMessageId = String(packet.messageId || packet.leafId || packet.replyMessageId || '');
-          if (settings.streamBubble) {
-            if (packet.parentMessageId && ['message', 'regenerate', 'replay'].includes(String(packet.mode || ''))) {
-              removeStaleLinearTail(packet.parentMessageId);
-            }
-            if (packet.parentHtml) {
-              replacePreviousLiveUserBubble(settings.streamBubble, packet.parentHtml);
-              const parentId = String(packet.parentMessageId || '').trim();
-              if (parentId && chatContainer) {
-                const currentParent = Array.from(chatContainer.querySelectorAll('article.bubble[data-message-id]'))
-                  .find((article) => String(article.dataset.messageId || '') === parentId);
-                if (currentParent && !currentParent.classList.contains('bubble-live')) {
-                  const fragment = createFragmentFromHtml(packet.parentHtml);
-                  const nextArticle = fragment.querySelector('article.bubble');
-                  if (nextArticle) {
-                    currentParent.replaceWith(nextArticle);
-                    hydrateRichContent(nextArticle);
-                  }
-                }
-              }
-            }
-            if (packet.html) {
-              const renderedArticle = replaceBubbleWithHtml(settings.streamBubble, packet.html);
-              if (renderedArticle && finalMessageId) {
-                renderedArticle.dataset.messageId = finalMessageId;
-              }
-            } else {
-              setBubbleFinalState(settings.streamBubble, fullText, {
-                mode: String(packet.mode || 'message'),
-                messageId: finalMessageId,
-                kindText: packet.mode === 'optimize-input' ? t('润色结果') : '',
-              });
-            }
-          }
-          return;
-        }
-        if (packet.type === 'error') {
-          const message = String(t(packet.message || 'AI 回复失败，请稍后重试。'));
-          if (settings.streamBubble) {
-            setBubbleFinalState(settings.streamBubble, message, {
-              mode: 'error',
-              messageId: '',
-              kindText: t('执行失败'),
-              error: true,
-            });
-          }
-          if (window.LougeNotifications && typeof window.LougeNotifications.showSupport === 'function') {
-            window.LougeNotifications.showSupport({ reason: 'chat-error' });
-          }
-          throw new Error(message);
-        }
-      };
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        lines.forEach((line) => {
-          const trimmed = line.trim();
-          if (!trimmed) return;
-          try {
-            handlePacket(JSON.parse(trimmed));
-          } catch (error) {
-            if (error instanceof Error) {
-              throw error;
-            }
-          }
-        });
-      }
-
-      if (buffer.trim()) {
-        handlePacket(JSON.parse(buffer.trim()));
-      }
-
-      if (!gotDonePacket && settings.streamBubble) {
-        if (gotRenderableContent && fullText) {
-          setBubbleFinalState(settings.streamBubble, fullText, {
-            mode: 'partial',
-            messageId: '',
-            kindText: t('连接中断'),
-            error: true,
-            plainText: true,
-          });
-          const note = settings.streamBubble.article.querySelector('.bubble-live-note');
-          if (note) note.textContent = t('连接中断，已保留已生成内容');
-        } else {
-          throw new Error(t('流式连接中断，未收到完整结束信号。'));
-        }
-      }
-
-      return {
-        finalMessageId,
-        fullText,
-        packet: donePacket,
-      };
+    streamClient = window.LougeChatStreamClient && window.LougeChatStreamClient.create({
+      t,
+      splitStreamingSegments,
+      scheduleStreamingRender,
+      setBubbleFinalState,
+      replacePreviousLiveUserBubble,
+      replaceBubbleWithHtml,
+      removeStaleLinearTail,
+      createFragmentFromHtml,
+      hydrateRichContent,
+      chatContainer,
+    });
+    if (!streamClient) {
+      console.warn('[chat] LougeChatStreamClient missing; controller skipped.');
+      return;
     }
+    const { consumeNdjsonStream } = streamClient;
 
     async function handleMainComposeSubmit(event) {
       ensureStartMessage();
@@ -893,21 +571,6 @@
       if (!button) return;
       event.preventDefault();
       loadOlderMessages(button);
-    });
-
-
-    document.addEventListener('click', (event) => {
-      const target = event.target;
-      const menu = target && target.closest ? target.closest('.message-menu, .more-menu') : null;
-      if (menu) {
-        window.setTimeout(() => {
-          if (menu.open) {
-            closeSiblingMessageMenus(menu);
-          }
-        }, 0);
-        return;
-      }
-      closeMessageMenus();
     });
 
     document.addEventListener('keydown', (event) => {

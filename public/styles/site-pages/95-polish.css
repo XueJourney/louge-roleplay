@@ -89,6 +89,7 @@ body::after {
 }
 
 .nav a:not(.brand),
+.nav-link-button,
 .nav-locale-switch {
   min-height: 34px;
   display: inline-flex;
@@ -98,7 +99,17 @@ body::after {
   border-radius: var(--radius-full);
 }
 
+.nav-link-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
 .nav a:not(.brand):hover,
+.nav-link-button:hover,
 .nav-locale-switch a.active {
   color: var(--text);
   background: rgba(155, 124, 255, 0.12);

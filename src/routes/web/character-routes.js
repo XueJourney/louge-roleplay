@@ -10,6 +10,7 @@ function registerCharacterRoutes(app, ctx) {
     updateCharacter,
     getCharacterById,
     deleteCharacterSafely,
+    markCharacterUsed,
     applyRuntimeTemplate,
     createConversation,
     addMessage,
@@ -144,6 +145,7 @@ function registerCharacterRoutes(app, ctx) {
         title: `${character.name} · 新对话`,
         selectedModelMode: String(req.body.modelMode || 'standard').trim(),
       });
+      await markCharacterUsed(characterId, req.session.user.id);
 
       if (String(character.first_message || '').trim()) {
         const userMessageId = await addMessage({

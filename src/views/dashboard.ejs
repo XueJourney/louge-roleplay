@@ -37,7 +37,7 @@
         <% if (latestConversation) { %>
           <a class="quick-link" href="/chat/<%= latestConversation.id %>"><%= t('继续最近会话') %></a>
         <% } %>
-        <a class="quick-link" href="/">逛公开角色</a>
+        <a class="quick-link" href="/characters/public">逛公开角色</a>
         <a class="quick-link" href="/profile">个人资料</a>
       </div>
     </div>
@@ -61,7 +61,7 @@
       <strong>创建角色</strong>
       <small>写设定、补人格、开始新的故事。</small>
     </a>
-    <a class="command-card" href="/">
+    <a class="command-card" href="/characters/public">
       <span>Explore</span>
       <strong>公开角色</strong>
       <small>看看其他公开角色，找点灵感。</small>
@@ -136,7 +136,7 @@
             还没有会话。挑一个角色，先说第一句话吧。
             <div class="dashboard-empty-actions">
               <a class="quick-link" href="/characters/new">先创建角色</a>
-              <a class="quick-link" href="/">逛公开角色</a>
+              <a class="quick-link" href="/characters/public">逛公开角色</a>
             </div>
           </div>
         <% } else { %>
@@ -157,7 +157,7 @@
                   </div>
                   <div class="dashboard-actions-row">
                     <a class="quick-link" href="/chat/<%= conversation.id %>"><%= t('进入对话') %></a>
-                    <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>');">
+                    <form method="POST" action="/chat/<%= conversation.id %>/delete" data-confirm-message="<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>">
                       <button class="inline-btn is-danger" type="submit">删除对话</button>
                     </form>
                   </div>
@@ -183,7 +183,7 @@
             你还没有创建角色。先去写一个有灵魂的名字，再慢慢把设定补完整。
             <div class="dashboard-empty-actions">
               <a class="quick-link" href="/characters/new">现在创建</a>
-              <a class="quick-link" href="/">先看看别人公开的角色</a>
+              <a class="quick-link" href="/characters/public">先看看别人公开的角色</a>
             </div>
           </div>
         <% } else { %>
@@ -204,7 +204,7 @@
                   <form method="POST" action="/conversations/start/<%= character.id %>">
                     <button class="inline-btn" type="submit">进入对话</button>
                   </form>
-                  <form method="POST" action="/characters/<%= character.id %>/delete" onsubmit="return confirm('<%= t('确认删除这个角色吗？只有从未开过对话的角色才能删除。') %>');">
+                  <form method="POST" action="/characters/<%= character.id %>/delete" data-confirm-message="<%= t('确认删除这个角色吗？只有从未开过对话的角色才能删除。') %>">
                     <button class="inline-btn is-danger" type="submit">删除角色</button>
                   </form>
                 </div>
@@ -268,7 +268,7 @@
                 <span>请求额度</span>
                 <strong><%= formatNum(quota.usage.usedRequests) %> / <%= formatNum(requestQuotaTotal) %></strong>
               </div>
-              <div class="quota-bar"><span style="width: <%= requestUsagePercent %>%"></span></div>
+              <div class="quota-bar"><span data-width="<%= requestUsagePercent %>"></span></div>
               <div class="dashboard-item-meta">
                 <span><%= t('剩余请求：{count}', { count: formatNum(quota.remainingRequests) }) %></span>
                 <span><%= t('已用占比：{percent}%', { percent: requestUsagePercent }) %></span>
@@ -280,7 +280,7 @@
                 <span><%= t('Token 额度') %></span>
                 <strong><%= formatNum(quota.usage.usedTokens) %> / <%= formatNum(tokenQuotaTotal) %></strong>
               </div>
-              <div class="quota-bar"><span style="width: <%= tokenUsagePercent %>%"></span></div>
+              <div class="quota-bar"><span data-width="<%= tokenUsagePercent %>"></span></div>
               <div class="dashboard-item-meta">
                 <span><%= t('剩余 Token：{count}', { count: formatNum(quota.remainingTokens) }) %></span>
                 <span><%= t('已用占比：{percent}%', { percent: tokenUsagePercent }) %></span>
@@ -310,9 +310,10 @@
           <% if (isAdmin) { %>
             <a class="shortcut-row" href="/admin"><span>⚙</span><strong>去管理后台</strong></a>
           <% } %>
-          <a class="shortcut-row" href="/"><span>⌂</span><strong>回首页看看</strong></a>
+          <a class="shortcut-row" href="/characters/public"><span>⌂</span><strong>浏览公开角色</strong></a>
         </div>
       </section>
     </aside>
   </section>
 </div>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/quota-bars.js"></script>

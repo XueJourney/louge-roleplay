@@ -5,6 +5,7 @@
  * DEBUG：若验证码流程异常，优先检查 /api/captcha、/api/send-email-code、/api/send-phone-code 返回体。
  */
 
+(function () {
   function getCountryType() {
     const checked = document.querySelector('input[name="countryType"]:checked');
     return checked ? checked.value : 'domestic';
@@ -15,8 +16,8 @@
   function syncCountryCards(countryType) {
     const domesticCard = document.getElementById('domesticCard');
     const internationalCard = document.getElementById('internationalCard');
-    domesticCard.classList.toggle('active', countryType === 'domestic');
-    internationalCard.classList.toggle('active', countryType === 'international');
+    if (domesticCard) domesticCard.classList.toggle('active', countryType === 'domestic');
+    if (internationalCard) internationalCard.classList.toggle('active', countryType === 'international');
   }
 
   function handleCountryChange() {
@@ -30,16 +31,16 @@
     syncCountryCards(countryType);
 
     if (countryType === 'domestic') {
-      phoneBlock.style.display = 'block';
-      emailToggleWrap.style.display = 'block';
-      emailBlock.style.display = emailToggle.checked ? 'block' : 'none';
-      numberAuthHint.style.display = 'block';
+      if (phoneBlock) phoneBlock.style.display = 'block';
+      if (emailToggleWrap) emailToggleWrap.style.display = 'block';
+      if (emailBlock && emailToggle) emailBlock.style.display = emailToggle.checked ? 'block' : 'none';
+      if (numberAuthHint) numberAuthHint.style.display = 'block';
     } else {
-      phoneBlock.style.display = 'none';
-      emailBlock.style.display = 'block';
-      emailToggle.checked = true;
-      emailToggleWrap.style.display = 'none';
-      numberAuthHint.style.display = 'none';
+      if (phoneBlock) phoneBlock.style.display = 'none';
+      if (emailBlock) emailBlock.style.display = 'block';
+      if (emailToggle) emailToggle.checked = true;
+      if (emailToggleWrap) emailToggleWrap.style.display = 'none';
+      if (numberAuthHint) numberAuthHint.style.display = 'none';
     }
   }
 
@@ -47,10 +48,11 @@
     const countryType = getCountryType();
     const emailBlock = document.getElementById('emailBlock');
     const emailToggle = document.getElementById('showEmailToggle');
-    if (countryType === 'domestic') {
+    if (countryType === 'domestic' && emailBlock && emailToggle) {
       emailBlock.style.display = emailToggle.checked ? 'block' : 'none';
     }
   }
+
   function showCaptchaHint(message) {
     const hint = document.getElementById('captchaHint');
     if (hint) {
@@ -61,14 +63,17 @@
   async function refreshCaptcha(message) {
     const captchaIdInput = document.querySelector('input[name="captchaId"]');
     const captchaTextInput = document.getElementById('captchaText');
+    if (!captchaIdInput) return;
     const previousCaptchaId = captchaIdInput.value;
     const res = await fetch('/api/captcha?previousCaptchaId=' + encodeURIComponent(previousCaptchaId));
     const data = await res.json();
     captchaIdInput.value = data.captchaId;
     document.getElementById('captchaImage').src = data.imageUrl + '?t=' + Date.now();
-    captchaTextInput.value = '';
+    if (captchaTextInput) {
+      captchaTextInput.value = '';
+      captchaTextInput.focus();
+    }
     showCaptchaHint(message || t('图形验证码已刷新，请输入新的验证码。'));
-    captchaTextInput.focus();
   }
 
   function applyCaptchaRefreshFromResponse(data, fallbackMessage) {
@@ -125,4 +130,32 @@
     alert(t(data.message || '已发送'));
   }
 
-  handleCountryChange();
+  function init() {
+    const emailBlock = document.getElementById('emailBlock');
+    if (emailBlock && emailBlock.dataset.initialDisplay) {
+      emailBlock.style.display = emailBlock.dataset.initialDisplay;
+    }
+
+    document.querySelectorAll('input[name="countryType"]').forEach((input) => {
+      input.addEventListener('change', handleCountryChange);
+    });
+    document.getElementById('showEmailToggle')?.addEventListener('change', toggleEmailBlock);
+    document.querySelector('[data-refresh-captcha]')?.addEventListener('click', () => {
+      refreshCaptcha(t('已刷新图形验证码，请输入新的验证码。')).catch((error) => alert(error.message || t('刷新失败')));
+    });
+    document.querySelector('[data-send-email-code]')?.addEventListener('click', () => {
+      sendEmailCode().catch((error) => alert(error.message || t('发送失败')));
+    });
+    document.querySelector('[data-send-phone-code]')?.addEventListener('click', () => {
+      sendPhoneCode().catch((error) => alert(error.message || t('发送失败')));
+    });
+
+    handleCountryChange();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
+}());

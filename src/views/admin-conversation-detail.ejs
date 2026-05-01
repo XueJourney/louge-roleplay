@@ -42,7 +42,7 @@
         <form method="POST" action="/admin/conversations/<%= detail.conversation.id %>/restore">
           <button type="submit"><%= t('恢复会话') %></button>
         </form>
-        <form method="POST" action="/admin/conversations/<%= detail.conversation.id %>/permanent-delete" onsubmit="return confirm('<%= t('确认永久删除这条会话及其所有消息吗？这个操作不可恢复。') %>');">
+        <form method="POST" action="/admin/conversations/<%= detail.conversation.id %>/permanent-delete" data-confirm-message="<%= t('确认永久删除这条会话及其所有消息吗？这个操作不可恢复。') %>">
           <button type="submit" class="danger"><%= t('永久删除') %></button>
         </form>
       <% } %>
@@ -81,7 +81,7 @@
               <form method="POST" action="/admin/conversations/<%= detail.conversation.id %>/messages/<%= message.id %>/restore">
                 <button type="submit"><%= t('恢复消息') %></button>
               </form>
-              <form method="POST" action="/admin/conversations/<%= detail.conversation.id %>/messages/<%= message.id %>/permanent-delete" onsubmit="return confirm('<%= t('确认永久删除这条消息吗？这个操作不可恢复。') %>');">
+              <form method="POST" action="/admin/conversations/<%= detail.conversation.id %>/messages/<%= message.id %>/permanent-delete" data-confirm-message="<%= t('确认永久删除这条消息吗？这个操作不可恢复。') %>">
                 <button type="submit" class="danger"><%= t('永久删除') %></button>
               </form>
             </div>

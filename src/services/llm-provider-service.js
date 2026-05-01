@@ -4,6 +4,7 @@
  */
 
 const { query } = require('../lib/db');
+const { assertSafeExternalHttpUrl } = require('../lib/url-safety');
 
 const MODEL_MODE_KEYS = [
   'standardModel',
@@ -203,6 +204,7 @@ async function listProviders() {
 async function createProvider(payload) {
   const apiKey = String(payload.apiKey || '').trim();
   const baseUrl = normalizeBaseUrl(payload.baseUrl || '');
+  await assertSafeExternalHttpUrl(baseUrl, { label: 'Provider Base URL' });
   const discovered = await fetchProviderModels(baseUrl, apiKey);
   validateProviderModels(discovered.models, payload);
   const fallbackModel = String(payload.standardModel || payload.model || '').trim() || discovered.defaultModel;
@@ -264,6 +266,7 @@ async function updateProvider(providerId, payload) {
 
   const apiKey = String(payload.apiKey || '').trim() || current.api_key;
   const baseUrl = normalizeBaseUrl(payload.baseUrl || current.base_url);
+  await assertSafeExternalHttpUrl(baseUrl, { label: 'Provider Base URL' });
   const shouldRefreshModels = baseUrl !== current.base_url || apiKey !== current.api_key || String(payload.refreshModels || '') === '1';
   const discovered = shouldRefreshModels
     ? await fetchProviderModels(baseUrl, apiKey)

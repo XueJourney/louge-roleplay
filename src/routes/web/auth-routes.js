@@ -326,7 +326,7 @@ function registerAuthRoutes(app, ctx) {
     }
   });
 
-  app.get('/logout', (req, res) => {
+  app.post('/logout', (req, res) => {
     req.session.destroy(() => res.redirect('/'));
   });
 

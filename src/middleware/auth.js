@@ -44,6 +44,8 @@ function requireAdmin(req, res, next) {
         appUrl: config.appUrl,
         locale: res.locals.locale,
         t,
+        csrfToken: res.locals.csrfToken || '',
+        cspNonce: res.locals.cspNonce || '',
         clientI18nMessages: res.locals.clientI18nMessages || {},
         localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
       });

@@ -261,7 +261,7 @@
                 <button type="submit"><%= t('保存通知') %></button>
               </div>
             </form>
-            <form method="post" action="/admin/notifications/<%= notification.id %>/delete" onsubmit="return confirm('<%= t('确定删除这条通知吗？') %>');">
+            <form method="post" action="/admin/notifications/<%= notification.id %>/delete" data-confirm-message="<%= t('确定删除这条通知吗？') %>">
               <button type="submit" class="danger-button"><%= t('删除通知') %></button>
             </form>
           </div>

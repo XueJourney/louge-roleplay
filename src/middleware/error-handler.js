@@ -28,6 +28,8 @@ async function renderErrorWithLayout(res, statusCode, title, message, errorCode)
       appUrl: config.appUrl,
       locale: res.locals.locale,
       t,
+      csrfToken: res.locals.csrfToken || '',
+      cspNonce: res.locals.cspNonce || '',
       clientI18nMessages: res.locals.clientI18nMessages || {},
       clientNotifications,
       localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
@@ -37,6 +39,10 @@ async function renderErrorWithLayout(res, statusCode, title, message, errorCode)
 
 function mapErrorToPresentation(error) {
   const message = String(error?.message || '');
+
+  if (message === 'CSRF_TOKEN_INVALID') {
+    return { statusCode: 403, title: '请求已过期', message: '这个操作的安全校验没有通过，请刷新页面后再试。', errorCode: 'CSRF_TOKEN_INVALID' };
+  }
 
   if (message === 'REQUEST_QUOTA_EXCEEDED') {
     return { statusCode: 429, title: '额度已用完', message: '请求次数额度已经用完了，先升级套餐或者等额度恢复。', errorCode: 'REQUEST_QUOTA_EXCEEDED' };
@@ -58,15 +64,24 @@ function mapErrorToPresentation(error) {
 }
 
 function errorHandler(error, req, res, next) {
-  logger.error('Unhandled application error', {
+  const presentation = mapErrorToPresentation(error);
+  const logMeta = {
     requestId: req.requestId,
     method: req.method,
     path: req.path,
     error: error.message,
-    stack: error.stack,
-  });
+    statusCode: presentation.statusCode,
+  };
 
-  const presentation = mapErrorToPresentation(error);
+  if (presentation.statusCode >= 500) {
+    logger.error('Unhandled application error', {
+      ...logMeta,
+      stack: error.stack,
+    });
+  } else {
+    logger.warn('Handled application error', logMeta);
+  }
+
   renderErrorWithLayout(res, presentation.statusCode, presentation.title, presentation.message, presentation.errorCode).catch(next);
 }
 

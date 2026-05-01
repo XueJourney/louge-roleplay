@@ -1,19 +1,27 @@
 <!-- @file src/views/home.ejs
-     @description 首页模板。调用说明：GET / 渲染，展示公开角色列表并引导开聊。
+     @description 首页模板。调用说明：GET / 渲染，展示轻量推荐角色并引导进入公开角色页。
 -->
 <link rel="stylesheet" href="/public/styles/site-pages.css" />
 
 <div class="home-shell">
-  <section class="hero-card">
+  <section class="hero-card home-hero-card">
     <div>
+      <div class="section-kicker">Louge</div>
       <h1>把想说的话，交给一个真正有气质的角色来接住。</h1>
       <p>楼阁是一个安静的角色对话空间。你可以创建角色、写下他们的性格和状态设定，再慢慢把每段对话聊出自己的味道。</p>
-      <p>不赶、不吵，也不故作花哨。只是给角色、故事和情绪留一个舒服的地方。</p>
+      <div class="home-hero-actions">
+        <a class="quick-link" href="/characters/public">浏览公开角色</a>
+        <% if (currentUser) { %>
+          <a class="quick-link" href="/characters/new">创建新角色</a>
+        <% } else { %>
+          <a class="quick-link" href="/register">注册开始</a>
+        <% } %>
+      </div>
     </div>
     <div class="hero-meta">
       <div class="hero-stat">
-        <strong>公开角色</strong>
-        <span>在这里逛一逛，先挑一个顺眼的角色开始聊天。</span>
+        <strong>公开角色热度</strong>
+        <span>公开角色支持点赞、评论、使用量和综合热度排序，首页只保留轻量推荐。</span>
       </div>
       <div class="hero-stat">
         <strong>多用户空间</strong>
@@ -26,34 +34,43 @@
     </div>
   </section>
 
-  <section>
+  <section class="home-featured-section">
     <div class="section-head">
       <div>
-        <h2>现在可以聊的角色</h2>
-        <p>挑一个合眼缘的，看看会发生什么。</p>
+        <h2>最近公开的角色</h2>
+        <p>这里只放少量热门推荐。想认真挑，去公开角色页按热度、点赞、评论或使用量慢慢筛。</p>
       </div>
+      <a class="quick-link" href="/characters/public">查看全部</a>
     </div>
+
+    <% if (characters.length === 0) { %>
+      <div class="empty-card home-empty">还没有公开角色。先注册一个账号，写下第一个角色吧。</div>
+    <% } %>
+
+    <% if (characters.length > 0) { %>
+      <div class="character-grid character-grid--featured">
+        <% characters.forEach(character => { %>
+          <article class="character-card">
+            <div class="character-avatar"><%= character.name.charAt(0) %></div>
+            <h3><%= character.name %></h3>
+            <p><%= character.summary || '这个角色还没有写简介。' %></p>
+            <div class="character-card-stats">
+              <span>🔥 <%= character.heat_score || 0 %></span>
+              <span>♥ <%= character.like_count || 0 %></span>
+              <span>💬 <%= character.comment_count || 0 %></span>
+              <span>↗ <%= character.usage_count || 0 %></span>
+            </div>
+            <div class="meta">由 <%= character.username %> 创建</div>
+            <% if (currentUser) { %>
+              <form method="POST" action="/conversations/start/<%= character.id %>" class="character-start-form">
+                <button class="btn-brand" type="submit">开始聊天</button>
+              </form>
+            <% } else { %>
+              <a class="quick-link" href="/login">登录后开始聊天</a>
+            <% } %>
+          </article>
+        <% }) %>
+      </div>
+    <% } %>
   </section>
-
-  <% if (characters.length === 0) { %>
-    <div class="empty-card">还没有公开角色。先注册一个账号，写下第一个角色吧。</div>
-  <% } %>
-
-  <% if (characters.length > 0) { %>
-    <div class="character-grid">
-      <% characters.forEach(character => { %>
-        <div class="character-card">
-          <div class="character-avatar"><%= character.name.charAt(0) %></div>
-          <h3><%= character.name %></h3>
-          <p><%= character.summary %></p>
-          <div class="meta">由 <%= character.username %> 创建</div>
-          <% if (currentUser) { %>
-            <form method="POST" action="/conversations/start/<%= character.id %>" class="character-start-form">
-              <button class="btn-brand" type="submit">开始聊天</button>
-            </form>
-          <% } %>
-        </div>
-      <% }) %>
-    </div>
-  <% } %>
 </div>

@@ -204,6 +204,22 @@
     max-width: 520px;
   }
 
+  .home-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .home-featured-section {
+    display: grid;
+    gap: 20px;
+  }
+
+  .character-grid--featured {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
   @media (max-width: 900px) {
     .hero-card {
       grid-template-columns: 1fr;
@@ -214,6 +230,7 @@
       flex-direction: column;
       align-items: start;
     }
+
   }
 
   @media (max-width: 640px) {
@@ -229,6 +246,7 @@
     .character-card {
       padding: 20px;
     }
+
   }
 
 

@@ -323,6 +323,38 @@ function initSqliteSchema(db) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_conversations_parent ON conversations (parent_conversation_id)');
 
   ensureSqliteCharactersVisibilityColumn(db);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS character_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_character_like_user ON character_likes (character_id, user_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_character_likes_character ON character_likes (character_id)');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS character_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'visible',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_character_comments_character ON character_comments (character_id, status, id)');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS character_usage_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      character_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_character_usage_character ON character_usage_events (character_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_character_usage_user ON character_usage_events (user_id, created_at)');
   ensureSqliteColumn(db, 'conversations', 'deleted_at', 'deleted_at TEXT NULL');
 
   // ─── 消息表 ──────────────────────────────────────────────────────────────────

@@ -18,7 +18,8 @@ const {
   verifyCaptcha,
 } = require('../services/captcha-service');
 const { createUser, findUserByUsername, findUserByEmail, findUserByPhone, findUserByLogin, findUserById, findUserAuthById, updateUserRole, updateUsername, updatePasswordHash, updateUserEmail, unbindUserEmail, updateUserPhone, unbindUserPhone } = require('../services/user-service');
-const { createCharacter, updateCharacter, listPublicCharacters, listUserCharacters, getCharacterById, deleteCharacterSafely } = require('../services/character-service');
+const { createCharacter, updateCharacter, listPublicCharacters, listFeaturedPublicCharacters, listUserCharacters, getCharacterById, deleteCharacterSafely } = require('../services/character-service');
+const { toggleCharacterLike, addCharacterComment, listCharacterComments, markCharacterUsed } = require('../services/character-social-service');
 const { listPlans, findPlanById, createPlan, updatePlan, deletePlan, getActiveSubscriptionForUser, getUserQuotaSnapshot, updateUserPlan } = require('../services/plan-service');
 const { listUsersWithPlans, getAdminOverview } = require('../services/admin-service');
 const { listLogEntries } = require('../services/log-service');
@@ -367,6 +368,11 @@ function registerWebRoutes(app) {
     createCharacter,
     updateCharacter,
     listPublicCharacters,
+    listFeaturedPublicCharacters,
+    toggleCharacterLike,
+    addCharacterComment,
+    listCharacterComments,
+    markCharacterUsed,
     listUserCharacters,
     getCharacterById,
     deleteCharacterSafely,

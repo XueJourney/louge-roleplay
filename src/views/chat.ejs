@@ -19,7 +19,7 @@
         <details class="more-menu chat-more-menu">
           <summary class="inline-btn"><%= t('更多') %></summary>
           <div class="more-menu-body">
-            <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>');">
+            <form method="POST" action="/chat/<%= conversation.id %>/delete" data-confirm-message="<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>">
               <button class="inline-btn danger" type="submit"><%= t('删除这条对话') %></button>
             </form>
             <p class="mini-note"><%= t('删除只适用于没有后续关联的对话，避免误删已有内容。') %></p>
@@ -153,5 +153,9 @@
     </section>
   </aside>
 </div>
-<script src="/public/js/chat/rich-renderer.js?v=stream-ux-v4"></script>
-<script src="/public/js/chat/controller.js?v=stream-ux-v4"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/chat/rich-renderer.js?v=stream-ux-v4"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/chat/dom-utils.js?v=stream-ux-v4"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/chat/bubbles.js?v=stream-ux-v4"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/chat/stream-client.js?v=stream-ux-v4"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/chat/message-menu.js?v=menu-v3"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/chat/controller.js?v=stream-ux-v4"></script>

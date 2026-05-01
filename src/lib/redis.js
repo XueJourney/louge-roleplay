@@ -242,6 +242,9 @@ const redisClient = new Proxy(_state, {
  */
 async function initRedis() {
   if (!config.redisUrl) {
+    if (process.env.NODE_ENV === 'production' && config.productionFailFast && !config.allowProductionMemoryRedis) {
+      throw new Error('REDIS_URL is required in production unless ALLOW_PRODUCTION_MEMORY_REDIS=true');
+    }
     logger.info('[redis] REDIS_URL 未设置，使用内存模式（本地开发）');
     return;
   }
@@ -263,7 +266,11 @@ async function initRedis() {
 
     logger.info('[redis] Redis 连接成功，已切换到真实 Redis 模式');
   } catch (error) {
-    // 连接失败：保持 MemoryRedis，不抛出，让应用继续启动
+    // 连接失败：默认保持 MemoryRedis；生产 fail-fast 时直接阻止启动，避免会话/验证码/限流静默退化。
+    if (process.env.NODE_ENV === 'production' && config.productionFailFast && !config.allowProductionMemoryRedis) {
+      logger.error('[redis] Redis 连接失败，生产模式拒绝降级到内存模式', { error: error.message });
+      throw error;
+    }
     logger.warn('[redis] Redis 连接失败，保持内存模式运行', {
       error: error.message,
       hint: '验证码、限流计数器、会话将存储在内存中（重启清空）',

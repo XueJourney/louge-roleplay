@@ -2,6 +2,7 @@
      @description 单条聊天消息局部模板。调用说明：聊天页首屏和 /messages/history、流式 done 包都会用它渲染消息 HTML。
 -->
 <article class="bubble bubble-<%= message.sender_type === 'system' ? 'system' : message.sender_type %>" data-message-id="<%= message.id %>">
+  <button class="message-action-trigger" type="button" data-message-actions-trigger aria-label="<%= t('消息操作') %>"><span aria-hidden="true"></span></button>
   <div class="bubble-header">
     <span class="bubble-role">
       <%= message.sender_type === 'user' ? t('你') : (message.sender_type === 'character' ? conversation.character_name : t('系统')) %>
@@ -9,9 +10,15 @@
     <% if (message.status === 'streaming') { %>
       <span class="bubble-status"><%= t('生成中断，已保留这段回复。') %></span>
     <% } %>
-    <details class="message-menu">
-      <summary aria-label="<%= t('消息操作') %>">⋯</summary>
-      <div class="message-menu-body">
+  </div>
+
+  <template data-message-actions-template>
+    <div class="message-actions-card" data-message-actions-card>
+      <div class="message-actions-head">
+        <span><%= t('操作') %></span>
+        <strong><%= message.sender_type === 'user' ? t('你的消息') : (message.sender_type === 'character' ? conversation.character_name : t('系统消息')) %></strong>
+      </div>
+      <div class="message-actions-body">
         <% if (message.sender_type === 'character') { %>
           <form class="inline-form" method="POST" action="/chat/<%= conversation.id %>/regenerate/<%= message.id %>" data-stream-endpoint="/chat/<%= conversation.id %>/regenerate/<%= message.id %>/stream" data-stream-mode="regenerate" data-stream-role-label="<%= conversation.character_name %>" data-stream-kind-label="<%= t('重新生成中…') %>" data-stream-sender-class="character">
             <button class="message-menu-item" type="submit"><%= t('重新生成') %></button>
@@ -47,12 +54,12 @@
           </form>
         <% } %>
 
-        <form class="inline-form" method="POST" action="/chat/<%= conversation.id %>/messages/<%= message.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条消息吗？只能删除最后一条没有后续关联的消息。') %>');">
+        <form class="inline-form" method="POST" action="/chat/<%= conversation.id %>/messages/<%= message.id %>/delete" data-confirm-message="<%= t('确认删除这条消息吗？只能删除最后一条没有后续关联的消息。') %>">
           <button class="message-menu-item danger" type="submit"><%= t('删除消息') %></button>
         </form>
       </div>
-    </details>
-  </div>
+    </div>
+  </template>
 
   <div class="bubble-rich" data-message-content><div class="bubble-text"><%= message.visibleContent || message.content %></div></div>
 </article>

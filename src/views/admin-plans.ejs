@@ -183,7 +183,7 @@
                   <button type="submit">保存套餐</button>
                 </div>
               </form>
-              <form method="post" action="/admin/plans/<%= plan.id %>/delete" onsubmit="return confirm('确定删除这个套餐？若已被用户订阅，将无法删除。');">
+              <form method="post" action="/admin/plans/<%= plan.id %>/delete" data-confirm-message="确定删除这个套餐？若已被用户订阅，将无法删除。">
                 <button class="danger-button" type="submit">删除套餐</button>
               </form>
             </div>
@@ -199,4 +199,4 @@
   </section>
 </div>
 
-<script src="/public/js/admin-page.js"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/admin-page.js"></script>

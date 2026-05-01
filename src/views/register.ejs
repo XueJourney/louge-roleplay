@@ -54,12 +54,12 @@
         <label>用户地区</label>
         <div class="field-grid">
           <label class="field-card active" id="domesticCard">
-            <input class="choice-radio" type="radio" name="countryType" value="domestic" <%= (form.countryType || 'domestic') === 'domestic' ? 'checked' : '' %> onchange="handleCountryChange()" />
+            <input class="choice-radio" type="radio" name="countryType" value="domestic" <%= (form.countryType || 'domestic') === 'domestic' ? 'checked' : '' %> />
             <h3>国内用户</h3>
             <p>手机号为必填项，先过图形验证码，再发送正式短信验证码。</p>
           </label>
           <label class="field-card" id="internationalCard">
-            <input class="choice-radio" type="radio" name="countryType" value="international" <%= (form.countryType || 'domestic') === 'international' ? 'checked' : '' %> onchange="handleCountryChange()" />
+            <input class="choice-radio" type="radio" name="countryType" value="international" <%= (form.countryType || 'domestic') === 'international' ? 'checked' : '' %> />
             <h3>国外用户</h3>
             <p>使用主流邮箱注册与登录，不走国内号码认证服务。</p>
           </label>
@@ -82,7 +82,7 @@
               <div class="captcha-box">
                 <img id="captchaImage" src="<%= captcha.imageUrl %>" alt="<%= t('图形验证码') %>" />
               </div>
-              <button class="btn-soft" type="button" onclick="refreshCaptcha(window.AI_ROLEPLAY_I18N.t('已刷新图形验证码，请输入新的验证码。'))">刷新验证码</button>
+              <button class="btn-soft" type="button" data-refresh-captcha>刷新验证码</button>
             </div>
             <div class="subtle-note" id="captchaHint">图形验证码只用于发送短信/邮箱验证码；发送成功后会自动刷新，下一次发送验证码时再填写新的图形验证码。</div>
           </div>
@@ -91,7 +91,7 @@
             <label for="phoneCode">短信验证码</label>
             <div class="inline-row">
               <input id="phoneCode" name="phoneCode" maxlength="6" placeholder="输入 6 位短信验证码" />
-              <button class="btn-soft" type="button" onclick="sendPhoneCode()">发送短信验证码</button>
+              <button class="btn-soft" type="button" data-send-phone-code>发送短信验证码</button>
             </div>
           </div>
         </div>
@@ -99,13 +99,13 @@
 
       <div class="field-group" id="emailToggleWrap">
         <label class="email-toggle">
-          <input type="checkbox" id="showEmailToggle" <%= form.showEmailToggle ? 'checked' : '' %> onchange="toggleEmailBlock()" />
+          <input type="checkbox" id="showEmailToggle" <%= form.showEmailToggle ? 'checked' : '' %> />
           <span>显示邮箱注册项</span>
         </label>
         <div class="subtle-note">国内用户可选填邮箱；国外用户会直接显示邮箱区。若填写邮箱，也需要先发送并输入邮箱验证码。</div>
       </div>
 
-      <div id="emailBlock" class="section-block" style="display:<%= (form.countryType === 'international' || form.showEmailToggle) ? 'block' : 'none' %>;">
+      <div id="emailBlock" class="section-block" data-initial-display="<%= (form.countryType === 'international' || form.showEmailToggle) ? 'block' : 'none' %>">
         <h4>邮箱验证</h4>
         <p>海外注册仅支持主流邮箱域名。国内用户如果想额外绑定邮箱，也可以在这里操作。</p>
         <div class="input-stack">
@@ -118,7 +118,7 @@
             <label for="emailCode">邮箱验证码</label>
             <div class="inline-row">
               <input id="emailCode" name="emailCode" maxlength="6" placeholder="输入 6 位邮箱验证码" />
-              <button class="btn-soft" type="button" onclick="sendEmailCode()">发送邮箱验证码</button>
+              <button class="btn-soft" type="button" data-send-email-code>发送邮箱验证码</button>
             </div>
           </div>
         </div>
@@ -130,13 +130,8 @@
     </form>
   </section>
 </div>
-<script src="/public/vendor/ct4.js"></script>
-<script src="/public/vendor/numberAuth-web-sdk.js"></script>
-<script>
-  window.AI_ROLEPLAY_AUTH_CONFIG = {
-    graphAuthAppId: '<%= authConfig.graphAuthAppId %>',
-    graphAuthAppKey: '<%= authConfig.graphAuthAppKey %>',
-    numberAuthSchemeCode: '<%= authConfig.numberAuthSchemeCode %>'
-  };
-</script>
-<script src="/public/js/register-page.js"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/vendor/ct4.js"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/vendor/numberAuth-web-sdk.js"></script>
+<script id="register-auth-config-data" type="application/json" nonce="<%= cspNonce || '' %>"><%- JSON.stringify(authConfig || {}) %></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/register-config.js"></script>
+<script nonce="<%= cspNonce || '' %>" src="/public/js/register-page.js"></script>

@@ -23,7 +23,7 @@ function readBool(name, fallback = false) {
   if (!value) {
     return fallback;
   }
-  return value === 'true';
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 }
 
 function maskSecret(value, options = {}) {
@@ -71,6 +71,10 @@ const config = {
   aliyunAccessKeySecret: readString('ALIYUN_ACCESS_KEY_SECRET', ''),
   aliyunSmsSignName: readString('ALIYUN_SMS_SIGN_NAME', ''),
   aliyunSmsTemplateCode: readString('ALIYUN_SMS_TEMPLATE_CODE', ''),
+  productionFailFast: readBool('PRODUCTION_FAIL_FAST', true),
+  allowProductionSqliteFallback: readBool('ALLOW_PRODUCTION_SQLITE_FALLBACK', false),
+  allowProductionMemoryRedis: readBool('ALLOW_PRODUCTION_MEMORY_REDIS', false),
+  rateLimitFailClosed: readBool('RATE_LIMIT_FAIL_CLOSED', true),
   trustProxy: readBool('TRUST_PROXY', false),
   cookieSecure: readBool('COOKIE_SECURE', false),
   publicPhoneAuthConfig: {
@@ -92,6 +96,10 @@ const config = {
       openaiConfigured: Boolean(this.openaiBaseUrl && this.openaiApiKey && this.openaiModel),
       resendConfigured: Boolean(this.resendApiKey),
       aliyunPhoneAuthEnabled: this.aliyunPhoneAuthEnabled,
+      productionFailFast: this.productionFailFast,
+      allowProductionSqliteFallback: this.allowProductionSqliteFallback,
+      allowProductionMemoryRedis: this.allowProductionMemoryRedis,
+      rateLimitFailClosed: this.rateLimitFailClosed,
       aliyunPhoneAuthPublic: {
         graphAuthAppIdConfigured: Boolean(this.publicPhoneAuthConfig.graphAuthAppId),
         graphAuthAppKeyExposed: Boolean(this.publicPhoneAuthConfig.graphAuthAppKey),

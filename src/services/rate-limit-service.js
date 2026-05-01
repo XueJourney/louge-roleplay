@@ -4,6 +4,8 @@
  */
 
 const { redisClient } = require('../lib/redis');
+const config = require('../config');
+const logger = require('../lib/logger');
 
 async function hitLimit(key, windowSeconds, limit) {
   try {
@@ -13,7 +15,8 @@ async function hitLimit(key, windowSeconds, limit) {
     }
     return count > limit;
   } catch (error) {
-    return false;
+    logger.error('Rate limit backend failed', { key, windowSeconds, limit, error: error.message });
+    return process.env.NODE_ENV === 'production' && config.rateLimitFailClosed;
   }
 }
 
