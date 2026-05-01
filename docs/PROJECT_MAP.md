@@ -47,16 +47,39 @@
 |---|---|
 | `src/config.js` | 环境变量解析与隐私安全配置摘要。被 server、service、脚本读取。 |
 | `src/i18n.js` | 服务端/客户端共用国际化词典与 HTML 文本翻译工具。被 i18n 中间件和渲染层调用。 |
+| `src/i18n/messages.en.js` | 待补充：该文件缺少明确文件头说明。 |
+| `src/i18n/messages.zh-CN.js` | 待补充：该文件缺少明确文件头说明。 |
 | `src/lib/db-sqlite-schema.js` | SQLite 初始化 schema 与种子数据，供 db.js 首次创建本地库时调用。 |
 | `src/lib/db.js` | 数据库抽象层，MySQL 优先、SQLite 兜底，提供 query/withTransaction。所有 service 的 DB 入口。 |
 | `src/lib/logger.js` | 统一结构化日志输出，支持 LOG_LEVEL 过滤和 DEBUG 开关。所有后端模块应通过它写日志。 |
 | `src/lib/redis.js` | Redis 客户端与内存降级实现，供 session、验证码、缓存、限流使用。 |
+| `src/lib/url-safety.js` | /** 外部服务 URL 安全校验，避免 Provider Base URL 被用于 SSRF/内网探测。 / |
+| `src/lib/user-public-id.js` | /** 用户公开唯一 ID 生成工具。公开 ID 从三位起步，无固定上限。 / |
 | `src/middleware/auth.js` | 登录/管理员鉴权中间件，保护 dashboard/admin/chat 等页面。 |
+| `src/middleware/csrf.js` | /** 基于 session 的轻量 CSRF 防护。优先校验 token；为避免上线时旧页面脚本瞬断，允许同源 Origin/Referer 兜底。 / |
 | `src/middleware/error-handler.js` | 全局错误转译与错误页渲染，避免向页面泄露堆栈。 |
 | `src/middleware/i18n.js` | 根据 query/cookie/Accept-Language 解析语言，并向 req/res.locals 注入 t()。 |
 | `src/middleware/request-context.js` | 为每个请求注入 requestId/currentUser，后续日志和错误页用它串联。 |
 | `src/routes/web-routes.js` | 主 Web 路由注册文件：公开页、认证、后台、角色、线性聊天、重写/编辑/流式接口。依赖 service 层完成业务。 |
+| `src/routes/web/admin-routes.js` | /** 从 web-routes.js 拆出的路由分组。 / |
+| `src/routes/web/auth-routes.js` | /** 从 web-routes.js 拆出的路由分组。 / |
+| `src/routes/web/character-routes.js` | /** 从 web-routes.js 拆出的路由分组。 / |
+| `src/routes/web/chat-routes.js` | /** 聊天路由聚合：页面、发送、重生、编辑、重写、工具。 / |
+| `src/routes/web/chat-stream-utils.js` | /** 聊天流式接口的 NDJSON 响应工具：错误文案映射、消息片段渲染、流式行切分与中断兜底。 设计约束： - 只被 web 路由层调用，避免 service 层依赖 Express response。 - `safeWrite` 必须在连接关闭后静默失败，防止客户端断开导致二次异常。 - 用户主动断开但已有部分模型输出时，优先保留已生成内容，避免“写了半天全没了”。 / |
+| `src/routes/web/chat/edit-routes.js` | /** 聊天路由子分组。 / |
+| `src/routes/web/chat/message-routes.js` | /** 聊天路由子分组。 / |
+| `src/routes/web/chat/page-routes.js` | /** 聊天路由子分组。 / |
+| `src/routes/web/chat/regenerate-routes.js` | /** 聊天路由子分组。 / |
+| `src/routes/web/chat/replay-routes.js` | /** 聊天路由子分组。 / |
+| `src/routes/web/chat/tool-routes.js` | /** 聊天路由子分组。 / |
+| `src/routes/web/public-routes.js` | /** 从 web-routes.js 拆出的路由分组。 / |
 | `src/server-helpers.js` | 路由公共辅助：页面渲染、参数解析、账号脱敏、聊天页 view model、NDJSON 输出。被 web-routes.js 调用。 |
+| `src/server-helpers/character-prompt-profile.js` | /** 角色 Prompt Profile 表单与存储格式转换，供角色编辑页和路由层复用。 / |
+| `src/server-helpers/chat-view.js` | /** 聊天页 view model、对话标题和会话加载辅助。保持路由层薄一点，避免把页面状态散落到各聊天子路由。 / |
+| `src/server-helpers/ndjson.js` | /** NDJSON 流响应基础工具。只负责 Express response 头和单包写入，不包含聊天业务语义。 / |
+| `src/server-helpers/parsing.js` | /** 路由层参数解析与基础账号格式校验。外部输入必须显式校验，避免 `Number(...) \|\| 0` 把非法值静默吞掉。 / |
+| `src/server-helpers/rendering.js` | /** EJS 页面渲染、默认 meta 与通用提示页封装。 / |
+| `src/server-helpers/request-meta.js` | /** 请求来源与账号标识脱敏工具。日志只记录可排障信息，不写入完整邮箱/手机号/密码等敏感值。 / |
 | `src/server.js` | Express 启动入口：等待 DB/Redis、装配全局中间件、注册路由、启动监听。调用链起点。 |
 | `src/services/admin-conversation-service.js` | /** 管理后台全局对话记录查询服务。 调用说明： - `src/routes/web-routes.js` 的 `/admin/conversations` 调用 `listAdminConversations()` 渲染全局会话列表。 - `src/routes/web-routes.js` 的 `/admin/conversations/:id` 调用 `getAdminConversationDetail()` 查看单条会话完整消息。 - 支持按用户、角色卡、日期和删除状态筛选；后台可以恢复或永久删除软删除数据。 / |
 | `src/services/admin-service.js` | 后台首页聚合查询：用户套餐、Provider 列表、概览统计。 |
@@ -64,15 +87,24 @@
 | `src/services/aliyun-sms-service.js` | 阿里云短信验证码发送封装。被 verification-service 调用。 |
 | `src/services/captcha-service.js` | 图形验证码生成、刷新、读取与校验。依赖 Redis/内存缓存。 |
 | `src/services/character-service.js` | 角色 CRUD 与可见性控制。被首页、dashboard、角色编辑和开聊流程调用。 |
+| `src/services/character-social-service.js` | /** 公开角色点赞、评论、使用量与热度统计服务。 / |
 | `src/services/conversation-service.js` | 会话/消息核心服务：消息写入、当前显示链读取、编辑、重写、独立对话克隆和删除保护。聊天路由主要依赖它。 |
 | `src/services/email-service.js` | Resend 邮件验证码发送封装。被 verification-service 调用。 |
+| `src/services/email-template-service.js` | /** Branded HTML email templates for verification messages. / |
 | `src/services/font-proxy-service.js` | Google Fonts 代理与缓存，避免页面字体资源直接失败。被 /fonts/* 路由调用。 |
 | `src/services/llm-gateway-service.js` | LLM 网关核心：Provider 选择、额度校验、上下文裁剪、队列、流式解析、用量记录。 |
+| `src/services/llm-gateway/content-utils.js` | /** LLM 响应内容、token 粗估和上下文裁剪工具。 / |
+| `src/services/llm-gateway/priority-queue.js` | /** LLM 全局并发与优先级队列。 / |
+| `src/services/llm-gateway/provider-client.js` | /** OpenAI-compatible provider 调用与 SSE 流解析。 / |
 | `src/services/llm-provider-service.js` | 后台 Provider 管理、模型列表拉取、模型模式配置校验。 |
 | `src/services/llm-usage-service.js` | LLM job 与 usage log 写入。被网关成功/失败收尾逻辑调用。 |
 | `src/services/log-service.js` | /** 后台日志查询与按日写入服务。 调用说明： - `src/lib/logger.js` 调用 `appendDailyLog()`，把运行日志拆成 `logs/app-YYYY-MM-DD.log`、`logs/app-error-YYYY-MM-DD.log`、`logs/access-YYYY-MM-DD.log`。 - `src/routes/web-routes.js` 的 `/admin/logs` 调用 `listLogEntries()`，解析旧日志和新日志，提供日期、等级、文件、错误类型、函数名筛选与分页。 - 本服务只读写 `logs/` 目录，不碰业务数据库，也不记录敏感请求正文。 / |
+| `src/services/model-entitlement-service.js` | /** Plan-specific model entitlement normalization, persistence helpers, and quota multiplier math. / |
+| `src/services/model-form-service.js` | /** Parse admin form fields for plan model entitlements. / |
+| `src/services/notification-service.js` | /** 站内通知与客服入口配置服务。调用说明：管理后台维护通知规则与客服入口外部资源，布局与聊天页通过公开接口读取当前用户可见通知。 / |
 | `src/services/password-service.js` | bcrypt 密码 hash/verify。被注册、登录、改密码使用。 |
 | `src/services/phone-auth-service.js` | 国内手机号一键认证占位/封装。被注册流程调用。 |
+| `src/services/plan-model-validation-service.js` | /** Server-side validation for plan model entitlements against configured providers. / |
 | `src/services/plan-service.js` | 套餐、订阅、额度快照与额度断言。被后台和 LLM 网关调用。 |
 | `src/services/prompt-engineering-service.js` | 全局提示词片段、角色提示词结构、运行时变量模板和最终 system prompt 拼装。 |
 | `src/services/rate-limit-service.js` | 基于 Redis/内存 incr+expire 的轻量限流。被登录/注册/验证码调用。 |
@@ -81,8 +113,23 @@
 | `public/js/admin-page.js` | 后台交互：套餐字段切换、Prompt 片段排序/预览、后台列表过滤。 |
 | `public/js/character-editor-page.js` | 角色编辑器动态字段：提示词条目增删、排序、预览。 |
 | `public/js/chat-page.js` | 聊天页前端核心：流式 NDJSON 消费、富文本/Markdown 渲染、思考块折叠、加载历史、输入优化。 |
+| `public/js/chat/bubbles.js` | 待补充：该文件缺少明确文件头说明。 |
+| `public/js/chat/controller.js` | /** 聊天页交互控制：流式发送、历史加载、重写/重新生成反馈。 / |
+| `public/js/chat/dom-utils.js` | 待补充：该文件缺少明确文件头说明。 |
+| `public/js/chat/message-menu.js` | /** 聊天消息操作区：点击消息上的“⋯”，在对应消息上方插入轻量上下文操作卡。 / |
+| `public/js/chat/rich-renderer.js` | /** 聊天消息富文本渲染与安全净化。 / |
+| `public/js/chat/stream-client.js` | 待补充：该文件缺少明确文件头说明。 |
+| `public/js/csrf.js` | /** 自动为同源 POST 表单与 fetch 请求附加 CSRF token。 / |
+| `public/js/error-page.js` | /** 错误页脚本；当前客服入口由 notification-client 的 data-open-support 委托统一处理。 / |
+| `public/js/form-guards.js` | /** CSP 兼容的全局表单保护：替代模板里的 inline onsubmit confirm。 / |
 | `public/js/i18n-runtime.js` | 浏览器端轻量 t() 翻译函数，供页面脚本复用。 |
+| `public/js/layout-bootstrap.js` | /** 全站前端 bootstrap。由 layout 注入 JSON 数据，本文件负责挂到 window。 / |
+| `public/js/notification-client.js` | /** 前台站内通知与客服入口展示。调用说明：layout 注入 bootstrap 后自动显示，聊天错误可触发 support 模式。 / |
+| `public/js/profile-page.js` | 待补充：该文件缺少明确文件头说明。 |
+| `public/js/quota-bars.js` | /** 将 data-width 百分比应用到额度条，避免 inline style 违反 CSP。 / |
+| `public/js/register-config.js` | /** 注册页认证配置 bootstrap，避免 inline script 违反 CSP。 / |
 | `public/js/register-page.js` | 注册页交互：国家/地区切换、验证码刷新、邮箱/手机验证码发送。 |
+| `scripts/check-i18n-completeness.js` | /** 检查楼阁项目 i18n 词典是否覆盖已登记 key，并扫描页面/前端脚本残留中文文案，帮助持续补全国际化。 调用说明：npm run i18n:check。脚本只读文件，发现缺失时以非 0 退出。 / |
 | `scripts/full-flow-e2e.js` | 全流程 E2E 测试脚本：创建临时用户/角色/会话，验证当前显示链、LLM 流式、后台查询、日志和删除保护，结束后清理测试数据。 |
 | `scripts/grant-admin.js` | /** 手动授予管理员权限。只允许本机显式执行，不走隐式自动提权。 用法：node scripts/grant-admin.js <username> / |
 | `scripts/health-check.js` | /** 基础健康检查：配置、数据库、Redis、公开 HTTP 页面。 / |
@@ -92,6 +139,7 @@
 | `scripts/test-admin-logs-route.js` | /** 管理后台日志页模板冒烟测试。调用说明：`npm run admin-logs:test`，验证日志查询结果能正常渲染为后台 UI。 / |
 | `scripts/test-conversation-service.js` | /** Conversation service regression tests for linear chat refactor behavior. / |
 | `scripts/test-log-service.js` | /** 日志解析服务冒烟测试。调用说明：`npm run logs:test`，用于确认后台日志分页/筛选基础逻辑可用。 / |
+| `scripts/test-model-entitlements.js` | /** Focused tests for plan model entitlement normalization and admin form parsing. / |
 | `scripts/test-prompt-route.js` | /** Prompt 路由/LLM 网关的轻量单元测试。 调用说明： - `npm run test:prompt-route` 执行。 - 通过 monkey patch Module._load 隔离外部依赖，只验证 prompt 构造与路由调用契约。 / |
 | `scripts/test-think-parser.js` | /** 最小回归测试：验证 think/reasoning 解析与展示规则的关键正则行为。 / |
 | `scripts/tmp-stream-e2e.js` | /** 临时流式聊天 E2E 调试脚本。 调用说明： - 手动运行 `node scripts/tmp-stream-e2e.js`。 - 会使用 .env 中 APP_URL/DATABASE_URL，登录固定测试用户并请求流式接口。 - 这是排查聊天 NDJSON/最终落库问题的临时脚本，不应放进生产定时任务。 / |
@@ -105,6 +153,7 @@
 | `src/views/admin-conversation-detail.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/admin-conversations.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/admin-logs.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
+| `src/views/admin-notifications.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/admin-plans.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/admin-prompts.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/admin-providers.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
@@ -119,6 +168,7 @@
 | `src/views/message.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/partials/chat-message.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/profile.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
+| `src/views/public-characters.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 | `src/views/register.ejs` | EJS 页面/局部模板；由 `renderPage` 或 `ejs.renderFile` 渲染，具体入口见路由表。 |
 
 ## 6. 样式文件地图
@@ -132,12 +182,16 @@
 | `public/styles/site-pages/01-typography.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/10-home.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/11-home-polish.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
+| `public/styles/site-pages/12-public-characters.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/20-admin.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/21-admin-polish.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
+| `public/styles/site-pages/25-notifications.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/30-character-editor.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/31-character-polish.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/40-dashboard.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/41-dashboard-polish.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
+| `public/styles/site-pages/42-dashboard-sections.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
+| `public/styles/site-pages/43-dashboard-responsive.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/50-chat.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/51-chat-polish.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
 | `public/styles/site-pages/52-rich-content.css` | 样式资源；通过 `public/styles/site-pages.css` 或页面 layout 引入。 |
@@ -154,66 +208,7 @@
 
 | 行号 | 路由注册 |
 |---:|---|
-| 339 | `app.get('/fonts/google.css', async (req, res) => {` |
-| 353 | `app.get('/fonts/google/file', async (req, res) => {` |
-| 366 | `app.get('/', async (req, res, next) => {` |
-| 375 | `app.get('/register', async (req, res, next) => {` |
-| 384 | `app.get('/api/captcha', async (req, res, next) => {` |
-| 394 | `app.get('/api/captcha/image/:captchaId', async (req, res, next) => {` |
-| 408 | `app.get('/healthz', async (req, res) => {` |
-| 449 | `app.post('/api/send-email-code', async (req, res, next) => {` |
-| 493 | `app.post('/api/send-phone-code', async (req, res, next) => {` |
-| 539 | `app.post('/register', async (req, res, next) => {` |
-| 663 | `app.get('/login', (req, res) => renderPage(res, 'login', { title: '登录' }));` |
-| 664 | `app.post('/login', async (req, res, next) => {` |
-| 717 | `app.get('/logout', (req, res) => {` |
-| 721 | `app.get('/dashboard', requireAuth, async (req, res, next) => {` |
-| 738 | `app.get('/profile', requireAuth, async (req, res, next) => {` |
-| 755 | `app.post('/profile', requireAuth, async (req, res, next) => {` |
-| 836 | `app.get('/admin', requireAdmin, async (req, res, next) => {` |
-| 855 | `app.get('/admin/plans', requireAdmin, async (req, res, next) => {` |
-| 872 | `app.get('/admin/providers', requireAdmin, async (req, res, next) => {` |
-| 889 | `app.get('/admin/prompts', requireAdmin, async (req, res, next) => {` |
-| 918 | `app.get('/admin/logs', requireAdmin, async (req, res, next) => {` |
-| 950 | `app.get('/admin/conversations', requireAdmin, async (req, res, next) => {` |
-| 985 | `app.get('/admin/conversations/:conversationId', requireAdmin, async (req, res, next) => {` |
-| 1002 | `app.post('/admin/conversations/:conversationId/restore', requireAdmin, async (req, res, next) => {` |
-| 1012 | `app.post('/admin/conversations/:conversationId/permanent-delete', requireAdmin, async (req, res, next) => {` |
-| 1022 | `app.post('/admin/conversations/:conversationId/messages/:messageId/restore', requireAdmin, async (req, res, next) => {` |
-| 1034 | `app.post('/admin/conversations/:conversationId/messages/:messageId/permanent-delete', requireAdmin, async (req, res, next) => {` |
-| 1053 | `app.post('/admin/plans/new', requireAdmin, async (req, res, next) => {` |
-| 1085 | `app.post('/admin/plans/:planId', requireAdmin, async (req, res, next) => {` |
-| 1116 | `app.post('/admin/plans/:planId/delete', requireAdmin, async (req, res, next) => {` |
-| 1142 | `app.post('/admin/users/:userId/role', requireAdmin, async (req, res, next) => {` |
-| 1159 | `app.post('/admin/users/:userId/plan', requireAdmin, async (req, res, next) => {` |
-| 1177 | `app.post('/admin/providers/new', requireAdmin, async (req, res, next) => {` |
-| 1212 | `app.post('/admin/providers/:providerId', requireAdmin, async (req, res, next) => {` |
-| 1242 | `app.post('/admin/prompt-blocks/new', requireAdmin, async (req, res, next) => {` |
-| 1265 | `app.post('/admin/prompt-blocks/:blockId', requireAdmin, async (req, res, next) => {` |
-| 1283 | `app.post('/admin/prompt-blocks/reorder', requireAdmin, async (req, res, next) => {` |
-| 1299 | `app.post('/admin/prompt-blocks/:blockId/delete', requireAdmin, async (req, res, next) => {` |
-| 1312 | `app.get('/characters/new', requireAuth, (req, res) => {` |
-| 1321 | `app.get('/characters/:characterId/edit', requireAuth, async (req, res, next) => {` |
-| 1352 | `app.post('/characters/new', requireAuth, async (req, res, next) => {` |
-| 1371 | `app.post('/characters/:characterId/edit', requireAuth, async (req, res, next) => {` |
-| 1396 | `app.post('/characters/:characterId/delete', requireAuth, async (req, res, next) => {` |
-| 1420 | `app.post('/conversations/start/:characterId', requireAuth, async (req, res, next) => {` |
-| 1473 | `app.get('/chat/:conversationId', requireAuth, async (req, res, next) => {` |
-| 1494 | `app.get('/chat/:conversationId/messages/history', requireAuth, async (req, res, next) => {` |
-| 1531 | `app.post('/chat/:conversationId/delete', requireAuth, async (req, res, next) => {` |
-| 1549 | `app.post('/chat/:conversationId/message', requireAuth, async (req, res, next) => {` |
-| 1630 | `app.post('/chat/:conversationId/message/stream', requireAuth, async (req, res, next) => {` |
-| 1767 | `app.post('/chat/:conversationId/regenerate/:messageId/stream', requireAuth, async (req, res, next) => {` |
-| 1860 | `app.post('/chat/:conversationId/regenerate/:messageId', requireAuth, async (req, res, next) => {` |
-| 1917 | `app.post('/chat/:conversationId/messages/:messageId/delete', requireAuth, async (req, res, next) => {` |
-| 1953 | `app.post('/chat/:conversationId/messages/:messageId/edit', requireAuth, async (req, res, next) => {` |
-| 1978 | `app.post('/chat/:conversationId/messages/:messageId/edit-user', requireAuth, async (req, res, next) => {` |
-| 2053 | `app.post('/chat/:conversationId/messages/:messageId/replay/stream', requireAuth, async (req, res, next) => {` |
-| 2235 | `app.post('/chat/:conversationId/messages/:messageId/replay', requireAuth, async (req, res, next) => {` |
-| 2373 | `app.post('/chat/:conversationId/model', requireAuth, async (req, res, next) => {` |
-| 2393 | `app.post('/chat/:conversationId/optimize-input/stream', requireAuth, async (req, res, next) => {` |
-| 2455 | `app.post('/chat/:conversationId/optimize-input', requireAuth, async (req, res, next) => {` |
-| 2493 | `app.post('/chat/:conversationId/branch/:messageId', requireAuth, async (req, res, next) => {` |
+
 
 ## 8. DEBUG 入口
 

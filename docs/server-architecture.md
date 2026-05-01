@@ -15,31 +15,16 @@
 - 启动 `app.listen(...)`
 
 ### `src/server-helpers.js`
-承接原来 `server.js` 顶部的公共工具函数，主要是：
-- 页面渲染：`renderPage`、`renderRegisterPage`、`renderValidationMessage`、`renderChatPage`
-- 参数解析：`parseIntegerField`、`parseNumberField`、`parseIdParam`
-- 文本/账号脱敏：`maskEmail`、`maskPhone`
-- 日志 meta：`buildRegisterLogMeta`、`buildLoginLogMeta`
-- 聊天编排辅助：`buildChatRequestContext`、`buildConversationTitle`、`buildBranchConversationTitle`、`buildNextConversationTitle`
-- 流输出辅助：`writeNdjson`、`initNdjsonStream`
-- 会话加载辅助：`loadConversationForUserOrFail`
-- 角色 prompt 结构处理：`splitCharacterPromptProfile`、`buildCharacterPromptProfileFromForm`
+兼容导出门面，继续对旧调用方暴露同一批 helper；具体实现已按职责拆到 `src/server-helpers/`：
+- `rendering.js`：`renderPage`、`renderRegisterPage`、`renderValidationMessage`、默认 meta、HTML escape
+- `request-meta.js`：`getClientIp`、`maskEmail`、`maskPhone`、注册/登录日志 meta
+- `ndjson.js`：`writeNdjson`、`initNdjsonStream`
+- `parsing.js`：`parseIntegerField`、`parseNumberField`、`parseIdParam`、邮箱/手机号格式校验
+- `character-prompt-profile.js`：角色 prompt profile 表单与存储格式转换
+- `chat-view.js`：`buildChatRequestContext`、`buildConversationTitle`、`buildNextConversationTitle`、`renderChatPage`、`loadConversationForUserOrFail`
 
 ### `src/routes/web-routes.js`
-承接原来 `server.js` 里所有业务路由注册，包含：
-- 首页、注册页、验证码 API
-- Health check
-- 角色/用户/计划/Provider/Admin 相关页面与 API
-- 聊天主流程：
-  - 普通发送
-  - 流式发送
-  - 重算 / regenerate
-  - 删除消息 / 对话
-  - 编辑用户消息 / AI 回复
-  - replay
-  - 分支创建
-  - 模型模式切换
-  - 输入优化
+路由聚合与依赖注入入口，负责组装 `routeContext` 并注册公开页、认证、后台、角色、聊天等子路由。聊天流式响应的细节已下沉到 `src/routes/web/chat-stream-utils.js`。
 
 ## 当前映射
 
@@ -51,31 +36,46 @@
 - `errorHandler`
 - `bootstrap()`
 
-### 已搬到 `src/server-helpers.js`
-- `renderPage`
-- `renderRegisterPage`
-- `getClientIp`
-- `maskEmail`
-- `maskPhone`
-- `buildRegisterLogMeta`
-- `buildLoginLogMeta`
-- `renderValidationMessage`
-- `writeNdjson`
-- `buildChatRequestContext`
-- `initNdjsonStream`
-- `parseIntegerField`
-- `parseNumberField`
-- `parseIdParam`
-- `splitCharacterPromptProfile`
-- `buildCharacterPromptProfileFromForm`
-- `isEmail`
-- `isAllowedInternationalEmail`
-- `isDomesticPhone`
-- `buildConversationTitle`
-- `buildBranchConversationTitle`
-- `buildNextConversationTitle`
-- `renderChatPage`
-- `loadConversationForUserOrFail`
+### 已搬到 `src/server-helpers/` 并由 `src/server-helpers.js` 统一导出
+- `rendering.js`
+  - `renderPage`
+  - `renderRegisterPage`
+  - `renderValidationMessage`
+- `request-meta.js`
+  - `getClientIp`
+  - `maskEmail`
+  - `maskPhone`
+  - `buildRegisterLogMeta`
+  - `buildLoginLogMeta`
+- `ndjson.js`
+  - `writeNdjson`
+  - `initNdjsonStream`
+- `parsing.js`
+  - `parseIntegerField`
+  - `parseNumberField`
+  - `parseIdParam`
+  - `isEmail`
+  - `isAllowedInternationalEmail`
+  - `isDomesticPhone`
+- `character-prompt-profile.js`
+  - `splitCharacterPromptProfile`
+  - `buildCharacterPromptProfileFromForm`
+- `chat-view.js`
+  - `buildChatRequestContext`
+  - `buildConversationTitle`
+  - `buildNextConversationTitle`
+  - `renderChatPage`
+  - `loadConversationForUserOrFail`
+
+### 已搬到 `src/routes/web/chat-stream-utils.js`
+- `mapLlmErrorToUserMessage`
+- `buildConversationCharacterPayload`
+- `renderChatMessageHtml`
+- `buildChatMessagePacket`
+- `createNdjsonResponder`
+- `createStreamingLineWriter`
+- `streamChatReplyToNdjson`
+- `streamOptimizedInputToNdjson`
 
 ### 已搬到 `src/routes/web-routes.js`
 - 所有 `app.get(...)`
@@ -98,9 +98,9 @@
 ## 下一步建议
 
 如果还要继续瘦身，推荐优先再拆这几个：
-- `src/routes/chat-routes.js`
-- `src/routes/admin-routes.js`
-- `src/routes/auth-routes.js`
-- `src/routes/public-routes.js`
+- `src/routes/web/admin-routes.js`：按 dashboard / plans / providers / notifications / prompts / logs / conversations / users 拆分
+- `src/routes/web/auth-routes.js`：按 verification / register / session / dashboard / profile 拆分
+- `public/js/chat/controller.js`：按 conversation state / streaming UI / compose submit / optimize submit / action stream submit / history loader 拆分
+- `src/services/plan-service.js`：按 plan normalizer / CRUD / subscription / quota 拆分
 
-这样 `web-routes.js` 就能继续缩下去，最终变成只负责汇总注册。
+继续采用“兼容门面 + 搬迁式拆分”，避免一次重构过多调用方。

@@ -7,12 +7,15 @@ const assert = require('assert');
 const path = require('path');
 const ejs = require('ejs');
 const { listLogEntries } = require('../src/services/log-service');
+const { translate } = require('../src/i18n');
 
 async function main() {
   const logResult = listLogEntries({ page: 1, pageSize: 3 });
+  const t = (key, vars) => translate('zh-CN', key, vars);
   const html = await ejs.renderFile(path.join(process.cwd(), 'src/views/admin-logs.ejs'), {
     logResult,
     buildPageUrl: (page) => `/admin/logs?page=${page}`,
+    t,
   });
 
   assert.ok(html.includes('日志查询'), 'admin logs view should render title');

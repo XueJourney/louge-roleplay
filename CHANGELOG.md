@@ -2,6 +2,17 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)：`MAJOR.MINOR.PATCH`。
 
+## [Unreleased]
+
+### Changed
+
+- 拆分聊天流式 NDJSON 工具到 `src/routes/web/chat-stream-utils.js`，让 `src/routes/web-routes.js` 回到路由聚合与依赖注入职责。
+- 将 `src/server-helpers.js` 改为兼容导出门面，并把渲染、请求 meta、NDJSON、参数解析、角色 Prompt Profile、聊天页 view model 拆到 `src/server-helpers/` 子模块。
+
+### Documentation
+
+- 更新项目地图、函数索引与 server 架构说明，补齐新拆分模块说明。
+
 ## [1.2.0] - 2026-05-01
 
 ### Added
