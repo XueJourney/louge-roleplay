@@ -1,0 +1,19 @@
+{
+  "name": "楼阁",
+  "short_name": "楼阁",
+  "icons": [
+    {
+      "src": "/public/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/public/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0b3f45",
+  "background_color": "#0b3f45",
+  "display": "standalone"
+}

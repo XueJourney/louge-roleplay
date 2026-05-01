@@ -2,6 +2,17 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)：`MAJOR.MINOR.PATCH`。
 
+## [1.1.4] - 2026-05-01
+
+### Added
+
+- 新增站点 favicon、Apple touch icon、PWA manifest 与 Open Graph 分享图。
+- 为公开首页与公开角色列表补充页面级 SEO/社交分享描述。
+
+### Fixed
+
+- 富文本消息中的引号高亮改为在 DOM 清洗后处理文本节点，避免高亮逻辑破坏链接、代码块或已转义 HTML。
+
 ## [1.1.3] - 2026-05-01
 
 ### Added

@@ -1,4 +1,5 @@
 const EN_MESSAGES = {
+  "楼阁默认分享描述": "Loft is a quiet space for character-driven conversations. Create a persona, shape their temperament and situation, then let each exchange find its own rhythm.",
   "首页": "Home",
   "管理后台": "Admin",
   "创建角色": "Create Character",
