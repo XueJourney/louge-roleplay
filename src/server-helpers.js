@@ -31,23 +31,28 @@ async function renderPage(res, view, params = {}) {
   const titleSource = params.title || config.appName;
   const title = translateHtml(locale, t(titleSource));
   const clientNotifications = await getClientNotificationBootstrap(res.locals.currentUser || null);
-  res.render(view, params, (viewError, html) => {
-    if (viewError) {
-      logger.error('[renderPage] View 渲染失败', { view, error: viewError.message });
-      return res.status(500).type('text').send(t('页面渲染失败，请稍后重试。'));
-    }
-    const translatedHtml = translateHtml(locale, html);
-    res.render('layout', {
-      title,
-      body: translatedHtml,
-      currentUser: res.locals.currentUser,
-      appName: config.appName,
-      appUrl: config.appUrl,
-      locale,
-      t,
-      clientI18nMessages: res.locals.clientI18nMessages || {},
-      clientNotifications,
-      localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
+  return new Promise((resolve) => {
+    res.render(view, params, (viewError, html) => {
+      if (viewError) {
+        logger.error('[renderPage] View 渲染失败', { view, error: viewError.message });
+        res.status(500).type('text').send(t('页面渲染失败，请稍后重试。'));
+        resolve();
+        return;
+      }
+      const translatedHtml = translateHtml(locale, html);
+      res.render('layout', {
+        title,
+        body: translatedHtml,
+        currentUser: res.locals.currentUser,
+        appName: config.appName,
+        appUrl: config.appUrl,
+        locale,
+        t,
+        clientI18nMessages: res.locals.clientI18nMessages || {},
+        clientNotifications,
+        localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
+      });
+      resolve();
     });
   });
 }
@@ -362,7 +367,7 @@ async function renderChatPage(req, res, conversation, options = {}) {
   view.oldestVisibleMessageId = view.visiblePathMessages.length ? view.visiblePathMessages[0].id : null;
   const chatModelSelector = await getChatModelSelector();
 
-  renderPage(res, 'chat', {
+  return renderPage(res, 'chat', {
     title: req.t ? req.t('聊天') : '聊天',
     conversation,
     view,

@@ -98,11 +98,15 @@
         </thead>
         <tbody id="users-list">
           <% users.forEach(u => { %>
-            <tr data-filter-item data-filter-text="<%= [u.username, u.nickname || '', u.email || '', u.phone || '', u.plan_name || '', u.plan_code || '', u.role || '', u.status || ''].join(' ') %>">
+            <%
+              const usernameForFilter = [u.public_id || '', u.username, u.nickname || '', u.email || '', u.phone || '', u.plan_name || '', u.plan_code || '', u.role || '', u.status || ''].join(' ');
+            %>
+            <tr data-filter-item data-filter-text="<%= usernameForFilter %>">
               <td>
                 <strong><%= u.username %></strong>
                 <div class="muted-text">
-                  <%= u.nickname || '—' %>
+                  ID：<%= u.public_id || '—' %>
+                  · <%= u.nickname || '—' %>
                   · 状态：<%= u.status %>
                   · 地区：<%= u.country_type || 'domestic' %>
                 </div>

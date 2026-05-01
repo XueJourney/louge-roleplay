@@ -51,9 +51,9 @@ async function main() {
 
   const suffix = Date.now();
   const userRow = await query(
-    `INSERT INTO users (username, password_hash, role, status, created_at, updated_at)
-     VALUES (?, 'test', 'user', 'active', NOW(), NOW())`,
-    [`admin_deleted_${suffix}`],
+    `INSERT INTO users (public_id, username, password_hash, role, status, created_at, updated_at)
+     VALUES (?, ?, 'test', 'user', 'active', NOW(), NOW())`,
+    [`7${String(suffix).slice(-8)}`, `admin_deleted_${suffix}`],
   );
   const userId = userRow.insertId;
   const characterRow = await query(

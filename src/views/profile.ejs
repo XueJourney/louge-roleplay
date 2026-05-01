@@ -1,42 +1,41 @@
 <!-- @file src/views/profile.ejs
-     @description 个人资料页模板。调用说明：GET/POST /profile 渲染与处理用户名/密码更新。
+     @description 个人资料页模板。调用说明：GET/POST /profile 渲染与处理用户名、联系方式、密码更新。
 -->
 <link rel="stylesheet" href="/public/styles/site-pages.css" />
 
 <%
   const currentName = user?.username || '';
+  const publicId = user?.public_id || '—';
   const currentRole = user?.role === 'admin' ? '管理员' : '普通用户';
   const emailText = user?.email || '未绑定';
   const phoneText = user?.phone || '未绑定';
+  const emailVerifiedText = user?.email_verified ? '已验证' : '未验证';
+  const phoneVerifiedText = user?.phone_verified ? '已验证' : '未验证';
   const joinedAt = user?.created_at || '—';
+  const emailStatusClass = user?.email_verified ? 'status-pill status-pill--ok' : 'status-pill status-pill--muted';
+  const phoneStatusClass = user?.phone_verified ? 'status-pill status-pill--ok' : 'status-pill status-pill--muted';
   const statusClass = formStatus ? `form-message form-message--${formStatus}` : 'form-message';
 %>
 
 <div class="profile-shell">
-  <section class="hero-card profile-hero">
-    <div class="profile-hero-copy">
-      <div class="section-kicker">Profile</div>
-      <h1>个人资料</h1>
-      <p>这页就做两件事：改用户名，和改密码。别的先不掺，保持干净。</p>
-      <div class="dashboard-actions">
-        <a class="quick-link" href="/dashboard">回控制台</a>
-        <a class="quick-link" href="/characters/new">新建角色</a>
+  <section class="profile-hero-card">
+    <div class="profile-identity">
+      <div class="profile-avatar" aria-hidden="true"><%= currentName.slice(0, 1).toUpperCase() || 'L' %></div>
+      <div class="profile-identity-copy">
+        <div class="section-kicker">Profile</div>
+        <h1>个人资料</h1>
+        <p>管理登录身份、联系方式和安全设置。用户名只做唯一性校验，用户 ID 由系统随机生成。</p>
+        <div class="profile-actions">
+          <a class="quick-link" href="/dashboard">回控制台</a>
+          <a class="quick-link" href="/characters/new">新建角色</a>
+        </div>
       </div>
     </div>
 
-    <div class="hero-meta profile-hero-meta">
-      <div class="hero-stat">
-        <strong>当前用户名</strong>
-        <span><%= currentName %></span>
-      </div>
-      <div class="hero-stat">
-        <strong>账号身份</strong>
-        <span><%= currentRole %></span>
-      </div>
-      <div class="hero-stat">
-        <strong>注册时间</strong>
-        <span><%= joinedAt %></span>
-      </div>
+    <div class="profile-id-card">
+      <span>唯一用户 ID</span>
+      <strong><%= publicId %></strong>
+      <small>三位起步 · 随机生成 · 无固定上限</small>
     </div>
   </section>
 
@@ -44,68 +43,206 @@
     <div class="<%= statusClass %>"><%= formMessage %></div>
   <% } %>
 
-  <section class="profile-grid">
-    <article class="panel profile-card">
-      <div class="section-heading">
-        <div>
-          <div class="section-kicker">Username</div>
-          <h2>修改用户名</h2>
-          <p>用户名会同步到当前登录会话里，改完不用重新登录。</p>
+  <section class="profile-overview panel">
+    <div class="profile-overview-item">
+      <span>当前用户名</span>
+      <strong><%= currentName %></strong>
+    </div>
+    <div class="profile-overview-item">
+      <span>账号身份</span>
+      <strong><%= currentRole %></strong>
+    </div>
+    <div class="profile-overview-item">
+      <span>注册时间</span>
+      <strong><%= joinedAt %></strong>
+    </div>
+    <div class="profile-overview-item">
+      <span>邮箱状态</span>
+      <strong><%= emailText %></strong>
+      <em class="<%= emailStatusClass %>"><%= emailVerifiedText %></em>
+    </div>
+    <div class="profile-overview-item">
+      <span>手机号状态</span>
+      <strong><%= phoneText %></strong>
+      <em class="<%= phoneStatusClass %>"><%= phoneVerifiedText %></em>
+    </div>
+  </section>
+
+  <section class="settings-layout">
+    <aside class="settings-rail panel">
+      <div class="section-kicker">Settings</div>
+      <h2>资料设置</h2>
+      <p>先在验证码区完成人机校验，再发送邮箱或短信验证码。提交绑定时只需要填写收到的 6 位验证码。</p>
+      <div class="settings-step-list">
+        <div class="settings-step">
+          <span>1</span>
+          <strong>填写目标邮箱或手机号</strong>
+        </div>
+        <div class="settings-step">
+          <span>2</span>
+          <strong>输入图形验证码并发送验证码</strong>
+        </div>
+        <div class="settings-step">
+          <span>3</span>
+          <strong>提交收到的验证码完成绑定</strong>
         </div>
       </div>
+    </aside>
 
-      <div class="profile-summary-list">
-        <div class="profile-summary-item">
-          <span>当前用户名</span>
-          <strong><%= currentName %></strong>
+    <div class="settings-main">
+      <section class="settings-section panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="section-kicker">Account</div>
+            <h2>账号信息</h2>
+            <p>用户名不再限制三位以上，只要非空、不重名即可。</p>
+          </div>
         </div>
-        <div class="profile-summary-item">
-          <span>邮箱</span>
-          <strong><%= emailText %></strong>
-        </div>
-        <div class="profile-summary-item">
-          <span>手机号</span>
-          <strong><%= phoneText %></strong>
-        </div>
-      </div>
 
-      <form method="POST" action="/profile" class="profile-form">
-        <input type="hidden" name="action" value="username" />
-        <div class="field-group">
-          <label for="username">新用户名</label>
-          <input id="username" name="username" maxlength="50" required value="<%= currentName %>" placeholder="至少 3 位" />
-          <div class="mini-note">用户名唯一；如果和当前用户名一样，我会直接拦住。</div>
-        </div>
-        <button class="submit-btn" type="submit">保存用户名</button>
-      </form>
-    </article>
+        <form method="POST" action="/profile" class="settings-form">
+          <input type="hidden" name="action" value="username" />
+          <div class="field-group">
+            <label for="username">新用户名</label>
+            <input id="username" name="username" maxlength="50" required value="<%= currentName %>" placeholder="输入想使用的用户名" />
+            <div class="mini-note">最多 50 位；系统只校验非空和唯一性。</div>
+          </div>
+          <div class="settings-form-actions">
+            <button class="submit-btn" type="submit">保存用户名</button>
+          </div>
+        </form>
+      </section>
 
-    <article class="panel profile-card">
-      <div class="section-heading">
-        <div>
-          <div class="section-kicker">Password</div>
-          <h2>修改密码</h2>
-          <p>改密码需要先验证当前密码，免得别人碰到你电脑就乱改。</p>
+      <section class="settings-section panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="section-kicker">Contact</div>
+            <h2>联系方式</h2>
+            <p>邮箱和手机号都可以单独绑定、切换或解绑，并保持唯一。</p>
+          </div>
         </div>
-      </div>
 
-      <form method="POST" action="/profile" class="profile-form">
-        <input type="hidden" name="action" value="password" />
-        <div class="field-group">
-          <label for="currentPassword">当前密码</label>
-          <input id="currentPassword" name="currentPassword" type="password" maxlength="100" required placeholder="先输入当前密码" />
+        <div class="contact-grid">
+          <article class="contact-card">
+            <div class="contact-card-head">
+              <div>
+                <span class="contact-icon">@</span>
+                <h3><%= user?.email ? '切换邮箱' : '绑定邮箱' %></h3>
+              </div>
+              <em class="<%= emailStatusClass %>"><%= emailVerifiedText %></em>
+            </div>
+            <p>邮箱绑定后可以作为登录账号，切换时需要邮箱验证码确认。</p>
+            <form method="POST" action="/profile" class="settings-form">
+              <input type="hidden" name="action" value="email" />
+              <div class="field-group">
+                <label for="profileEmail">邮箱</label>
+                <input id="profileEmail" name="email" type="email" maxlength="120" value="<%= user?.email || '' %>" placeholder="name@example.com" />
+              </div>
+              <div class="field-group">
+                <label for="emailCode">邮箱验证码</label>
+                <div class="inline-row profile-inline-row">
+                  <input id="emailCode" name="emailCode" maxlength="6" placeholder="输入 6 位验证码" />
+                  <button class="btn-soft" type="button" data-send-profile-email-code>发送邮箱验证码</button>
+                </div>
+              </div>
+              <div class="settings-form-actions settings-form-actions--split">
+                <button class="submit-btn" type="submit"><%= user?.email ? '保存新邮箱' : '绑定邮箱' %></button>
+              </div>
+            </form>
+            <% if (user?.email) { %>
+              <form method="POST" action="/profile" class="profile-danger-form">
+                <input type="hidden" name="action" value="unbindEmail" />
+                <button class="text-danger-btn" type="submit">解绑邮箱</button>
+              </form>
+            <% } %>
+          </article>
+
+          <article class="contact-card">
+            <div class="contact-card-head">
+              <div>
+                <span class="contact-icon">☎</span>
+                <h3><%= user?.phone ? '切换手机号' : '绑定手机号' %></h3>
+              </div>
+              <em class="<%= phoneStatusClass %>"><%= phoneVerifiedText %></em>
+            </div>
+            <p>手机号需要短信验证码确认，绑定后也可以用来登录。</p>
+            <form method="POST" action="/profile" class="settings-form">
+              <input type="hidden" name="action" value="phone" />
+              <div class="field-group">
+                <label for="profilePhone">手机号</label>
+                <input id="profilePhone" name="phone" maxlength="30" value="<%= user?.phone || '' %>" placeholder="请输入国内手机号" />
+              </div>
+              <div class="field-group">
+                <label for="phoneCode">短信验证码</label>
+                <div class="inline-row profile-inline-row">
+                  <input id="phoneCode" name="phoneCode" maxlength="6" placeholder="输入 6 位验证码" />
+                  <button class="btn-soft" type="button" data-send-profile-phone-code>发送短信验证码</button>
+                </div>
+              </div>
+              <div class="settings-form-actions settings-form-actions--split">
+                <button class="submit-btn" type="submit"><%= user?.phone ? '保存新手机号' : '绑定手机号' %></button>
+              </div>
+            </form>
+            <% if (user?.phone) { %>
+              <form method="POST" action="/profile" class="profile-danger-form">
+                <input type="hidden" name="action" value="unbindPhone" />
+                <button class="text-danger-btn" type="submit">解绑手机号</button>
+              </form>
+            <% } %>
+          </article>
         </div>
-        <div class="field-group">
-          <label for="newPassword">新密码</label>
-          <input id="newPassword" name="newPassword" type="password" maxlength="100" required placeholder="至少 6 位" />
+      </section>
+
+      <section class="settings-section panel profile-captcha-card">
+        <div class="settings-section-head">
+          <div>
+            <div class="section-kicker">Verification</div>
+            <h2>验证码发送校验</h2>
+            <p>发送邮箱或短信验证码前，先完成这里的图形验证码。每次发送后会自动刷新。</p>
+          </div>
         </div>
-        <div class="field-group">
-          <label for="confirmPassword">确认新密码</label>
-          <input id="confirmPassword" name="confirmPassword" type="password" maxlength="100" required placeholder="再输一次新密码" />
+        <div class="captcha-row profile-captcha-row">
+          <input type="hidden" name="captchaId" value="<%= captcha?.captchaId || '' %>" />
+          <input id="profileCaptchaText" maxlength="10" placeholder="输入图形验证码" autocomplete="off" />
+          <div class="captcha-box">
+            <img id="profileCaptchaImage" src="<%= captcha?.imageUrl || '' %>" alt="图形验证码" />
+          </div>
+          <button class="btn-soft" type="button" data-refresh-profile-captcha>刷新验证码</button>
+        </div>
+        <div class="subtle-note" id="profileCaptchaHint">图形验证码只用于发送验证码；提交绑定时只校验邮箱或短信收到的 6 位验证码。</div>
+      </section>
+
+      <section class="settings-section panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="section-kicker">Security</div>
+            <h2>修改密码</h2>
+            <p>需要先验证当前密码，避免账号在已登录设备上被误改。</p>
+          </div>
+        </div>
+
+        <form method="POST" action="/profile" class="settings-form">
+          <input type="hidden" name="action" value="password" />
+          <div class="password-grid">
+            <div class="field-group">
+              <label for="currentPassword">当前密码</label>
+              <input id="currentPassword" name="currentPassword" type="password" maxlength="100" required placeholder="先输入当前密码" />
+            </div>
+            <div class="field-group">
+              <label for="newPassword">新密码</label>
+              <input id="newPassword" name="newPassword" type="password" maxlength="100" required placeholder="至少 6 位" />
+            </div>
+            <div class="field-group">
+              <label for="confirmPassword">确认新密码</label>
+              <input id="confirmPassword" name="confirmPassword" type="password" maxlength="100" required placeholder="再输一次新密码" />
+            </div>
+          </div>
           <div class="mini-note">新密码不能和当前密码一样。</div>
-        </div>
-        <button class="submit-btn" type="submit">更新密码</button>
-      </form>
-    </article>
+          <div class="settings-form-actions">
+            <button class="submit-btn" type="submit">更新密码</button>
+          </div>
+        </form>
+      </section>
+    </div>
   </section>
 </div>
+<script src="/public/js/profile-page.js"></script>

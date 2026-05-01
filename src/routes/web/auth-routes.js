@@ -17,6 +17,10 @@ function registerAuthRoutes(app, ctx) {
     findUserAuthById,
     updateUsername,
     updatePasswordHash,
+    updateUserEmail,
+    unbindUserEmail,
+    updateUserPhone,
+    unbindUserPhone,
     listUserCharacters,
     getActiveSubscriptionForUser,
     getUserQuotaSnapshot,
@@ -55,6 +59,8 @@ function registerAuthRoutes(app, ctx) {
       const ip = getClientIp(req);
       const email = String(req.body.email || '').trim().toLowerCase();
       const countryType = String(req.body.countryType || 'international').trim();
+      const purpose = String(req.body.purpose || 'register').trim();
+      const currentUserId = req.session?.user?.id ? Number(req.session.user.id) : null;
       const captchaId = String(req.body.captchaId || '').trim();
       const captchaText = String(req.body.captchaText || '').trim();
 
@@ -69,8 +75,12 @@ function registerAuthRoutes(app, ctx) {
       if (countryType === 'international' && !isAllowedInternationalEmail(email)) {
         return refreshAndRespond(400, { message: '海外用户仅支持 Gmail、Outlook、Hotmail、Live、iCloud、Yahoo、AOL、Proton 等主流邮箱，请输入新的图形验证码后重试。' });
       }
-      if (await findUserByEmail(email)) {
+      const emailOwner = await findUserByEmail(email);
+      if (emailOwner && (!currentUserId || Number(emailOwner.id) !== currentUserId || purpose !== 'profile-email')) {
         return refreshAndRespond(400, { message: '邮箱已被注册，请输入新的图形验证码后重试。' });
+      }
+      if (emailOwner && Number(emailOwner.id) === currentUserId && purpose === 'profile-email') {
+        return refreshAndRespond(400, { message: '这个邮箱已经绑定在当前账号上，请换一个邮箱。' });
       }
 
       await issueEmailCode(email, ip);
@@ -98,14 +108,20 @@ function registerAuthRoutes(app, ctx) {
     try {
       const ip = getClientIp(req);
       const phone = String(req.body.phone || '').trim();
+      const purpose = String(req.body.purpose || 'register').trim();
+      const currentUserId = req.session?.user?.id ? Number(req.session.user.id) : null;
       const captchaId = String(req.body.captchaId || '').trim();
       const captchaText = String(req.body.captchaText || '').trim();
 
       if (!isDomesticPhone(phone)) {
         return refreshAndRespond(400, { message: '请输入正确的国内手机号，并输入新的图形验证码后重试。' });
       }
-      if (await findUserByPhone(phone)) {
+      const phoneOwner = await findUserByPhone(phone);
+      if (phoneOwner && (!currentUserId || Number(phoneOwner.id) !== currentUserId || purpose !== 'profile-phone')) {
         return refreshAndRespond(400, { message: '手机号已被注册，请输入新的图形验证码后重试。' });
+      }
+      if (phoneOwner && Number(phoneOwner.id) === currentUserId && purpose === 'profile-phone') {
+        return refreshAndRespond(400, { message: '这个手机号已经绑定在当前账号上，请换一个手机号。' });
       }
 
       const captchaPassed = await verifyCaptcha(captchaId, captchaText, true);
@@ -173,8 +189,8 @@ function registerAuthRoutes(app, ctx) {
       const emailCode = String(req.body.emailCode || '').trim();
       const phone = String(req.body.phone || '').trim() || null;
       const phoneCode = String(req.body.phoneCode || '').trim();
-      if (username.length < 3 || password.length < 6) {
-        return renderRegisterError('用户名至少 3 位，密码至少 6 位。', 'USERNAME_OR_PASSWORD_TOO_SHORT');
+      if (username.length < 1 || password.length < 6) {
+        return renderRegisterError('用户名不能为空，密码至少 6 位。', 'USERNAME_OR_PASSWORD_TOO_SHORT');
       }
 
       const existingUser = await findUserByUsername(username);
@@ -242,7 +258,9 @@ function registerAuthRoutes(app, ctx) {
         ...registerLogMeta(),
         userId,
       });
-      req.session.user = { id: userId, username, role: 'user' };
+      req.session.user = { id: userId, publicId: null, username, role: 'user' };
+      const registeredUser = await findUserById(userId);
+      req.session.user.publicId = registeredUser?.public_id || null;
       return res.redirect('/dashboard');
     } catch (error) {
       logger.error('Register request failed', {
@@ -296,7 +314,7 @@ function registerAuthRoutes(app, ctx) {
         ...buildLoginLogMeta(req, { login }),
         userId: user.id,
       });
-      req.session.user = { id: user.id, username: user.username, role: user.role || 'user' };
+      req.session.user = { id: user.id, publicId: user.public_id || null, username: user.username, role: user.role || 'user' };
       return res.redirect('/dashboard');
     } catch (error) {
       logger.error('Login request failed', {
@@ -335,9 +353,11 @@ function registerAuthRoutes(app, ctx) {
       if (!user) {
         return req.session.destroy(() => res.redirect('/login'));
       }
+      const nextCaptcha = await createCaptcha();
       renderPage(res, 'profile', {
         title: '个人资料',
         user,
+        captcha: nextCaptcha,
         formMessage: '',
         formStatus: '',
       });
@@ -355,34 +375,101 @@ function registerAuthRoutes(app, ctx) {
         return req.session.destroy(() => res.redirect('/login'));
       }
 
-      const renderProfileMessage = (message, status = 'error', targetUser = user) => renderPage(res, 'profile', {
+      const renderProfileMessage = async (message, status = 'error', targetUser = user) => renderPage(res, 'profile', {
         title: '个人资料',
         user: targetUser,
+        captcha: await createCaptcha(),
         formMessage: message,
         formStatus: status,
       });
 
       if (action === 'username') {
         const username = String(req.body.username || '').trim();
-        if (username.length < 3) {
-          return renderProfileMessage('用户名至少 3 位。');
+        if (!username) {
+          return await renderProfileMessage('用户名不能为空。');
         }
         if (username.length > 50) {
-          return renderProfileMessage('用户名不能超过 50 位。');
+          return await renderProfileMessage('用户名不能超过 50 位。');
         }
         if (username === user.username) {
-          return renderProfileMessage('新用户名和当前用户名一样，就别折腾啦。', 'info');
+          return await renderProfileMessage('新用户名和当前用户名一样，就别折腾啦。', 'info');
         }
 
         const existedUser = await findUserByUsername(username);
         if (existedUser && Number(existedUser.id) !== Number(userId)) {
-          return renderProfileMessage('这个用户名已经有人用了。');
+          return await renderProfileMessage('这个用户名已经有人用了。');
         }
 
         await updateUsername(userId, username);
         req.session.user.username = username;
         const refreshedUser = await findUserById(userId);
-        return renderProfileMessage('用户名改好了。', 'success', refreshedUser);
+        return await renderProfileMessage('用户名改好了。', 'success', refreshedUser);
+      }
+
+      if (action === 'email') {
+        const email = String(req.body.email || '').trim().toLowerCase();
+        const emailCode = String(req.body.emailCode || '').trim();
+
+        if (!email || !isEmail(email)) {
+          return await renderProfileMessage('请输入有效邮箱。');
+        }
+        const existedUser = await findUserByEmail(email);
+        if (existedUser && Number(existedUser.id) !== Number(userId)) {
+          return await renderProfileMessage('这个邮箱已经被绑定了。');
+        }
+        if (email === String(user.email || '').toLowerCase()) {
+          return await renderProfileMessage('这个邮箱已经在当前账号上。', 'info');
+        }
+        const emailOk = await verifyEmailCode(email, emailCode);
+        if (!emailOk) {
+          return await renderProfileMessage('邮箱验证码错误或已失效。');
+        }
+
+        await updateUserEmail(userId, email, 1);
+        const refreshedUser = await findUserById(userId);
+        return await renderProfileMessage(user.email ? '邮箱已经切换好了。' : '邮箱已经绑定好了。', 'success', refreshedUser);
+      }
+
+      if (action === 'unbindEmail') {
+        if (!user.email) {
+          return await renderProfileMessage('当前没有绑定邮箱。', 'info');
+        }
+        await unbindUserEmail(userId);
+        const refreshedUser = await findUserById(userId);
+        return await renderProfileMessage('邮箱已经解绑。', 'success', refreshedUser);
+      }
+
+      if (action === 'phone') {
+        const phone = String(req.body.phone || '').trim();
+        const phoneCode = String(req.body.phoneCode || '').trim();
+
+        if (!phone || !isDomesticPhone(phone)) {
+          return await renderProfileMessage('请输入正确的国内手机号。');
+        }
+        const existedUser = await findUserByPhone(phone);
+        if (existedUser && Number(existedUser.id) !== Number(userId)) {
+          return await renderProfileMessage('这个手机号已经被绑定了。');
+        }
+        if (phone === String(user.phone || '')) {
+          return await renderProfileMessage('这个手机号已经在当前账号上。', 'info');
+        }
+        const phoneOk = await verifyPhoneCode(phone, phoneCode);
+        if (!phoneOk) {
+          return await renderProfileMessage('短信验证码错误或已失效。');
+        }
+
+        await updateUserPhone(userId, phone, 1);
+        const refreshedUser = await findUserById(userId);
+        return await renderProfileMessage(user.phone ? '手机号已经切换好了。' : '手机号已经绑定好了。', 'success', refreshedUser);
+      }
+
+      if (action === 'unbindPhone') {
+        if (!user.phone) {
+          return await renderProfileMessage('当前没有绑定手机号。', 'info');
+        }
+        await unbindUserPhone(userId);
+        const refreshedUser = await findUserById(userId);
+        return await renderProfileMessage('手机号已经解绑。', 'success', refreshedUser);
       }
 
       if (action === 'password') {
@@ -391,13 +478,13 @@ function registerAuthRoutes(app, ctx) {
         const confirmPassword = String(req.body.confirmPassword || '').trim();
 
         if (!currentPassword || !newPassword || !confirmPassword) {
-          return renderProfileMessage('改密码这几项得填完整。');
+          return await renderProfileMessage('改密码这几项得填完整。');
         }
         if (newPassword.length < 6) {
-          return renderProfileMessage('新密码至少 6 位。');
+          return await renderProfileMessage('新密码至少 6 位。');
         }
         if (newPassword !== confirmPassword) {
-          return renderProfileMessage('两次输入的新密码不一致。');
+          return await renderProfileMessage('两次输入的新密码不一致。');
         }
 
         const authUser = await findUserAuthById(userId);
@@ -407,21 +494,21 @@ function registerAuthRoutes(app, ctx) {
 
         const isValidPassword = await verifyPassword(currentPassword, authUser.password_hash);
         if (!isValidPassword) {
-          return renderProfileMessage('当前密码不对。');
+          return await renderProfileMessage('当前密码不对。');
         }
 
         const isSamePassword = await verifyPassword(newPassword, authUser.password_hash);
         if (isSamePassword) {
-          return renderProfileMessage('新密码不能和现在这个一样。', 'info');
+          return await renderProfileMessage('新密码不能和现在这个一样。', 'info');
         }
 
         const passwordHash = await hashPassword(newPassword);
         await updatePasswordHash(userId, passwordHash);
         const refreshedUser = await findUserById(userId);
-        return renderProfileMessage('密码已经更新好了。', 'success', refreshedUser);
+        return await renderProfileMessage('密码已经更新好了。', 'success', refreshedUser);
       }
 
-      return renderProfileMessage('不认识这个资料操作。');
+      return await renderProfileMessage('不认识这个资料操作。');
     } catch (error) {
       next(error);
     }

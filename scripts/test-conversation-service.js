@@ -17,9 +17,9 @@ const {
 async function main() {
   const suffix = Date.now();
   const userRow = await query(
-    `INSERT INTO users (username, password_hash, role, status, created_at, updated_at)
-     VALUES (?, 'test', 'user', 'active', NOW(), NOW())`,
-    [`conversation_service_test_${suffix}`],
+    `INSERT INTO users (public_id, username, password_hash, role, status, created_at, updated_at)
+     VALUES (?, ?, 'test', 'user', 'active', NOW(), NOW())`,
+    [`8${String(suffix).slice(-8)}`, `conversation_service_test_${suffix}`],
   );
   const userId = userRow.insertId;
   const characterRow = await query(

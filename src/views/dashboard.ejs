@@ -10,82 +10,176 @@
   const hasQuota = Boolean(quota && quota.usage);
   const isAdmin = user.role === 'admin';
   const isActive = user.status === 'active';
+  const publicId = user.public_id || user.publicId || '—';
   const safeNum = (value) => {
     const num = Number(value || 0);
     return Number.isFinite(num) ? num : 0;
   };
+  const formatNum = (value) => safeNum(value).toLocaleString('zh-CN');
   const publicCharacterCount = characterList.filter((character) => character.visibility !== 'private').length;
   const privateCharacterCount = characterList.filter((character) => character.visibility === 'private').length;
   const requestQuotaTotal = hasQuota ? safeNum(quota.usage.usedRequests) + safeNum(quota.remainingRequests) : 0;
   const tokenQuotaTotal = hasQuota ? safeNum(quota.usage.usedTokens) + safeNum(quota.remainingTokens) : 0;
   const requestUsagePercent = requestQuotaTotal > 0 ? Math.min(100, Math.round((safeNum(quota.usage.usedRequests) / requestQuotaTotal) * 100)) : 0;
   const tokenUsagePercent = tokenQuotaTotal > 0 ? Math.min(100, Math.round((safeNum(quota.usage.usedTokens) / tokenQuotaTotal) * 100)) : 0;
+  const latestConversation = conversationList[0];
+  const accountInitial = String(user.username || 'L').slice(0, 1).toUpperCase();
 %>
 
 <div class="dashboard-shell">
-  <section class="hero-card dashboard-hero">
-    <div class="dashboard-hero-copy">
-      <div class="section-kicker">控制台</div>
+  <section class="dashboard-hero-card">
+    <div class="dashboard-welcome">
+      <div class="section-kicker">Dashboard</div>
       <h1><%= t('欢迎回来，{username}', { username: user.username }) %></h1>
-      <p>这里把账号状态、角色和最近会话都收拢到一页里了。先看状态，再决定是继续聊、补角色，还是顺手整理一下自己的空间。</p>
+      <p>你的角色、会话、额度和账号状态都在这里。先看总览，再继续创作或回到最近的故事里。</p>
       <div class="dashboard-actions">
         <a class="quick-link" href="/characters/new"><%= t('创建新角色') %></a>
-        <a class="quick-link" href="/">逛公开角色</a>
-        <% if (conversationList.length > 0) { %>
-          <a class="quick-link" href="/chat/<%= conversationList[0].id %>"><%= t('继续最近会话') %></a>
+        <% if (latestConversation) { %>
+          <a class="quick-link" href="/chat/<%= latestConversation.id %>"><%= t('继续最近会话') %></a>
         <% } %>
+        <a class="quick-link" href="/">逛公开角色</a>
+        <a class="quick-link" href="/profile">个人资料</a>
       </div>
     </div>
 
-    <div class="hero-meta dashboard-hero-meta">
-      <div class="hero-stat">
-        <strong>账号身份</strong>
-        <span><%= t(isAdmin ? '管理员' : '普通用户') %> · <%= t(isActive ? '状态正常' : '当前受限') %></span>
+    <aside class="dashboard-account-card">
+      <div class="dashboard-avatar" aria-hidden="true"><%= accountInitial %></div>
+      <div>
+        <strong><%= user.username %></strong>
+        <span>ID <%= publicId %></span>
       </div>
-      <div class="hero-stat">
-        <strong>当前套餐</strong>
-        <span><%= hasSubscription ? subscription.plan_name : t('还没有绑定套餐') %></span>
+      <div class="dashboard-account-pills">
+        <em class="status-pill <%= isActive ? 'status-pill--ok' : 'status-pill--warn' %>"><%= t(isActive ? '状态正常' : '当前受限') %></em>
+        <em class="status-pill <%= isAdmin ? 'status-pill--admin' : 'status-pill--muted' %>"><%= t(isAdmin ? '管理员' : '普通用户') %></em>
       </div>
-      <div class="hero-stat">
-        <strong>最近可做的事</strong>
-        <span><%= t(conversationList.length > 0 ? '接着上次会话往下聊，或者回头整理角色设定。' : '先写一个角色，再开始第一段对话。') %></span>
-      </div>
-    </div>
+    </aside>
+  </section>
+
+  <section class="dashboard-command-grid" aria-label="快捷操作">
+    <a class="command-card command-card--primary" href="/characters/new">
+      <span>New</span>
+      <strong>创建角色</strong>
+      <small>写设定、补人格、开始新的故事。</small>
+    </a>
+    <a class="command-card" href="/">
+      <span>Explore</span>
+      <strong>公开角色</strong>
+      <small>看看其他公开角色，找点灵感。</small>
+    </a>
+    <% if (latestConversation) { %>
+      <a class="command-card" href="/chat/<%= latestConversation.id %>">
+        <span>Continue</span>
+        <strong>继续会话</strong>
+        <small><%= latestConversation.character_name %> · <%= latestConversation.title || t('未命名对话') %></small>
+      </a>
+    <% } else { %>
+      <a class="command-card" href="/characters/new">
+        <span>Start</span>
+        <strong>开始第一段会话</strong>
+        <small>先创建角色，再让故事开口。</small>
+      </a>
+    <% } %>
+    <% if (isAdmin) { %>
+      <a class="command-card" href="/admin">
+        <span>Admin</span>
+        <strong>管理后台</strong>
+        <small>用户、套餐、日志和供应商配置。</small>
+      </a>
+    <% } else { %>
+      <a class="command-card" href="/profile">
+        <span>Profile</span>
+        <strong>完善资料</strong>
+        <small>绑定邮箱/手机号，维护登录方式。</small>
+      </a>
+    <% } %>
   </section>
 
   <section class="dashboard-stats">
     <article class="stat-card">
-      <strong><%= characterList.length %></strong>
-      <span>我的角色总数</span>
+      <span>我的角色</span>
+      <strong><%= formatNum(characterList.length) %></strong>
+      <small><%= t('公开 {publicCount} / 私有 {privateCount}', { publicCount: publicCharacterCount, privateCount: privateCharacterCount }) %></small>
     </article>
     <article class="stat-card">
-      <strong><%= publicCharacterCount %> / <%= privateCharacterCount %></strong>
-      <span>公开 / 私有角色</span>
+      <span>累计会话</span>
+      <strong><%= formatNum(conversationList.length) %></strong>
+      <small><%= latestConversation ? t('最近更新：{updatedAt}', { updatedAt: latestConversation.updated_at }) : '还没有会话' %></small>
     </article>
     <article class="stat-card">
-      <strong><%= conversationList.length %></strong>
-      <span>累计会话数</span>
-    </article>
-    <article class="stat-card">
+      <span>当前套餐</span>
       <strong><%= hasSubscription ? subscription.plan_name : t('未配置') %></strong>
-      <span><%= hasSubscription ? t('计费方式：{billingMode}', { billingMode: subscription.billing_mode }) : t('需要管理员先给你绑定套餐') %></span>
+      <small><%= hasSubscription ? t('计费方式：{billingMode}', { billingMode: subscription.billing_mode }) : t('需要管理员先给你绑定套餐') %></small>
+    </article>
+    <article class="stat-card">
+      <span>请求使用率</span>
+      <strong><%= requestUsagePercent %>%</strong>
+      <small><%= hasQuota ? t('剩余请求：{count}', { count: formatNum(quota.remainingRequests) }) : '暂无配额快照' %></small>
     </article>
   </section>
 
   <section class="dashboard-grid">
-    <div class="dashboard-column">
-      <section class="panel dashboard-section">
-        <div class="section-heading">
+    <main class="dashboard-main-column">
+      <section class="panel dashboard-section dashboard-section--featured">
+        <div class="section-heading dashboard-section-heading">
           <div>
-            <div class="section-kicker">角色</div>
+            <div class="section-kicker">Conversations</div>
+            <h2>最近会话</h2>
+            <p>从最近更新的地方继续，少一点翻找，多一点进入状态。</p>
+          </div>
+          <% if (latestConversation) { %>
+            <a class="quick-link" href="/chat/<%= latestConversation.id %>"><%= t('继续最新会话') %></a>
+          <% } %>
+        </div>
+
+        <% if (conversationList.length === 0) { %>
+          <div class="empty-panel dashboard-empty-state">
+            还没有会话。挑一个角色，先说第一句话吧。
+            <div class="dashboard-empty-actions">
+              <a class="quick-link" href="/characters/new">先创建角色</a>
+              <a class="quick-link" href="/">逛公开角色</a>
+            </div>
+          </div>
+        <% } else { %>
+          <div class="conversation-timeline">
+            <% conversationList.forEach((conversation, index) => { %>
+              <article class="timeline-item <%= index === 0 ? 'is-latest' : '' %>">
+                <div class="timeline-dot" aria-hidden="true"></div>
+                <div class="timeline-card">
+                  <div class="timeline-card-head">
+                    <div>
+                      <h3><%= conversation.character_name %></h3>
+                      <p><%= conversation.title || t('未命名对话') %></p>
+                    </div>
+                    <span class="meta-pill"><%= index === 0 ? '最新' : t('对话 #{id}', { id: conversation.id }) %></span>
+                  </div>
+                  <div class="dashboard-item-meta">
+                    <span><%= t('最近更新：{updatedAt}', { updatedAt: conversation.updated_at }) %></span>
+                  </div>
+                  <div class="dashboard-actions-row">
+                    <a class="quick-link" href="/chat/<%= conversation.id %>"><%= t('进入对话') %></a>
+                    <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>');">
+                      <button class="inline-btn is-danger" type="submit">删除对话</button>
+                    </form>
+                  </div>
+                </div>
+              </article>
+            <% }) %>
+          </div>
+        <% } %>
+      </section>
+
+      <section class="panel dashboard-section">
+        <div class="section-heading dashboard-section-heading">
+          <div>
+            <div class="section-kicker">Characters</div>
             <h2>我的角色</h2>
-            <p>公开、私有、编辑入口都放在这里，不用再来回翻页面。</p>
+            <p>公开、私有、编辑和开聊入口放在一起，整理起来更顺手。</p>
           </div>
           <a class="quick-link" href="/characters/new">新建角色</a>
         </div>
 
         <% if (characterList.length === 0) { %>
-          <div class="empty-panel">
+          <div class="empty-panel dashboard-empty-state">
             你还没有创建角色。先去写一个有灵魂的名字，再慢慢把设定补完整。
             <div class="dashboard-empty-actions">
               <a class="quick-link" href="/characters/new">现在创建</a>
@@ -93,23 +187,19 @@
             </div>
           </div>
         <% } else { %>
-          <div class="dashboard-list">
+          <div class="character-card-grid">
             <% characterList.forEach(character => { %>
-              <article class="dashboard-item">
-                <div class="dashboard-item-head">
-                  <div>
-                    <h3><%= character.name %></h3>
-                    <p class="dashboard-item-summary"><%= character.summary || t('这个角色还没有写简介。') %></p>
-                  </div>
-                  <div class="subscription-meta">
-                    <span class="meta-pill"><%= t(character.visibility === 'private' ? '私有' : '公开') %></span>
-                    <span class="meta-pill"><%= t('角色 #{id}', { id: character.id }) %></span>
-                  </div>
+              <article class="character-dashboard-card">
+                <div class="character-card-topline">
+                  <span class="meta-pill"><%= t(character.visibility === 'private' ? '私有' : '公开') %></span>
+                  <span class="meta-pill"><%= t('角色 #{id}', { id: character.id }) %></span>
                 </div>
+                <h3><%= character.name %></h3>
+                <p><%= character.summary || t('这个角色还没有写简介。') %></p>
                 <div class="dashboard-item-meta">
                   <span><%= t('创建时间：{createdAt}', { createdAt: character.created_at }) %></span>
                 </div>
-                <div class="bubble-actions bubble-actions--solid dashboard-actions-row">
+                <div class="dashboard-actions-row character-actions">
                   <a class="quick-link" href="/characters/<%= character.id %>/edit"><%= t('编辑角色') %></a>
                   <form method="POST" action="/conversations/start/<%= character.id %>">
                     <button class="inline-btn" type="submit">进入对话</button>
@@ -123,63 +213,25 @@
           </div>
         <% } %>
       </section>
+    </main>
 
-      <section class="panel dashboard-section">
-        <div class="section-heading">
+    <aside class="dashboard-side-column">
+      <section class="panel dashboard-section compact-section">
+        <div class="section-heading dashboard-section-heading">
           <div>
-            <div class="section-kicker">会话</div>
-            <h2>最近会话</h2>
-            <p>从最近更新的地方继续，不用自己去猜上次停在哪一支。</p>
-          </div>
-        </div>
-
-        <% if (conversationList.length === 0) { %>
-          <div class="empty-panel">
-            还没有会话。挑一个角色，先说第一句话吧。
-          </div>
-        <% } else { %>
-          <div class="dashboard-list">
-            <% conversationList.forEach(conversation => { %>
-              <article class="dashboard-item">
-                <div class="dashboard-item-head">
-                  <div>
-                    <h3><%= conversation.character_name %></h3>
-                    <p class="dashboard-item-summary"><%= t('标题：{title}', { title: conversation.title || t('未命名对话') }) %></p>
-                  </div>
-                  <div class="subscription-meta">
-                    <span class="meta-pill"><%= t('对话 #{id}', { id: conversation.id }) %></span>
-                  </div>
-                </div>
-                <div class="dashboard-item-meta">
-                  <span><%= t('最近更新：{updatedAt}', { updatedAt: conversation.updated_at }) %></span>
-                </div>
-                <div class="bubble-actions bubble-actions--solid dashboard-actions-row">
-                  <a class="quick-link" href="/chat/<%= conversation.id %>"><%= t('进入对话') %></a>
-                  <form method="POST" action="/chat/<%= conversation.id %>/delete" onsubmit="return confirm('<%= t('确认删除这条对话吗？只有没有后续关联的对话才能删除。') %>');">
-                    <button class="inline-btn is-danger" type="submit">删除对话</button>
-                  </form>
-                </div>
-              </article>
-            <% }) %>
-          </div>
-        <% } %>
-      </section>
-    </div>
-
-    <div class="dashboard-column">
-      <section class="panel dashboard-section">
-        <div class="section-heading">
-          <div>
-            <div class="section-kicker">账号</div>
+            <div class="section-kicker">Account</div>
             <h2>账号与套餐</h2>
-            <p>把权限、套餐和额度放在同一个角落里，想查的时候一眼能看完。</p>
+            <p>权限、套餐和关键限制都收在这里。</p>
           </div>
         </div>
 
         <div class="subscription-card">
-          <div>
-            <strong><%= user.username %></strong>
-            <p class="dashboard-note"><%= t(isAdmin ? '管理员账号' : '普通用户账号') %> · <%= t(isActive ? '目前可正常使用' : '当前状态受限') %></p>
+          <div class="subscription-user-row">
+            <div class="mini-avatar"><%= accountInitial %></div>
+            <div>
+              <strong><%= user.username %></strong>
+              <p class="dashboard-note"><%= t(isAdmin ? '管理员账号' : '普通用户账号') %> · <%= t(isActive ? '目前可正常使用' : '当前状态受限') %></p>
+            </div>
           </div>
 
           <% if (hasSubscription) { %>
@@ -188,11 +240,11 @@
               <span class="meta-pill"><%= subscription.billing_mode %></span>
               <span class="meta-pill"><%= t('优先级 {priority}', { priority: subscription.priority_weight }) %></span>
             </div>
-            <ul class="feature-list">
-              <li>并发保障：<strong><%= subscription.concurrency_limit %></strong></li>
-              <li>请求额度：<strong><%= subscription.request_quota %></strong></li>
-              <li>Token 额度：<strong><%= subscription.token_quota %></strong></li>
-              <li>最大输出：<strong><%= subscription.max_output_tokens %></strong></li>
+            <ul class="feature-list dashboard-feature-list">
+              <li><span>并发保障</span><strong><%= formatNum(subscription.concurrency_limit) %></strong></li>
+              <li><span>请求额度</span><strong><%= formatNum(subscription.request_quota) %></strong></li>
+              <li><span>Token 额度</span><strong><%= formatNum(subscription.token_quota) %></strong></li>
+              <li><span>最大输出</span><strong><%= formatNum(subscription.max_output_tokens) %></strong></li>
             </ul>
           <% } else { %>
             <div class="empty-panel">这个账号还没有绑定有效套餐。要继续正常调用模型，得先在后台给你配上。</div>
@@ -200,12 +252,12 @@
         </div>
       </section>
 
-      <section class="panel dashboard-section">
-        <div class="section-heading">
+      <section class="panel dashboard-section compact-section">
+        <div class="section-heading dashboard-section-heading">
           <div>
-            <div class="section-kicker">配额</div>
+            <div class="section-kicker">Quota</div>
             <h2>额度快照</h2>
-            <p>请求和 Token 的消耗分开看，免得一页里全是数字却看不出重点。</p>
+            <p>请求和 Token 分开看，剩余量一眼就能确认。</p>
           </div>
         </div>
 
@@ -214,11 +266,11 @@
             <div class="quota-row">
               <div class="quota-row-head">
                 <span>请求额度</span>
-                <strong><%= safeNum(quota.usage.usedRequests) %> / <%= requestQuotaTotal %></strong>
+                <strong><%= formatNum(quota.usage.usedRequests) %> / <%= formatNum(requestQuotaTotal) %></strong>
               </div>
               <div class="quota-bar"><span style="width: <%= requestUsagePercent %>%"></span></div>
               <div class="dashboard-item-meta">
-                <span><%= t('剩余请求：{count}', { count: safeNum(quota.remainingRequests) }) %></span>
+                <span><%= t('剩余请求：{count}', { count: formatNum(quota.remainingRequests) }) %></span>
                 <span><%= t('已用占比：{percent}%', { percent: requestUsagePercent }) %></span>
               </div>
             </div>
@@ -226,11 +278,11 @@
             <div class="quota-row">
               <div class="quota-row-head">
                 <span><%= t('Token 额度') %></span>
-                <strong><%= safeNum(quota.usage.usedTokens) %> / <%= tokenQuotaTotal %></strong>
+                <strong><%= formatNum(quota.usage.usedTokens) %> / <%= formatNum(tokenQuotaTotal) %></strong>
               </div>
               <div class="quota-bar"><span style="width: <%= tokenUsagePercent %>%"></span></div>
               <div class="dashboard-item-meta">
-                <span><%= t('剩余 Token：{count}', { count: safeNum(quota.remainingTokens) }) %></span>
+                <span><%= t('剩余 Token：{count}', { count: formatNum(quota.remainingTokens) }) %></span>
                 <span><%= t('已用占比：{percent}%', { percent: tokenUsagePercent }) %></span>
               </div>
             </div>
@@ -240,26 +292,27 @@
         <% } %>
       </section>
 
-      <section class="panel dashboard-section">
-        <div class="section-heading">
+      <section class="panel dashboard-section compact-section">
+        <div class="section-heading dashboard-section-heading">
           <div>
-            <div class="section-kicker">快捷入口</div>
+            <div class="section-kicker">Next</div>
             <h2>接下来做什么</h2>
-            <p>把高频动作留在右边，少折腾几次跳转。</p>
+            <p>把高频动作放在手边，少跳几次页面。</p>
           </div>
         </div>
 
         <div class="dashboard-shortcuts">
-          <a class="quick-link" href="/characters/new">写一个新角色</a>
-          <% if (conversationList.length > 0) { %>
-            <a class="quick-link" href="/chat/<%= conversationList[0].id %>"><%= t('继续最新会话') %></a>
+          <a class="shortcut-row" href="/characters/new"><span>＋</span><strong>写一个新角色</strong></a>
+          <% if (latestConversation) { %>
+            <a class="shortcut-row" href="/chat/<%= latestConversation.id %>"><span>↗</span><strong><%= t('继续最新会话') %></strong></a>
           <% } %>
+          <a class="shortcut-row" href="/profile"><span>◎</span><strong>完善个人资料</strong></a>
           <% if (isAdmin) { %>
-            <a class="quick-link" href="/admin">去管理后台</a>
+            <a class="shortcut-row" href="/admin"><span>⚙</span><strong>去管理后台</strong></a>
           <% } %>
-          <a class="quick-link" href="/">回首页看看</a>
+          <a class="shortcut-row" href="/"><span>⌂</span><strong>回首页看看</strong></a>
         </div>
       </section>
-    </div>
+    </aside>
   </section>
 </div>

@@ -7,7 +7,7 @@ const { query } = require('../lib/db');
 
 async function listUsersWithPlans() {
   return query(
-    `SELECT u.id, u.username, u.nickname, u.email, u.phone, u.role, u.status,
+    `SELECT u.id, u.public_id, u.username, u.nickname, u.email, u.phone, u.role, u.status,
             u.country_type, u.created_at,
             p.name AS plan_name, p.code AS plan_code, p.billing_mode,
             p.priority_weight, p.concurrency_limit

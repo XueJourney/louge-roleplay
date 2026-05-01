@@ -21,6 +21,7 @@
 'use strict';
 
 const mysql = require('mysql2/promise');
+const crypto = require('node:crypto');
 const config = require('../src/config');
 
 function getDatabaseNameFromUrl(databaseUrl) {
@@ -53,6 +54,44 @@ function maskApiKey(apiKey = '') {
   if (!raw) return '';
   if (raw.length <= 8) return `${raw.slice(0, 2)}***${raw.slice(-2)}`;
   return `${raw.slice(0, 4)}***${raw.slice(-4)}`;
+}
+
+function getRandomDigits(length) {
+  let value = String(crypto.randomInt(1, 10));
+  while (value.length < length) {
+    value += String(crypto.randomInt(0, 10));
+  }
+  return value;
+}
+
+async function backfillUserPublicIds(connection) {
+  const [users] = await connection.query("SELECT id FROM users WHERE public_id IS NULL OR public_id = '' ORDER BY id ASC");
+  if (!users.length) {
+    return;
+  }
+
+  const exists = async (candidate) => {
+    const [rows] = await connection.query('SELECT id FROM users WHERE public_id = ? LIMIT 1', [candidate]);
+    return rows.length > 0;
+  };
+
+  for (const user of users) {
+    let publicId = '';
+    for (let digits = 3; !publicId; digits += 1) {
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        const candidate = getRandomDigits(digits);
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await exists(candidate))) {
+          publicId = candidate;
+          break;
+        }
+      }
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await connection.query('UPDATE users SET public_id = ?, updated_at = NOW() WHERE id = ?', [publicId, user.id]);
+  }
+
+  console.log(`[init-db]   + 已为 ${users.length} 个历史用户补齐公开 ID`);
 }
 
 // ─── SQLite 模式：提示并退出 ──────────────────────────────────────────────────
@@ -153,6 +192,7 @@ async function main() {
   await connection.query(`
     CREATE TABLE IF NOT EXISTS users (
       id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+      public_id     VARCHAR(32) NULL,
       username      VARCHAR(50) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
       nickname      VARCHAR(80) NULL,
@@ -167,6 +207,7 @@ async function main() {
       updated_at    DATETIME NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  await ensureColumn('users', 'public_id',      'public_id VARCHAR(32) NULL AFTER id');
   await ensureColumn('users', 'email',          'email VARCHAR(120) NULL');
   await ensureColumn('users', 'phone',          'phone VARCHAR(30) NULL');
   await ensureColumn('users', 'country_type',   "country_type ENUM('domestic','international') NOT NULL DEFAULT 'domestic'");
@@ -176,6 +217,8 @@ async function main() {
   await ensureColumn('users', 'status',         "status ENUM('active','blocked') NOT NULL DEFAULT 'active'");
   await ensureUniqueIndex('users', 'uniq_users_email', 'email');
   await ensureUniqueIndex('users', 'uniq_users_phone', 'phone');
+  await backfillUserPublicIds(connection);
+  await ensureUniqueIndex('users', 'uniq_users_public_id', 'public_id');
 
   // ── 套餐表 ───────────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 plans 表...');

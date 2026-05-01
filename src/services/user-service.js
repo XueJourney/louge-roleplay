@@ -23,6 +23,12 @@
 
 const { query, withTransaction } = require('../lib/db');
 const { assignDefaultPlanToUser } = require('./plan-service');
+const { generateUniqueUserPublicId } = require('../lib/user-public-id');
+
+async function findUserByPublicId(publicId) {
+  const rows = await query('SELECT * FROM users WHERE public_id = ? LIMIT 1', [String(publicId || '').trim()]);
+  return rows[0] || null;
+}
 
 /**
  * 创建新用户，并在同一事务内为其分配默认套餐。
@@ -55,23 +61,36 @@ async function createUser({
   role = 'user',
   status = 'active',
 }) {
-  return withTransaction(async (conn) => {
-    const [result] = await conn.execute(
-      `INSERT INTO users (
-        username, password_hash, email, phone, country_type,
-        email_verified, phone_verified, role, status,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [username, passwordHash, email, phone, countryType, emailVerified, phoneVerified, role, status],
-    );
+  for (let retry = 0; retry < 5; retry += 1) {
+    const publicId = await generateUniqueUserPublicId(async (candidate) => Boolean(await findUserByPublicId(candidate)));
 
-    const userId = result.insertId;
+    try {
+      return await withTransaction(async (conn) => {
+        const [result] = await conn.execute(
+          `INSERT INTO users (
+            public_id, username, password_hash, email, phone, country_type,
+            email_verified, phone_verified, role, status,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+          [publicId, username, passwordHash, email, phone, countryType, emailVerified, phoneVerified, role, status],
+        );
 
-    // 在同一事务内分配默认套餐，保证用户创建后一定有可用的配额
-    await assignDefaultPlanToUser(conn, userId);
+        const userId = result.insertId;
 
-    return userId;
-  });
+        // 在同一事务内分配默认套餐，保证用户创建后一定有可用的配额
+        await assignDefaultPlanToUser(conn, userId);
+
+        return userId;
+      });
+    } catch (error) {
+      if (/public_id|uniq_users_public_id|duplicate/i.test(String(error?.message || '')) && retry < 4) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error('Unable to allocate unique user ID');
 }
 
 /**
@@ -132,7 +151,7 @@ async function findUserByLogin(login) {
 async function findUserById(id) {
   const rows = await query(
     `SELECT
-       id, username, nickname, email, phone, country_type,
+       id, public_id, username, nickname, email, phone, country_type,
        email_verified, phone_verified, role, status, created_at
      FROM users
      WHERE id = ?
@@ -151,7 +170,7 @@ async function findUserById(id) {
 async function findUserAuthById(id) {
   const rows = await query(
     `SELECT
-       id, username, password_hash, email, phone, role, status, created_at, updated_at
+       id, public_id, username, password_hash, email, phone, role, status, created_at, updated_at
      FROM users
      WHERE id = ?
      LIMIT 1`,
@@ -182,6 +201,22 @@ async function updatePasswordHash(userId, passwordHash) {
   await query('UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?', [passwordHash, userId]);
 }
 
+async function updateUserEmail(userId, email, verified = 1) {
+  await query('UPDATE users SET email = ?, email_verified = ?, updated_at = NOW() WHERE id = ?', [email, verified ? 1 : 0, userId]);
+}
+
+async function unbindUserEmail(userId) {
+  await query('UPDATE users SET email = NULL, email_verified = 0, updated_at = NOW() WHERE id = ?', [userId]);
+}
+
+async function updateUserPhone(userId, phone, verified = 1) {
+  await query('UPDATE users SET phone = ?, phone_verified = ?, updated_at = NOW() WHERE id = ?', [phone, verified ? 1 : 0, userId]);
+}
+
+async function unbindUserPhone(userId) {
+  await query('UPDATE users SET phone = NULL, phone_verified = 0, updated_at = NOW() WHERE id = ?', [userId]);
+}
+
 /**
  * 更新用户角色（仅管理员操作）。
  *
@@ -195,6 +230,7 @@ async function updateUserRole(userId, role) {
 
 module.exports = {
   createUser,
+  findUserByPublicId,
   findUserByUsername,
   findUserByEmail,
   findUserByPhone,
@@ -204,4 +240,8 @@ module.exports = {
   updateUserRole,
   updateUsername,
   updatePasswordHash,
+  updateUserEmail,
+  unbindUserEmail,
+  updateUserPhone,
+  unbindUserPhone,
 };

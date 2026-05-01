@@ -17,7 +17,7 @@ const {
   getCaptchaImage,
   verifyCaptcha,
 } = require('../services/captcha-service');
-const { createUser, findUserByUsername, findUserByEmail, findUserByPhone, findUserByLogin, findUserById, findUserAuthById, updateUserRole, updateUsername, updatePasswordHash } = require('../services/user-service');
+const { createUser, findUserByUsername, findUserByEmail, findUserByPhone, findUserByLogin, findUserById, findUserAuthById, updateUserRole, updateUsername, updatePasswordHash, updateUserEmail, unbindUserEmail, updateUserPhone, unbindUserPhone } = require('../services/user-service');
 const { createCharacter, updateCharacter, listPublicCharacters, listUserCharacters, getCharacterById, deleteCharacterSafely } = require('../services/character-service');
 const { listPlans, findPlanById, createPlan, updatePlan, deletePlan, getActiveSubscriptionForUser, getUserQuotaSnapshot, updateUserPlan } = require('../services/plan-service');
 const { listUsersWithPlans, getAdminOverview } = require('../services/admin-service');
@@ -360,6 +360,10 @@ function registerWebRoutes(app) {
     updateUserRole,
     updateUsername,
     updatePasswordHash,
+    updateUserEmail,
+    unbindUserEmail,
+    updateUserPhone,
+    unbindUserPhone,
     createCharacter,
     updateCharacter,
     listPublicCharacters,

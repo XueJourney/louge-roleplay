@@ -41,7 +41,8 @@
       <div class="field-grid">
         <div class="field-group">
           <label for="username">用户名</label>
-          <input id="username" name="username" maxlength="50" required placeholder="至少 3 位" value="<%= form.username || '' %>" />
+          <input id="username" name="username" maxlength="50" required placeholder="输入想使用的用户名" value="<%= form.username || '' %>" />
+          <div class="subtle-note">用户名不再限制三位以上，只校验非空和唯一；账号唯一 ID 由系统随机生成。</div>
         </div>
         <div class="field-group">
           <label for="password">密码</label>

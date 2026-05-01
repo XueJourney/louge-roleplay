@@ -193,12 +193,10 @@ function initSQLite() {
 
   logger.info('[db] SQLite 数据库已打开', { path: dbPath, isNewDatabase });
 
-  if (isNewDatabase) {
-    // 首次创建：运行完整 schema 初始化（建表 + 种子数据）
-    const { initSqliteSchema } = require('./db-sqlite-schema');
-    initSqliteSchema(db);
-    logger.info('[db] SQLite 表结构与种子数据初始化完成');
-  }
+  // 首次创建或历史库升级：运行幂等 schema 初始化（建表 + 补列 + 种子数据）
+  const { initSqliteSchema } = require('./db-sqlite-schema');
+  initSqliteSchema(db);
+  logger.info('[db] SQLite 表结构检查完成', { initialized: isNewDatabase });
 
   return db;
 }
