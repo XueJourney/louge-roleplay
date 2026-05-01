@@ -51,6 +51,7 @@ function buildPlanModelLabel(modelKey, modelId = '') {
 
 function normalizePlanModelItem(item = {}, index = 0, options = {}) {
   const fallbackProviderId = normalizeProviderId(options.fallbackProviderId || null);
+  const presetModelId = normalizeProviderId(item.presetModelId ?? item.preset_model_id, null);
   const modelKey = normalizeModelKey(item.modelKey ?? item.model_key ?? item.mode ?? item.key, index === 0 ? DEFAULT_MODEL_KEY : `model-${index + 1}`);
   const modelId = String(item.modelId ?? item.model_id ?? item.hiddenModelId ?? item.model ?? '').trim();
   if (!modelId) {
@@ -61,6 +62,8 @@ function normalizePlanModelItem(item = {}, index = 0, options = {}) {
   return {
     modelKey,
     label: String(item.label || item.name || '').trim() || buildPlanModelLabel(modelKey, modelId),
+    description: String(item.description || item.modelDescription || item.model_description || '').trim(),
+    presetModelId,
     providerId: normalizeProviderId(item.providerId ?? item.provider_id, fallbackProviderId),
     modelId,
     requestMultiplier,
@@ -107,6 +110,8 @@ function serializePlanModels(items = []) {
   return JSON.stringify(normalizePlanModels(items).map((item) => ({
     modelKey: item.modelKey,
     label: item.label,
+    description: item.description || '',
+    presetModelId: item.presetModelId || null,
     providerId: item.providerId,
     modelId: item.modelId,
     requestMultiplier: item.requestMultiplier,

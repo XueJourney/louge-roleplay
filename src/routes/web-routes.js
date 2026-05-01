@@ -23,6 +23,7 @@ const { listLogEntries } = require('../services/log-service');
 const { DEFAULT_SUPPORT_QR_URL, listNotificationsForAdmin, listActiveNotificationsForUser, createNotification, updateNotification, deleteNotification } = require('../services/notification-service');
 const { getAdminConversationDetail, listAdminConversations, permanentlyDeleteConversation, permanentlyDeleteMessage, restoreConversation, restoreMessage } = require('../services/admin-conversation-service');
 const { listProviders, createProvider, updateProvider } = require('../services/llm-provider-service');
+const { listPresetModels, createPresetModel, updatePresetModel, deletePresetModel } = require('../services/preset-model-service');
 const { parsePlanModelsFromBody } = require('../services/model-form-service');
 const { validatePlanModelsAgainstProviders } = require('../services/plan-model-validation-service');
 const {
@@ -183,6 +184,10 @@ function registerWebRoutes(app) {
     listProviders,
     createProvider,
     updateProvider,
+    listPresetModels,
+    createPresetModel,
+    updatePresetModel,
+    deletePresetModel,
     listPromptBlocks,
     createPromptBlock,
     updatePromptBlock,

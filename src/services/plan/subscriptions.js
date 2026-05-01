@@ -132,6 +132,7 @@ function buildPlanModelOptions(subscription) {
   return (subscription?.planModels || parsePlanModelsJson(subscription?.plan_models_json || '[]')).map((item) => ({
     mode: item.modelKey,
     label: item.label,
+    description: item.description || '',
     enabled: true,
     requestMultiplier: item.requestMultiplier,
     tokenMultiplier: item.tokenMultiplier,

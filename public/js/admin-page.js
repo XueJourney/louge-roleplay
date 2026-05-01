@@ -25,6 +25,23 @@
     row.dataset.planModelInitialized = '1';
     const providerSelect = row.querySelector('[data-plan-model-provider]');
     const modelSelect = row.querySelector('[data-plan-model-select]');
+    const presetSelect = row.querySelector('[data-plan-model-preset]');
+
+    function applyPresetPreview() {
+      if (!presetSelect) return;
+      const option = presetSelect.selectedOptions?.[0];
+      const name = option?.dataset.modelLabel || option?.textContent || '未选择模型';
+      const description = option?.dataset.modelDescription || '暂无描述';
+      const previewName = row.querySelector('[data-plan-model-preview-name]');
+      const previewDesc = row.querySelector('[data-plan-model-preview-desc]');
+      const defaultInput = row.querySelector('[data-plan-model-default]');
+      if (previewName) previewName.textContent = name;
+      if (previewDesc) previewDesc.textContent = description;
+      if (defaultInput) defaultInput.value = presetSelect.value || '';
+    }
+
+    presetSelect?.addEventListener('change', applyPresetPreview);
+    applyPresetPreview();
 
     function applyModelFilter() {
       if (!providerSelect || !modelSelect) return;
@@ -58,13 +75,13 @@
       if (list && list.querySelectorAll('.plan-model-row').length <= 1) {
         row.querySelectorAll('input, select').forEach((field) => {
           if (field.type === 'radio') field.checked = true;
-          else if (field.name === 'planModelKey') field.value = 'standard';
           else if (field.name === 'planModelRequestMultiplier' || field.name === 'planModelTokenMultiplier') field.value = '1';
-          else if (field.tagName === 'SELECT') field.selectedIndex = 0;
+          else if (field.tagName === 'SELECT') field.selectedIndex = field.querySelector('option[value]:not([value=""])') ? Array.from(field.options).findIndex((option) => option.value) : 0;
           else field.value = '';
         });
         syncDefaultValue();
         applyModelFilter();
+        applyPresetPreview();
         return;
       }
       const wasDefault = Boolean(defaultInput?.checked);
@@ -91,6 +108,26 @@
       list.appendChild(row);
       setupPlanModelRow(row);
     });
+  });
+
+  document.querySelectorAll('[data-preset-provider]').forEach((providerSelect) => {
+    const form = providerSelect.closest('form');
+    const modelSelect = form?.querySelector('[data-preset-model-select]');
+    if (!modelSelect) return;
+    function applyPresetModelFilter() {
+      const providerId = String(providerSelect.value || '');
+      let selectedVisible = false;
+      Array.from(modelSelect.options).forEach((option) => {
+        const optionProviderId = String(option.dataset.providerId || '');
+        const visible = !option.value || optionProviderId === providerId;
+        option.hidden = !visible;
+        option.disabled = !visible;
+        if (option.selected && visible) selectedVisible = true;
+      });
+      if (!selectedVisible) modelSelect.value = '';
+    }
+    providerSelect.addEventListener('change', applyPresetModelFilter);
+    applyPresetModelFilter();
   });
 })();
 

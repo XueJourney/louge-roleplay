@@ -17,31 +17,35 @@ function asArray(value) {
   return [value];
 }
 
-function parsePlanModelsFromBody(body = {}) {
-  const modelKeys = asArray(body.planModelKey);
-  const labels = asArray(body.planModelLabel);
-  const providerIds = asArray(body.planModelProviderId);
-  const modelIds = asArray(body.planModelId);
+function parsePlanModelsFromBody(body = {}, presetModels = []) {
+  const presetModelIds = asArray(body.planModelPresetId);
   const requestMultipliers = asArray(body.planModelRequestMultiplier);
   const tokenMultipliers = asArray(body.planModelTokenMultiplier);
-  const defaultKeys = new Set(asArray(body.planModelDefaultKey).map((item) => String(item || '').trim()).filter(Boolean));
-  const maxLength = Math.max(modelKeys.length, labels.length, providerIds.length, modelIds.length, requestMultipliers.length, tokenMultipliers.length);
+  const defaultPresetIds = new Set(asArray(body.planModelDefaultPresetId).map((item) => String(item || '').trim()).filter(Boolean));
+  const presetById = new Map((Array.isArray(presetModels) ? presetModels : []).map((preset) => [String(preset.id), preset]));
+  const maxLength = Math.max(presetModelIds.length, requestMultipliers.length, tokenMultipliers.length);
   const items = [];
 
   for (let index = 0; index < maxLength; index += 1) {
-    const modelId = String(modelIds[index] || '').trim();
-    if (!modelId) {
+    const presetModelId = String(presetModelIds[index] || '').trim();
+    if (!presetModelId) {
       continue;
     }
-    const modelKey = String(modelKeys[index] || '').trim();
+    const preset = presetById.get(presetModelId);
+    if (!preset) {
+      items.push({ presetModelId });
+      continue;
+    }
     items.push({
-      modelKey,
-      label: String(labels[index] || '').trim(),
-      providerId: providerIds[index],
-      modelId,
+      presetModelId: Number(preset.id),
+      modelKey: preset.model_key,
+      label: preset.name,
+      description: preset.description || '',
+      providerId: preset.provider_id,
+      modelId: preset.model_id,
       requestMultiplier: requestMultipliers[index],
       tokenMultiplier: tokenMultipliers[index] || requestMultipliers[index],
-      isDefault: defaultKeys.has(modelKey) || (!defaultKeys.size && items.length === 0),
+      isDefault: defaultPresetIds.has(presetModelId) || (!defaultPresetIds.size && items.length === 0),
       sortOrder: index * 10,
     });
   }

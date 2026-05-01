@@ -25,10 +25,11 @@ function registerAdminPlanRoutes(app, ctx) {
 
   app.get('/admin/plans', requireAdmin, async (req, res, next) => {
     try {
-      const [overview, plans, providers] = await Promise.all([
+      const [overview, plans, providers, presetModels] = await Promise.all([
         getAdminOverview(),
         listPlans(),
         listProviders(),
+        ctx.listPresetModels({ includeDisabled: true }),
       ]);
 
       renderPage(res, 'admin-plans', {
@@ -36,6 +37,7 @@ function registerAdminPlanRoutes(app, ctx) {
         overview,
         plans,
         providers,
+        presetModels,
       });
     } catch (error) {
       next(error);
@@ -50,14 +52,15 @@ function registerAdminPlanRoutes(app, ctx) {
         return renderValidationMessage(res, '新增套餐时，code 和 name 不能为空。');
       }
 
-      const planModels = parsePlanModelsFromBody(req.body);
+      const presetModels = await ctx.listPresetModels({ includeDisabled: false });
+      const planModels = parsePlanModelsFromBody(req.body, presetModels);
       if (!planModels.length) {
         return renderValidationMessage(res, '每个套餐至少要配置一个可用模型。');
       }
       try {
         await validatePlanModelsAgainstProviders(planModels);
       } catch (error) {
-        return renderValidationMessage(res, '套餐模型配置无效：请确认已配置 Provider，并且每行模型都来自所选 Provider。');
+        return renderValidationMessage(res, '套餐模型配置无效：请确认已在「预设模型」里启用模型，然后在套餐中选择预设模型。');
       }
 
       await createPlan({
@@ -93,14 +96,15 @@ function registerAdminPlanRoutes(app, ctx) {
         return renderValidationMessage(res, '套餐不存在。');
       }
 
-      const planModels = parsePlanModelsFromBody(req.body);
+      const presetModels = await ctx.listPresetModels({ includeDisabled: false });
+      const planModels = parsePlanModelsFromBody(req.body, presetModels);
       if (!planModels.length) {
         return renderValidationMessage(res, '每个套餐至少要配置一个可用模型。');
       }
       try {
         await validatePlanModelsAgainstProviders(planModels);
       } catch (error) {
-        return renderValidationMessage(res, '套餐模型配置无效：请确认已配置 Provider，并且每行模型都来自所选 Provider。');
+        return renderValidationMessage(res, '套餐模型配置无效：请确认已在「预设模型」里启用模型，然后在套餐中选择预设模型。');
       }
 
       await updatePlan(planId, {

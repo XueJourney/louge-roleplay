@@ -56,6 +56,110 @@ function maskApiKey(apiKey = '') {
   return `${raw.slice(0, 4)}***${raw.slice(-4)}`;
 }
 
+function normalizeModelKey(value, fallback = 'model') {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64);
+  return normalized || fallback;
+}
+
+function buildPresetModelLabel(modelId = '') {
+  const tail = String(modelId || 'model').split('/').pop() || 'model';
+  return tail.replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function mergePresetLabels(labels = [], fallback = '') {
+  const unique = [...new Set(labels.map((item) => String(item || '').trim()).filter(Boolean))];
+  if (!unique.length) return fallback;
+  return unique.length === 1 ? unique[0] : unique.slice(0, 3).join(' / ');
+}
+
+async function migratePresetModelsFromPlans(connection) {
+  const [presetRows] = await connection.query('SELECT id, provider_id, model_id FROM preset_models');
+  const existingBySignature = new Map((presetRows || []).map((preset) => [`${Number(preset.provider_id || 0)}::${String(preset.model_id || '').trim()}`, preset]));
+  const [plans] = await connection.query('SELECT id, plan_models_json FROM plans ORDER BY id ASC');
+  const groups = new Map();
+
+  (plans || []).forEach((plan) => {
+    let items = [];
+    try {
+      const parsed = JSON.parse(String(plan.plan_models_json || '[]'));
+      items = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      items = [];
+    }
+    items.forEach((item) => {
+      const providerId = Number(item.providerId ?? item.provider_id ?? 0);
+      const modelId = String(item.modelId ?? item.model_id ?? '').trim();
+      if (!providerId || !modelId) return;
+      const signature = `${providerId}::${modelId}`;
+      if (!groups.has(signature)) {
+        groups.set(signature, { providerId, modelId, modelKeys: [], labels: [], descriptions: [], planIds: [] });
+      }
+      const group = groups.get(signature);
+      group.modelKeys.push(item.modelKey ?? item.model_key ?? '');
+      group.labels.push(item.label ?? item.name ?? '');
+      group.descriptions.push(item.description ?? item.modelDescription ?? item.model_description ?? '');
+      group.planIds.push(Number(plan.id));
+    });
+  });
+
+  let created = 0;
+  let updatedPlans = 0;
+
+  for (const group of groups.values()) {
+    const signature = `${group.providerId}::${group.modelId}`;
+    if (existingBySignature.has(signature)) continue;
+    const name = mergePresetLabels(group.labels, buildPresetModelLabel(group.modelId));
+    const [result] = await connection.query(
+      `INSERT INTO preset_models (
+         provider_id, model_key, model_id, name, description, status, sort_order, metadata_json, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, 'active', 0, ?, NOW(), NOW())`,
+      [
+        group.providerId,
+        normalizeModelKey(group.modelKeys.find(Boolean) || name || group.modelId),
+        group.modelId,
+        name,
+        mergePresetLabels(group.descriptions, '') || null,
+        JSON.stringify({ migratedFromPlanIds: [...new Set(group.planIds)] }),
+      ],
+    );
+    existingBySignature.set(signature, { id: result.insertId, provider_id: group.providerId, model_id: group.modelId });
+    created += 1;
+  }
+
+  const [freshPresetRows] = await connection.query('SELECT id, provider_id, model_id FROM preset_models');
+  const freshBySignature = new Map((freshPresetRows || []).map((preset) => [`${Number(preset.provider_id || 0)}::${String(preset.model_id || '').trim()}`, preset]));
+
+  for (const plan of plans || []) {
+    let items = [];
+    try {
+      const parsed = JSON.parse(String(plan.plan_models_json || '[]'));
+      items = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      items = [];
+    }
+    let changed = false;
+    const migrated = items.map((item) => {
+      const providerId = Number(item.providerId ?? item.provider_id ?? 0);
+      const modelId = String(item.modelId ?? item.model_id ?? '').trim();
+      const preset = freshBySignature.get(`${providerId}::${modelId}`);
+      if (!preset || Number(item.presetModelId || item.preset_model_id || 0) === Number(preset.id)) return item;
+      changed = true;
+      return { ...item, presetModelId: Number(preset.id) };
+    });
+    if (changed) {
+      await connection.query('UPDATE plans SET plan_models_json = ?, updated_at = NOW() WHERE id = ?', [JSON.stringify(migrated), plan.id]);
+      updatedPlans += 1;
+    }
+  }
+
+  return { created, updatedPlans };
+}
+
 function buildLegacyPlanModelsJson(provider = {}) {
   const entries = [
     ['standard', '标准模型', provider.standard_model || provider.model],
@@ -195,7 +299,7 @@ async function main() {
    * 若唯一索引不存在则添加。
    * @param {string} tableName
    * @param {string} indexName
-   * @param {string} columnName
+   * @param {string|string[]} columnName
    */
   async function ensureUniqueIndex(tableName, indexName, columnName) {
     const [rows] = await connection.query(
@@ -205,8 +309,12 @@ async function main() {
       [tableName, indexName],
     );
     if (Number(rows[0].count || 0) === 0) {
+      const columns = Array.isArray(columnName)
+        ? columnName
+        : String(columnName).split(',').map((item) => item.trim()).filter(Boolean);
+      const columnSql = columns.map((column) => `\`${column}\``).join(', ');
       await connection.query(
-        `ALTER TABLE \`${tableName}\` ADD UNIQUE INDEX \`${indexName}\` (${columnName})`,
+        `ALTER TABLE \`${tableName}\` ADD UNIQUE INDEX \`${indexName}\` (${columnSql})`,
       );
       console.log(`[init-db]   + 唯一索引 ${tableName}.${indexName}`);
     }
@@ -273,6 +381,33 @@ async function main() {
     ALTER TABLE \`plans\`
     MODIFY COLUMN \`billing_mode\` ENUM('per_request','per_token','hybrid') NOT NULL DEFAULT 'per_request'
   `);
+
+  // ── 预设模型表 ───────────────────────────────────────────────────────────────
+  console.log('[init-db] 初始化 preset_models 表...');
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS preset_models (
+      id            BIGINT PRIMARY KEY AUTO_INCREMENT,
+      provider_id   BIGINT NOT NULL,
+      model_key     VARCHAR(80) NOT NULL,
+      model_id      VARCHAR(200) NOT NULL,
+      name          VARCHAR(120) NOT NULL,
+      description   VARCHAR(1000) NULL,
+      status        ENUM('active','disabled') NOT NULL DEFAULT 'active',
+      sort_order    INT NOT NULL DEFAULT 0,
+      metadata_json LONGTEXT NULL,
+      created_at    DATETIME NOT NULL,
+      updated_at    DATETIME NOT NULL,
+      UNIQUE INDEX uniq_preset_models_provider_model (provider_id, model_id),
+      INDEX idx_preset_models_status (status, sort_order)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await ensureColumn('preset_models', 'model_key',     "model_key VARCHAR(80) NOT NULL DEFAULT ''");
+  await ensureColumn('preset_models', 'description',   'description VARCHAR(1000) NULL');
+  await ensureColumn('preset_models', 'status',        "status ENUM('active','disabled') NOT NULL DEFAULT 'active'");
+  await ensureColumn('preset_models', 'sort_order',    'sort_order INT NOT NULL DEFAULT 0');
+  await ensureColumn('preset_models', 'metadata_json', 'metadata_json LONGTEXT NULL');
+  await ensureUniqueIndex('preset_models', 'uniq_preset_models_provider_model', 'provider_id, model_id');
+  await ensureIndex('preset_models', 'idx_preset_models_status', '(status, sort_order)');
 
   // ── 用户订阅表 ───────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 user_subscriptions 表...');
@@ -658,6 +793,9 @@ async function main() {
       console.log('[init-db]   ~ 空套餐模型配置已按当前 active provider 回填');
     }
   }
+
+  const presetMigration = await migratePresetModelsFromPlans(connection);
+  console.log(`[init-db]   ~ 预设模型迁移完成：新增 ${presetMigration.created} 个，更新 ${presetMigration.updatedPlans} 个套餐`);
 
   await connection.end();
   console.log('[init-db] MySQL 数据库初始化完成。');

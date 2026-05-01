@@ -35,29 +35,35 @@ function testNormalizationAndBilling() {
 
 function testSerializationAndFallback() {
   const serialized = serializePlanModels([
-    { modelKey: 'standard', label: '基础', providerId: 1, modelId: 'basic', isDefault: true },
-    { modelKey: 'premium', label: '高级', providerId: 1, modelId: 'premium', requestMultiplier: 2.5, tokenMultiplier: 3 },
+    { presetModelId: 1, modelKey: 'standard', label: '基础', description: '基础模型描述', providerId: 1, modelId: 'basic', isDefault: true },
+    { presetModelId: 2, modelKey: 'premium', label: '高级', providerId: 1, modelId: 'premium', requestMultiplier: 2.5, tokenMultiplier: 3 },
   ]);
   const parsed = parsePlanModelsJson(serialized);
   assert.equal(parsed.length, 2);
+  assert.equal(parsed[0].presetModelId, 1);
+  assert.equal(parsed[0].description, '基础模型描述');
   assert.equal(findPlanModel(parsed, 'premium').modelId, 'premium');
   assert.equal(findPlanModel(parsed, 'missing').modelKey, 'standard');
 }
 
 function testFormParsing() {
+  const presetModels = [
+    { id: 1, model_key: 'standard', name: '基础模型', description: '稳', provider_id: 1, model_id: 'basic-model', status: 'active' },
+    { id: 2, model_key: 'premium', name: '高级模型', description: '强', provider_id: 2, model_id: 'premium-model', status: 'active' },
+  ];
   const parsed = parsePlanModelsFromBody({
-    planModelKey: ['standard', 'premium', 'empty'],
-    planModelLabel: ['基础模型', '高级模型', '空行'],
-    planModelProviderId: ['1', '2', '2'],
-    planModelId: ['basic-model', 'premium-model', ''],
+    planModelPresetId: ['1', '2', ''],
     planModelRequestMultiplier: ['1', '3', '1'],
     planModelTokenMultiplier: ['1', '3', '1'],
-    planModelDefaultKey: 'premium',
-  });
+    planModelDefaultPresetId: '2',
+  }, presetModels);
 
   assert.equal(parsed.length, 2);
+  assert.equal(parsed[0].presetModelId, 1);
   assert.equal(parsed[0].modelKey, 'standard');
+  assert.equal(parsed[0].description, '稳');
   assert.equal(parsed[0].isDefault, false);
+  assert.equal(parsed[1].presetModelId, 2);
   assert.equal(parsed[1].modelKey, 'premium');
   assert.equal(parsed[1].isDefault, true);
   assert.equal(parsed[1].providerId, 2);

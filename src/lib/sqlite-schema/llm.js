@@ -15,6 +15,30 @@ function ensureSqliteColumn(db, tableName, columnName, definitionSql) {
 }
 
 function ensureSqliteLlmSchema(db) {
+// ─── 预设模型表 ───────────────────────────────────────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS preset_models (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider_id   INTEGER NOT NULL,
+      model_key     TEXT NOT NULL,
+      model_id      TEXT NOT NULL,
+      name          TEXT NOT NULL,
+      description   TEXT NULL,
+      status        TEXT NOT NULL DEFAULT 'active',
+      sort_order    INTEGER NOT NULL DEFAULT 0,
+      metadata_json TEXT NULL,
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL
+    )
+  `);
+  ensureSqliteColumn(db, 'preset_models', 'model_key', "model_key TEXT NOT NULL DEFAULT ''");
+  ensureSqliteColumn(db, 'preset_models', 'description', 'description TEXT NULL');
+  ensureSqliteColumn(db, 'preset_models', 'status', "status TEXT NOT NULL DEFAULT 'active'");
+  ensureSqliteColumn(db, 'preset_models', 'sort_order', 'sort_order INTEGER NOT NULL DEFAULT 0');
+  ensureSqliteColumn(db, 'preset_models', 'metadata_json', 'metadata_json TEXT NULL');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_preset_models_provider_model ON preset_models (provider_id, model_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_preset_models_status ON preset_models (status, sort_order)');
+
 // ─── LLM 提供商表 ─────────────────────────────────────────────────────────────
   db.exec(`
     CREATE TABLE IF NOT EXISTS llm_providers (

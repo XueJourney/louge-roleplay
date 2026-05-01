@@ -10,65 +10,50 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
-  const providerOptions = Array.isArray(locals.providers) ? locals.providers : [];
-  const providerModels = [];
-  const modelOptionsByProvider = new Map();
-  providerOptions.forEach((provider) => {
-    const options = provider.availableModels || [];
-    modelOptionsByProvider.set(Number(provider.id), options);
-    options.forEach((model) => {
-      providerModels.push({ provider, model });
-    });
-  });
-  const fallbackProvider = providerOptions[0] || null;
-  const defaultPlanModels = providerModels.slice(0, 1).map((item, index) => ({
-    modelKey: index === 0 ? 'standard' : `model-${index + 1}`,
-    label: item.model.label,
-    providerId: item.provider.id,
-    modelId: item.model.id,
+  const presetModelOptions = (Array.isArray(locals.presetModels) ? locals.presetModels : []).filter((model) => model.status === 'active');
+  const fallbackPresetModel = presetModelOptions[0] || null;
+  const defaultPlanModels = fallbackPresetModel ? [{
+    presetModelId: fallbackPresetModel.id,
+    modelKey: fallbackPresetModel.model_key,
+    label: fallbackPresetModel.name,
+    description: fallbackPresetModel.description || '',
+    providerId: fallbackPresetModel.provider_id,
+    modelId: fallbackPresetModel.model_id,
     requestMultiplier: 1,
     tokenMultiplier: 1,
-    isDefault: index === 0,
-  }));
+    isDefault: true,
+  }] : [{ modelKey: 'standard', requestMultiplier: 1, tokenMultiplier: 1, isDefault: true }];
 
-  function renderProviderOptions(selectedProviderId = 0) {
-    return providerOptions.map((provider) => `<option value="${esc(provider.id)}" ${Number(selectedProviderId) === Number(provider.id) ? 'selected' : ''}>${esc(provider.name)}</option>`).join('');
-  }
-
-  function renderModelOptions(selectedProviderId = 0, selectedModelId = '') {
-    return providerModels.map(({ provider, model }) => `<option value="${esc(model.id)}" data-provider-id="${esc(provider.id)}" ${String(selectedModelId || '') === String(model.id) && Number(selectedProviderId) === Number(provider.id) ? 'selected' : ''}>${esc(provider.name)} · ${esc(model.label)} (${esc(model.id)})</option>`).join('');
+  function renderPresetModelOptions(selectedPresetModelId = 0) {
+    return presetModelOptions.map((model) => {
+      const description = model.description ? ` — ${model.description}` : '';
+      return `<option value="${esc(model.id)}" data-model-key="${esc(model.model_key)}" data-model-label="${esc(model.name)}" data-model-description="${esc(model.description || '')}" ${Number(selectedPresetModelId) === Number(model.id) ? 'selected' : ''}>${esc(model.name)} · ${esc(model.model_id)}${esc(description)}</option>`;
+    }).join('');
   }
 
   function renderPlanModelRow(item = {}, index = 0) {
-    const rowKey = item.modelKey || (index === 0 ? 'standard' : `model-${index + 1}`);
-    const providerId = Number(item.providerId || fallbackProvider?.id || 0);
+    const presetModelId = Number(item.presetModelId || item.preset_model_id || fallbackPresetModel?.id || 0);
+    const label = item.label || item.name || fallbackPresetModel?.name || '未选择模型';
+    const description = item.description || fallbackPresetModel?.description || '';
     return `
       <div class="plan-model-row">
         <div class="inline-grid inline-grid--dense">
-          <label>Key<input type="text" name="planModelKey" value="${esc(rowKey)}" placeholder="standard / premium" data-plan-model-key /></label>
-          <label>前台名称<input type="text" name="planModelLabel" value="${esc(item.label || '')}" placeholder="基础模型 / 高级模型" /></label>
-        </div>
-        <div class="inline-grid inline-grid--dense">
           <label>
-            Provider
-            <select name="planModelProviderId" data-plan-model-provider>
-              ${renderProviderOptions(providerId)}
-            </select>
-          </label>
-          <label>
-            模型 ID
-            <select name="planModelId" data-plan-model-select>
+            预设模型
+            <select name="planModelPresetId" data-plan-model-preset>
               <option value="">不启用这一行</option>
-              ${renderModelOptions(providerId, item.modelId)}
+              ${renderPresetModelOptions(presetModelId)}
             </select>
           </label>
-        </div>
-        <div class="inline-grid inline-grid--dense">
           <label>请求倍率<input type="number" name="planModelRequestMultiplier" value="${esc(item.requestMultiplier || 1)}" min="0.01" step="0.01" /></label>
           <label>Token 倍率<input type="number" name="planModelTokenMultiplier" value="${esc(item.tokenMultiplier || item.requestMultiplier || 1)}" min="0.01" step="0.01" /></label>
         </div>
+        <div class="preset-model-preview" data-plan-model-preview>
+          <strong data-plan-model-preview-name>${esc(label)}</strong>
+          <span data-plan-model-preview-desc>${esc(description || '暂无描述')}</span>
+        </div>
         <div class="toolbar-row toolbar-row--between toolbar-row--tight">
-          <label class="checkbox-line"><input type="radio" name="planModelDefaultKey" value="${esc(rowKey)}" data-plan-model-default ${item.isDefault || index === 0 ? 'checked' : ''} /> 默认使用这个模型</label>
+          <label class="checkbox-line"><input type="radio" name="planModelDefaultPresetId" value="${esc(presetModelId)}" data-plan-model-default ${item.isDefault || index === 0 ? 'checked' : ''} /> 默认使用这个模型</label>
           <button type="button" class="danger-button danger-button--small" data-plan-model-remove>删除模型</button>
         </div>
       </div>`;
@@ -77,20 +62,19 @@
   function renderPlanModelRows(planModels) {
     const rows = Array.isArray(planModels) && planModels.length
       ? planModels
-      : (defaultPlanModels.length ? defaultPlanModels : [{ modelKey: 'standard', requestMultiplier: 1, tokenMultiplier: 1, isDefault: true }]);
+      : defaultPlanModels;
     return `<div class="plan-model-list" data-plan-model-list>${rows.map((item, index) => renderPlanModelRow(item, index)).join('')}</div>
-      <div class="toolbar-row toolbar-row--tight"><button type="button" class="secondary-button" data-plan-model-add>添加模型</button></div>`;
+      <div class="toolbar-row toolbar-row--tight"><button type="button" class="secondary-button" data-plan-model-add>添加模型</button><a class="secondary-button" href="/admin/models">管理预设模型</a></div>`;
   }
 
-  const planModelRowTemplate = renderPlanModelRow({ modelKey: '__KEY__', requestMultiplier: 1, tokenMultiplier: 1 }, 0)
-    .replace(/__KEY__/g, 'model-__INDEX__');
+  const planModelRowTemplate = renderPlanModelRow({ presetModelId: 0, requestMultiplier: 1, tokenMultiplier: 1 }, 0);
 %>
 <div class="admin-shell">
   <section class="hero-card admin-hero">
     <div class="admin-hero-copy">
       <p class="section-kicker">Plans</p>
       <h1>套餐配置</h1>
-      <p class="muted-text">现在模型跟着套餐走：每个套餐默认 1 个模型，也可以按需要动态添加多个模型，并分别设置请求倍率与 Token 倍率。</p>
+      <p class="muted-text">现在模型先进入预设模型库，套餐里只选择预设模型并设置请求 / Token 倍率；同一模型可以复用到多个套餐。</p>
     </div>
 
     <div class="metrics metrics--compact">
@@ -104,6 +88,7 @@
     <div class="admin-subnav">
       <a class="quick-link" href="/admin">用户与总览</a>
       <a class="quick-link" href="/admin/providers">LLM 配置</a>
+      <a class="quick-link" href="/admin/models">预设模型</a>
       <a class="quick-link is-active" href="/admin/plans">套餐配置</a>
       <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
       <a class="quick-link" href="/admin/notifications">通知中心</a>
@@ -166,7 +151,7 @@
               <label>排序<input type="number" name="sortOrder" value="0" /></label>
             </div>
             <h3>套餐可用模型</h3>
-            <p class="mini-note">默认一个模型；需要更多模型时点「添加模型」，高级模型可把请求 / Token 倍率设为 3。</p>
+            <p class="mini-note">默认一个模型；需要更多模型时点「添加模型」。模型名称和描述在「预设模型」统一维护，这里只管套餐倍率。</p>
             <%- renderPlanModelRows([]) %>
             <div class="inline-grid">
               <label>
@@ -249,7 +234,7 @@
                   <label>排序<input type="number" name="sortOrder" value="<%= plan.sort_order %>" /></label>
                 </div>
                 <h3>套餐可用模型</h3>
-                <p class="mini-note">当前用户只会看到这里配置的模型；可动态添加或删除，模型 Key 会保存在会话上，改套餐时会自动回落到默认可用模型。</p>
+                <p class="mini-note">当前用户只会看到这里选择的预设模型；模型 Key、前台名称、描述来自预设模型库，套餐只保存选择关系和倍率。</p>
                 <%- renderPlanModelRows(plan.planModels || []) %>
                 <div class="inline-grid">
                   <label>

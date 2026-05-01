@@ -6,6 +6,7 @@
 'use strict';
 
 const { listProviders } = require('./llm-provider-service');
+const { listPresetModels } = require('./preset-model-service');
 
 function buildProviderModelLookup(providers = []) {
   const lookup = new Map();
@@ -18,16 +19,28 @@ function buildProviderModelLookup(providers = []) {
 }
 
 async function validatePlanModelsAgainstProviders(planModels = []) {
-  const providers = await listProviders();
+  const [providers, presetModels] = await Promise.all([
+    listProviders(),
+    listPresetModels({ includeDisabled: false }),
+  ]);
   const lookup = buildProviderModelLookup(providers);
+  const presetLookup = new Map(presetModels.map((preset) => [Number(preset.id), preset]));
 
   if (!providers.length) {
     throw new Error('PLAN_MODEL_PROVIDER_REQUIRED');
   }
 
   for (const item of planModels) {
+    const presetModelId = Number(item.presetModelId || item.preset_model_id || 0);
     const providerId = Number(item.providerId || 0);
     const modelId = String(item.modelId || '').trim();
+    const preset = presetLookup.get(presetModelId);
+    if (!preset) {
+      throw new Error('PLAN_MODEL_PRESET_INVALID');
+    }
+    if (Number(preset.provider_id) !== providerId || String(preset.model_id) !== modelId) {
+      throw new Error('PLAN_MODEL_PRESET_MISMATCH');
+    }
     const entry = lookup.get(providerId);
     if (!entry) {
       throw new Error('PLAN_MODEL_PROVIDER_INVALID');

@@ -40,6 +40,88 @@ function buildLegacyPlanModelsJson(provider = {}) {
     }));
 }
 
+function migratePresetModelsFromPlansSqlite(db) {
+  const presetRows = db.prepare('SELECT id, provider_id, model_id FROM preset_models').all();
+  const existingBySignature = new Map((presetRows || []).map((preset) => [`${Number(preset.provider_id || 0)}::${String(preset.model_id || '').trim()}`, preset]));
+  const plans = db.prepare('SELECT id, plan_models_json FROM plans ORDER BY id ASC').all();
+  const groups = new Map();
+
+  (plans || []).forEach((plan) => {
+    let items = [];
+    try {
+      const parsed = JSON.parse(String(plan.plan_models_json || '[]'));
+      items = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      items = [];
+    }
+    items.forEach((item) => {
+      const providerId = Number(item.providerId ?? item.provider_id ?? 0);
+      const modelId = String(item.modelId ?? item.model_id ?? '').trim();
+      if (!providerId || !modelId) return;
+      const signature = `${providerId}::${modelId}`;
+      if (!groups.has(signature)) {
+        groups.set(signature, { providerId, modelId, labels: [], keys: [], planIds: [] });
+      }
+      const group = groups.get(signature);
+      group.labels.push(item.label || item.name || '');
+      group.keys.push(item.modelKey || item.model_key || '');
+      group.planIds.push(Number(plan.id));
+    });
+  });
+
+  function fallbackLabel(modelId) {
+    return String(modelId || 'model').split('/').pop().replace(/[-_]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  function fallbackKey(value) {
+    return String(value || 'model').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'model';
+  }
+
+  groups.forEach((group) => {
+    const signature = `${group.providerId}::${group.modelId}`;
+    if (existingBySignature.has(signature)) return;
+    const labels = [...new Set(group.labels.map((item) => String(item || '').trim()).filter(Boolean))];
+    const name = labels.length ? labels.slice(0, 3).join(' / ') : fallbackLabel(group.modelId);
+    const result = db.prepare(`
+      INSERT INTO preset_models (
+        provider_id, model_key, model_id, name, description, status, sort_order, metadata_json, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, NULL, 'active', 0, ?, NOW(), NOW())
+    `).run(
+      group.providerId,
+      fallbackKey(group.keys.find(Boolean) || name || group.modelId),
+      group.modelId,
+      name,
+      JSON.stringify({ migratedFromPlanIds: [...new Set(group.planIds)] }),
+    );
+    existingBySignature.set(signature, { id: Number(result.lastInsertRowid), provider_id: group.providerId, model_id: group.modelId });
+  });
+
+  const freshPresetRows = db.prepare('SELECT id, provider_id, model_id FROM preset_models').all();
+  const freshBySignature = new Map((freshPresetRows || []).map((preset) => [`${Number(preset.provider_id || 0)}::${String(preset.model_id || '').trim()}`, preset]));
+
+  (plans || []).forEach((plan) => {
+    let items = [];
+    try {
+      const parsed = JSON.parse(String(plan.plan_models_json || '[]'));
+      items = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      items = [];
+    }
+    let changed = false;
+    const migrated = items.map((item) => {
+      const providerId = Number(item.providerId ?? item.provider_id ?? 0);
+      const modelId = String(item.modelId ?? item.model_id ?? '').trim();
+      const preset = freshBySignature.get(`${providerId}::${modelId}`);
+      if (!preset || Number(item.presetModelId || item.preset_model_id || 0) === Number(preset.id)) return item;
+      changed = true;
+      return { ...item, presetModelId: Number(preset.id) };
+    });
+    if (changed) {
+      db.prepare('UPDATE plans SET plan_models_json = ?, updated_at = NOW() WHERE id = ?').run(JSON.stringify(migrated), plan.id);
+    }
+  });
+}
+
 /**
  * 初始化 SQLite 数据库表结构，并写入种子数据（套餐、默认 LLM 提供商）。
  * 所有 CREATE TABLE 使用 IF NOT EXISTS，可以安全重复调用。
@@ -108,6 +190,8 @@ function seedSqliteDefaults(db) {
       db.prepare("UPDATE plans SET plan_models_json = ?, updated_at = NOW() WHERE plan_models_json IS NULL OR plan_models_json = '' OR plan_models_json = '[]'").run(legacyPlanModelsJson);
     }
   }
+
+  migratePresetModelsFromPlansSqlite(db);
 }
 
 module.exports = { seedSqliteDefaults };

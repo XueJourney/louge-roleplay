@@ -1,0 +1,168 @@
+<!-- @file src/views/admin-models.ejs
+     @description 预设模型管理页面。Provider 负责接入与发现，Preset Model 负责前台显示与套餐复用。
+-->
+<%
+  const esc = typeof escapeHtml === 'function'
+    ? escapeHtml
+    : (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  const providerOptions = Array.isArray(locals.providers) ? locals.providers : [];
+  const presetRows = Array.isArray(locals.presetModels) ? locals.presetModels : [];
+
+  function renderProviderOptions(selectedProviderId = 0) {
+    return providerOptions.map((provider) => `<option value="${esc(provider.id)}" ${Number(selectedProviderId) === Number(provider.id) ? 'selected' : ''}>${esc(provider.name)}</option>`).join('');
+  }
+
+  function renderDiscoveredModelOptions(selectedProviderId = 0, selectedModelId = '') {
+    const options = [];
+    providerOptions.forEach((provider) => {
+      (provider.availableModels || []).forEach((model) => {
+        const selected = Number(selectedProviderId) === Number(provider.id) && String(selectedModelId || '') === String(model.id);
+        options.push(`<option value="${esc(model.id)}" data-provider-id="${esc(provider.id)}" ${selected ? 'selected' : ''}>${esc(provider.name)} · ${esc(model.label)} (${esc(model.id)})</option>`);
+      });
+    });
+    return options.join('');
+  }
+%>
+<div class="admin-shell">
+  <section class="hero-card admin-hero">
+    <div class="admin-hero-copy">
+      <p class="section-kicker">Preset Models</p>
+      <h1>预设模型</h1>
+      <p class="muted-text">先把模型 ID、前台显示名和描述整理成可复用模型库；套餐里只选择预设模型并设置倍率，后台会清爽很多。</p>
+    </div>
+    <div class="metrics metrics--compact">
+      <div class="metric"><strong><%= presetRows.length %></strong><span>预设模型</span></div>
+      <div class="metric"><strong><%= presetRows.filter(model => model.status === 'active').length %></strong><span>启用</span></div>
+      <div class="metric"><strong><%= providerOptions.length %></strong><span>Provider</span></div>
+    </div>
+  </section>
+
+  <section class="section-card admin-section">
+    <div class="admin-subnav">
+      <a class="quick-link" href="/admin">用户与总览</a>
+      <a class="quick-link" href="/admin/providers">LLM 配置</a>
+      <a class="quick-link is-active" href="/admin/models">预设模型</a>
+      <a class="quick-link" href="/admin/plans">套餐配置</a>
+      <a class="quick-link" href="/admin/prompts">Prompt 配置</a>
+      <a class="quick-link" href="/admin/notifications">通知中心</a>
+      <a class="quick-link" href="/admin/logs">日志查询</a>
+      <a class="quick-link" href="/admin/conversations">对话记录</a>
+    </div>
+
+    <details class="admin-fold" <%= presetRows.length ? '' : 'open' %>>
+      <summary>新增预设模型</summary>
+      <div class="admin-fold-body">
+        <div class="provider-card provider-card--flat">
+          <form method="post" action="/admin/models/new">
+            <div class="inline-grid">
+              <label>
+                Provider
+                <select name="providerId" data-preset-provider>
+                  <option value="">请选择 Provider</option>
+                  <%- renderProviderOptions(0) %>
+                </select>
+              </label>
+              <label>
+                模型 ID
+                <select name="modelId" data-preset-model-select>
+                  <option value="">请选择模型</option>
+                  <%- renderDiscoveredModelOptions(0, '') %>
+                </select>
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>模型 Key<input type="text" name="modelKey" placeholder="standard / premium" /></label>
+              <label>前台显示名<input type="text" name="name" placeholder="基础模型 / 高级模型" /></label>
+            </div>
+            <label>模型描述<textarea name="description" rows="3" placeholder="给管理员和未来套餐配置看的说明，比如适合长文、推理更强、成本更高。"></textarea></label>
+            <div class="inline-grid">
+              <label>
+                状态
+                <select name="status">
+                  <option value="active">active</option>
+                  <option value="disabled">disabled</option>
+                </select>
+              </label>
+              <label>排序<input type="number" name="sortOrder" value="0" min="0" /></label>
+            </div>
+            <div class="toolbar-row toolbar-row--admin">
+              <button type="submit">新增预设模型</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </details>
+
+    <% if (presetRows.length) { %>
+      <div id="preset-models-list" class="admin-list">
+        <% presetRows.forEach(model => { %>
+          <details class="admin-item" data-filter-item data-filter-text="<%= [model.name, model.model_key, model.model_id, model.description || '', model.provider_name || '', model.status].join(' ') %>">
+            <summary class="admin-item-summary">
+              <div class="admin-item-main">
+                <strong><%= model.name %></strong>
+                <span class="pill"><%= model.model_key %></span>
+                <span class="pill <%= model.status === 'active' ? 'pill--success' : '' %>"><%= model.status %></span>
+              </div>
+              <div class="admin-item-meta">
+                <span class="meta-chip">Provider <strong><%= model.provider_name || model.provider_id %></strong></span>
+                <span class="meta-chip">模型 <strong><%= model.model_id %></strong></span>
+              </div>
+            </summary>
+            <div class="admin-item-body">
+              <% if (model.description) { %><p class="mini-note"><%= model.description %></p><% } %>
+              <form method="post" action="/admin/models/<%= model.id %>">
+                <div class="inline-grid">
+                  <label>
+                    Provider
+                    <select name="providerId" data-preset-provider>
+                      <%- renderProviderOptions(model.provider_id) %>
+                    </select>
+                  </label>
+                  <label>
+                    模型 ID
+                    <select name="modelId" data-preset-model-select>
+                      <option value="">请选择模型</option>
+                      <%- renderDiscoveredModelOptions(model.provider_id, model.model_id) %>
+                    </select>
+                  </label>
+                </div>
+                <div class="inline-grid">
+                  <label>模型 Key<input type="text" name="modelKey" value="<%= model.model_key %>" /></label>
+                  <label>前台显示名<input type="text" name="name" value="<%= model.name %>" /></label>
+                </div>
+                <label>模型描述<textarea name="description" rows="3"><%= model.description || '' %></textarea></label>
+                <div class="inline-grid">
+                  <label>
+                    状态
+                    <select name="status">
+                      <option value="active" <%= model.status === 'active' ? 'selected' : '' %>>active</option>
+                      <option value="disabled" <%= model.status === 'disabled' ? 'selected' : '' %>>disabled</option>
+                    </select>
+                  </label>
+                  <label>排序<input type="number" name="sortOrder" value="<%= model.sort_order %>" min="0" /></label>
+                </div>
+                <div class="toolbar-row toolbar-row--admin">
+                  <button type="submit">保存预设模型</button>
+                </div>
+              </form>
+              <form method="post" action="/admin/models/<%= model.id %>/delete" data-confirm-message="确定删除这个预设模型？被套餐引用时会拒绝删除。">
+                <button class="danger-button" type="submit">删除预设模型</button>
+              </form>
+            </div>
+          </details>
+        <% }) %>
+      </div>
+    <% } else { %>
+      <div class="empty-state">
+        <strong>还没有预设模型</strong>
+        <span class="muted-text">先从 Provider 发现到的模型里选一个，填前台显示名和描述。</span>
+      </div>
+    <% } %>
+  </section>
+</div>
+<script nonce="<%= locals.cspNonce || '' %>" src="/public/js/admin-page.js"></script>
