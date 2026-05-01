@@ -17,7 +17,7 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    const pageMeta = meta || {};
+    const pageMeta = locals.meta || {};
     const metaTitle = `${title} - ${appName}`;
     const metaDescription = pageMeta.description || t('楼阁默认分享描述');
     const metaImage = pageMeta.image || '/public/icons/og-louge.png';

@@ -10,7 +10,7 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
-  const providerOptions = Array.isArray(providers) ? providers : [];
+  const providerOptions = Array.isArray(locals.providers) ? locals.providers : [];
   const providerModels = [];
   const modelOptionsByProvider = new Map();
   providerOptions.forEach((provider) => {
@@ -273,4 +273,4 @@
   </section>
 </div>
 
-<script nonce="<%= cspNonce || '' %>" src="/public/js/admin-page.js"></script>
+<script nonce="<%= locals.cspNonce || '' %>" src="/public/js/admin-page.js"></script>

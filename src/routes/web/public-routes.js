@@ -78,7 +78,7 @@ function registerPublicRoutes(app, ctx) {
         characters,
         meta: {
           url: '/',
-          description: t('楼阁默认分享描述'),
+          description: '楼阁是一个沉浸式 AI 角色对话空间，可以创建角色、公开分享，并与喜欢的人设持续展开故事。',
         },
       });
     } catch (error) {
