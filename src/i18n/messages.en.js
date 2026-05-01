@@ -1,3 +1,8 @@
+/**
+ * @file src/i18n/messages.en.js
+ * @description English UI translations for server-rendered pages and browser scripts.
+ */
+
 const EN_MESSAGES = {
   "楼阁默认分享描述": "Loft is a quiet space for character-driven conversations. Create a persona, shape their temperament and situation, then let each exchange find its own rhythm.",
   "首页": "Home",

@@ -47,12 +47,19 @@
 |---|---|
 | `src/config.js` | 环境变量解析与隐私安全配置摘要。被 server、service、脚本读取。 |
 | `src/i18n.js` | 服务端/客户端共用国际化词典与 HTML 文本翻译工具。被 i18n 中间件和渲染层调用。 |
-| `src/i18n/messages.en.js` | 待补充：该文件缺少明确文件头说明。 |
-| `src/i18n/messages.zh-CN.js` | 待补充：该文件缺少明确文件头说明。 |
+| `src/i18n/messages.en.js` | /** English UI translations for server-rendered pages and browser scripts. / |
+| `src/i18n/messages.zh-CN.js` | /** 中文界面文案词典，供服务端页面和前端脚本共享。 / |
 | `src/lib/db-sqlite-schema.js` | SQLite 初始化 schema 与种子数据，供 db.js 首次创建本地库时调用。 |
 | `src/lib/db.js` | 数据库抽象层，MySQL 优先、SQLite 兜底，提供 query/withTransaction。所有 service 的 DB 入口。 |
 | `src/lib/logger.js` | 统一结构化日志输出，支持 LOG_LEVEL 过滤和 DEBUG 开关。所有后端模块应通过它写日志。 |
 | `src/lib/redis.js` | Redis 客户端与内存降级实现，供 session、验证码、缓存、限流使用。 |
+| `src/lib/sqlite-schema/characters-conversations.js` | /** 角色、互动事件、会话与消息表结构。 / |
+| `src/lib/sqlite-schema/llm.js` | /** LLM 提供商、任务队列与用量日志 SQLite 结构。 / |
+| `src/lib/sqlite-schema/plans.js` | /** 套餐表结构与模型权益字段补列。 / |
+| `src/lib/sqlite-schema/prompts-notifications.js` | /** 系统提示词片段、站内通知与客服入口表结构。 / |
+| `src/lib/sqlite-schema/seed.js` | /** 默认套餐、默认 LLM provider 与旧套餐模型权益回填。 / |
+| `src/lib/sqlite-schema/subscriptions.js` | /** 用户订阅表结构与用户状态索引。 / |
+| `src/lib/sqlite-schema/users.js` | /** 用户表结构、public_id 补列与历史用户 public_id 回填。 / |
 | `src/lib/url-safety.js` | /** 外部服务 URL 安全校验，避免 Provider Base URL 被用于 SSRF/内网探测。 / |
 | `src/lib/user-public-id.js` | /** 用户公开唯一 ID 生成工具。公开 ID 从三位起步，无固定上限。 / |
 | `src/middleware/auth.js` | 登录/管理员鉴权中间件，保护 dashboard/admin/chat 等页面。 |
@@ -61,8 +68,22 @@
 | `src/middleware/i18n.js` | 根据 query/cookie/Accept-Language 解析语言，并向 req/res.locals 注入 t()。 |
 | `src/middleware/request-context.js` | 为每个请求注入 requestId/currentUser，后续日志和错误页用它串联。 |
 | `src/routes/web-routes.js` | 主 Web 路由注册文件：公开页、认证、后台、角色、线性聊天、重写/编辑/流式接口。依赖 service 层完成业务。 |
-| `src/routes/web/admin-routes.js` | /** 从 web-routes.js 拆出的路由分组。 / |
-| `src/routes/web/auth-routes.js` | /** 从 web-routes.js 拆出的路由分组。 / |
+| `src/routes/web/admin-routes.js` | /** 管理后台路由聚合器。具体页面/表单路由拆分在 `src/routes/web/admin/`，本文件只保持注册顺序。 / |
+| `src/routes/web/admin/admin-route-utils.js` | /** 管理后台路由共享小工具：表单校验错误识别和分页 URL 拼装。 / |
+| `src/routes/web/admin/conversation-routes.js` | /** 管理后台全局对话审计、软删除恢复与永久删除路由。 / |
+| `src/routes/web/admin/dashboard-routes.js` | /** 管理后台首页路由，展示概览、用户与套餐摘要。 / |
+| `src/routes/web/admin/log-routes.js` | /** 管理后台日志查询页路由，支持日期、等级、文件、错误类型和函数名筛选。 / |
+| `src/routes/web/admin/notification-routes.js` | /** 管理后台通知中心与前台客服通知查询接口。 / |
+| `src/routes/web/admin/plan-routes.js` | /** 管理后台套餐列表、新增、更新与删除路由，包含模型权益配置校验。 / |
+| `src/routes/web/admin/prompt-routes.js` | /** 管理后台全局 Prompt 片段预览、创建、排序、更新与删除路由。 / |
+| `src/routes/web/admin/provider-routes.js` | /** 管理后台 LLM Provider 列表、新增与更新路由。 / |
+| `src/routes/web/admin/user-routes.js` | /** 管理后台用户角色与套餐调整路由。 / |
+| `src/routes/web/auth-routes.js` | /** 认证与个人中心路由聚合器。具体实现拆分在 `src/routes/web/auth/`。 / |
+| `src/routes/web/auth/dashboard-routes.js` | /** 用户控制台路由，汇总角色、会话、套餐和额度快照。 / |
+| `src/routes/web/auth/profile-routes.js` | /** 个人资料维护路由，支持用户名、邮箱、手机和密码变更。 / |
+| `src/routes/web/auth/register-routes.js` | /** 用户注册提交路由，包含地区、邮箱/手机验证码和默认登录态建立。 / |
+| `src/routes/web/auth/session-routes.js` | /** 登录、登出路由，包含 IP 限流和失败原因脱敏日志。 / |
+| `src/routes/web/auth/verification-routes.js` | /** 邮箱/手机验证码发送接口，统一在响应后刷新图形验证码以降低重放风险。 / |
 | `src/routes/web/character-routes.js` | /** 从 web-routes.js 拆出的路由分组。 / |
 | `src/routes/web/chat-routes.js` | /** 聊天路由聚合：页面、发送、重生、编辑、重写、工具。 / |
 | `src/routes/web/chat-stream-utils.js` | /** 聊天流式接口的 NDJSON 响应工具：错误文案映射、消息片段渲染、流式行切分与中断兜底。 设计约束： - 只被 web 路由层调用，避免 service 层依赖 Express response。 - `safeWrite` 必须在连接关闭后静默失败，防止客户端断开导致二次异常。 - 用户主动断开但已有部分模型输出时，优先保留已生成内容，避免“写了半天全没了”。 / |
@@ -89,6 +110,8 @@
 | `src/services/character-service.js` | 角色 CRUD 与可见性控制。被首页、dashboard、角色编辑和开聊流程调用。 |
 | `src/services/character-social-service.js` | /** 公开角色点赞、评论、使用量与热度统计服务。 / |
 | `src/services/conversation-service.js` | 会话/消息核心服务：消息写入、当前显示链读取、编辑、重写、独立对话克隆和删除保护。聊天路由主要依赖它。 |
+| `src/services/conversation/message-view.js` | /** 会话消息视图层纯函数：metadata 解析、think 标签清理和链路构建。 / |
+| `src/services/conversation/path-repository.js` | /** 使用递归查询读取当前会话从叶子消息到根消息的显示链。 / |
 | `src/services/email-service.js` | Resend 邮件验证码发送封装。被 verification-service 调用。 |
 | `src/services/email-template-service.js` | /** Branded HTML email templates for verification messages. / |
 | `src/services/font-proxy-service.js` | Google Fonts 代理与缓存，避免页面字体资源直接失败。被 /fonts/* 路由调用。 |
@@ -106,6 +129,11 @@
 | `src/services/phone-auth-service.js` | 国内手机号一键认证占位/封装。被注册流程调用。 |
 | `src/services/plan-model-validation-service.js` | /** Server-side validation for plan model entitlements against configured providers. / |
 | `src/services/plan-service.js` | 套餐、订阅、额度快照与额度断言。被后台和 LLM 网关调用。 |
+| `src/services/plan/crud.js` | /** 套餐 CRUD 与默认套餐切换逻辑，保留原 SQL 行为。 / |
+| `src/services/plan/hydration.js` | /** 套餐模型权益 JSON 的解析、默认模型兜底与列表展示字段补齐。 / |
+| `src/services/plan/normalizer.js` | /** 套餐载荷归一化与数值字段强校验，避免后台表单脏值进入服务层。 / |
+| `src/services/plan/subscriptions.js` | /** 用户套餐订阅、用量统计、配额断言和套餐模型选项。 / |
+| `src/services/plan/usage-window.js` | /** 根据数据库类型和套餐周期生成用量统计时间窗口 SQL。 / |
 | `src/services/prompt-engineering-service.js` | 全局提示词片段、角色提示词结构、运行时变量模板和最终 system prompt 拼装。 |
 | `src/services/rate-limit-service.js` | 基于 Redis/内存 incr+expire 的轻量限流。被登录/注册/验证码调用。 |
 | `src/services/user-service.js` | 用户创建、登录查询、资料更新、角色更新。 |
@@ -113,19 +141,25 @@
 | `public/js/admin-page.js` | 后台交互：套餐字段切换、Prompt 片段排序/预览、后台列表过滤。 |
 | `public/js/character-editor-page.js` | 角色编辑器动态字段：提示词条目增删、排序、预览。 |
 | `public/js/chat-page.js` | 聊天页前端核心：流式 NDJSON 消费、富文本/Markdown 渲染、思考块折叠、加载历史、输入优化。 |
-| `public/js/chat/bubbles.js` | 待补充：该文件缺少明确文件头说明。 |
-| `public/js/chat/controller.js` | /** 聊天页交互控制：流式发送、历史加载、重写/重新生成反馈。 / |
-| `public/js/chat/dom-utils.js` | 待补充：该文件缺少明确文件头说明。 |
+| `public/js/chat/action-stream-submit.js` | /** 重新生成、从这里重写等消息操作表单的流式提交绑定。 / |
+| `public/js/chat/bubbles.js` | /** 聊天页气泡 DOM 创建、临时流式气泡追加与 HTML 替换工具。 / |
+| `public/js/chat/compose-submit.js` | /** 主聊天输入框流式提交与 Enter 快捷键绑定。 / |
+| `public/js/chat/controller.js` | /** 聊天页轻量入口：装配 DOM 工具、流客户端和各交互子模块。 / |
+| `public/js/chat/conversation-state.js` | /** 聊天页 URL leaf、父消息隐藏字段、可见消息计数与旧尾巴清理。 / |
+| `public/js/chat/dom-utils.js` | /** 聊天页 DOM 小工具：滚动判断、菜单收起、toast、富文本挂载等。 / |
+| `public/js/chat/history-loader.js` | /** 聊天页“查看更早消息”懒加载与滚动位置保持。 / |
 | `public/js/chat/message-menu.js` | /** 聊天消息操作区：点击消息上的“⋯”，在对应消息上方插入轻量上下文操作卡。 / |
+| `public/js/chat/optimize-submit.js` | /** 润色输入表单的流式提交绑定。 / |
 | `public/js/chat/rich-renderer.js` | /** 聊天消息富文本渲染与安全净化。 / |
-| `public/js/chat/stream-client.js` | 待补充：该文件缺少明确文件头说明。 |
+| `public/js/chat/stream-client.js` | /** 聊天页 NDJSON 流式请求消费器。 / |
+| `public/js/chat/streaming-ui.js` | /** 聊天页流式渲染调度、自动跟随滚动和气泡最终态处理。 / |
 | `public/js/csrf.js` | /** 自动为同源 POST 表单与 fetch 请求附加 CSRF token。 / |
 | `public/js/error-page.js` | /** 错误页脚本；当前客服入口由 notification-client 的 data-open-support 委托统一处理。 / |
 | `public/js/form-guards.js` | /** CSP 兼容的全局表单保护：替代模板里的 inline onsubmit confirm。 / |
 | `public/js/i18n-runtime.js` | 浏览器端轻量 t() 翻译函数，供页面脚本复用。 |
 | `public/js/layout-bootstrap.js` | /** 全站前端 bootstrap。由 layout 注入 JSON 数据，本文件负责挂到 window。 / |
 | `public/js/notification-client.js` | /** 前台站内通知与客服入口展示。调用说明：layout 注入 bootstrap 后自动显示，聊天错误可触发 support 模式。 / |
-| `public/js/profile-page.js` | 待补充：该文件缺少明确文件头说明。 |
+| `public/js/profile-page.js` | /** 个人资料页验证码刷新、邮箱验证码和短信验证码发送交互。 / |
 | `public/js/quota-bars.js` | /** 将 data-width 百分比应用到额度条，避免 inline style 违反 CSP。 / |
 | `public/js/register-config.js` | /** 注册页认证配置 bootstrap，避免 inline script 违反 CSP。 / |
 | `public/js/register-page.js` | 注册页交互：国家/地区切换、验证码刷新、邮箱/手机验证码发送。 |

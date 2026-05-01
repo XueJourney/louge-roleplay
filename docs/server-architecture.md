@@ -95,12 +95,15 @@
 - 工具函数更容易复用
 - 后面要再拆聊天/管理/认证，只需要继续从 `web-routes.js` 往下拆
 
-## 下一步建议
+## 进一步拆分完成项
 
-如果还要继续瘦身，推荐优先再拆这几个：
-- `src/routes/web/admin-routes.js`：按 dashboard / plans / providers / notifications / prompts / logs / conversations / users 拆分
-- `src/routes/web/auth-routes.js`：按 verification / register / session / dashboard / profile 拆分
-- `public/js/chat/controller.js`：按 conversation state / streaming UI / compose submit / optimize submit / action stream submit / history loader 拆分
-- `src/services/plan-service.js`：按 plan normalizer / CRUD / subscription / quota 拆分
+本轮继续采用“兼容门面 + 搬迁式拆分”：
 
-继续采用“兼容门面 + 搬迁式拆分”，避免一次重构过多调用方。
+- `src/routes/web/admin-routes.js` 已拆为后台聚合器，具体实现位于 `src/routes/web/admin/`。
+- `src/routes/web/auth-routes.js` 已拆为认证聚合器，具体实现位于 `src/routes/web/auth/`。
+- `public/js/chat/controller.js` 已改为聊天页前端装配入口，conversation state / streaming UI / compose submit / optimize submit / action stream submit / history loader 已拆成独立脚本。
+- `src/services/plan-service.js` 已改为兼容门面，CRUD、订阅/配额、normalizer、hydration、usage-window 已拆入 `src/services/plan/`。
+- `src/services/conversation-service.js` 已拆出 `src/services/conversation/message-view.js` 与 `path-repository.js`。
+- `src/lib/db-sqlite-schema.js` 已拆为 SQLite schema 聚合入口，具体表结构和种子数据位于 `src/lib/sqlite-schema/`。
+
+后续如继续瘦身，建议只在新增业务时顺手拆对应领域，避免为了“更小”而打散已有稳定边界。

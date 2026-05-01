@@ -1,3 +1,8 @@
+/**
+ * @file public/js/profile-page.js
+ * @description 个人资料页验证码刷新、邮箱验证码和短信验证码发送交互。
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
   const t = window.AI_ROLEPLAY_I18N?.t || ((key) => key);
 
