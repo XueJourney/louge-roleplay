@@ -5,6 +5,15 @@
 
 const { query } = require('../lib/db');
 
+function formatDateTimeForDb(date) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function buildStaleJobCutoff(minutes = 10) {
+  return formatDateTimeForDb(new Date(Date.now() - minutes * 60 * 1000));
+}
+
 async function listUsersWithPlans() {
   return query(
     `SELECT u.id, u.public_id, u.username, u.nickname, u.email, u.phone, u.role, u.status,
@@ -29,23 +38,30 @@ async function listProviders() {
   );
 }
 
-async function getAdminOverview() {
+async function getAdminOverview({ runtimeQueueState = null } = {}) {
+  const staleJobCutoff = buildStaleJobCutoff(10);
   const [userRows] = await Promise.all([
     query('SELECT COUNT(*) AS total_users FROM users'),
   ]);
-  const [providerRows, activePlanRows, queueRows, usageRows] = await Promise.all([
+  const [providerRows, activePlanRows, staleQueueRows, usageRows] = await Promise.all([
     query('SELECT COUNT(*) AS total_providers, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_providers FROM llm_providers'),
     query("SELECT COUNT(*) AS active_subscriptions FROM user_subscriptions WHERE status = 'active'"),
-    query("SELECT COUNT(*) AS queued_jobs FROM llm_jobs WHERE status IN ('queued','running')"),
+    query("SELECT COUNT(*) AS stale_running_jobs FROM llm_jobs WHERE status = 'running' AND updated_at < ?", [staleJobCutoff]),
     query("SELECT COUNT(*) AS total_requests, COALESCE(SUM(total_cost), 0) AS total_cost FROM llm_usage_logs"),
   ]);
+
+  const liveRuntimeJobs = Number(runtimeQueueState?.activeCount || 0) + Number(runtimeQueueState?.pendingQueueLength || 0);
 
   return {
     totalUsers: Number(userRows[0]?.total_users || 0),
     totalProviders: Number(providerRows[0]?.total_providers || 0),
     activeProviders: Number(providerRows[0]?.active_providers || 0),
     activeSubscriptions: Number(activePlanRows[0]?.active_subscriptions || 0),
-    queuedJobs: Number(queueRows[0]?.queued_jobs || 0),
+    queuedJobs: liveRuntimeJobs,
+    runtimeQueueActive: Number(runtimeQueueState?.activeCount || 0),
+    runtimeQueuePending: Number(runtimeQueueState?.pendingQueueLength || 0),
+    runtimeQueueMaxConcurrency: Number(runtimeQueueState?.maxConcurrency || 0),
+    staleRunningJobs: Number(staleQueueRows[0]?.stale_running_jobs || 0),
     totalRequests: Number(usageRows[0]?.total_requests || 0),
     totalCost: Number(usageRows[0]?.total_cost || 0),
   };

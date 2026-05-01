@@ -87,8 +87,22 @@ async function createUsageLog({
   );
 }
 
+async function recoverInterruptedLlmJobs(reason = 'Job interrupted by application restart before completion') {
+  const result = await query(
+    `UPDATE llm_jobs
+     SET status = 'failed',
+         finished_at = COALESCE(finished_at, NOW()),
+         error_message = COALESCE(error_message, ?),
+         updated_at = NOW()
+     WHERE status IN ('queued', 'running')`,
+    [String(reason || '').slice(0, 255)],
+  );
+  return Number(result?.affectedRows || 0);
+}
+
 module.exports = {
   createLlmJob,
   updateLlmJob,
   createUsageLog,
+  recoverInterruptedLlmJobs,
 };

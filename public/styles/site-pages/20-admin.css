@@ -989,3 +989,16 @@
       align-items: flex-start;
     }
   }
+
+  .metric-subtle,
+  .metric-warning {
+    display: block;
+    margin-top: 6px;
+    color: #fbbf24;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .metric-subtle {
+    color: var(--text-tertiary);
+  }

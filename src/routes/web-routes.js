@@ -56,7 +56,7 @@ const {
 } = require('../services/conversation-service');
 const { translate } = require('../i18n');
 const { DEFAULT_MODEL_KEY, normalizeModelKey } = require('../services/model-entitlement-service');
-const { generateReplyViaGateway, optimizeUserInputViaGateway, getChatModelSelector } = require('../services/llm-gateway-service');
+const { generateReplyViaGateway, optimizeUserInputViaGateway, getChatModelSelector, getLlmRuntimeQueueState } = require('../services/llm-gateway-service');
 const { issueEmailCode, issuePhoneCode, verifyEmailCode, verifyPhoneCode } = require('../services/verification-service');
 const { hashPassword, verifyPassword } = require('../services/password-service');
 const { verifyDomesticPhoneIdentity } = require('../services/phone-auth-service');
@@ -216,6 +216,7 @@ function registerWebRoutes(app) {
     generateReplyViaGateway,
     optimizeUserInputViaGateway,
     getChatModelSelector,
+    getLlmRuntimeQueueState,
     DEFAULT_MODEL_KEY,
     normalizeModelKey,
     parsePlanModelsFromBody,

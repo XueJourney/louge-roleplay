@@ -4,12 +4,12 @@
  */
 
 function registerAdminDashboardRoutes(app, ctx) {
-  const { requireAdmin, listPlans, listUsersWithPlans, getAdminOverview, renderPage } = ctx;
+  const { requireAdmin, listPlans, listUsersWithPlans, getAdminOverview, getLlmRuntimeQueueState, renderPage } = ctx;
 
   app.get('/admin', requireAdmin, async (req, res, next) => {
     try {
       const [overview, users, plans] = await Promise.all([
-        getAdminOverview(),
+        getAdminOverview({ runtimeQueueState: getLlmRuntimeQueueState ? getLlmRuntimeQueueState() : null }),
         listUsersWithPlans(),
         listPlans(),
       ]);

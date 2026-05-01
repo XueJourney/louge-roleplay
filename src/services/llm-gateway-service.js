@@ -425,8 +425,13 @@ async function getChatModelSelector(userId = null) {
   };
 }
 
+function getLlmRuntimeQueueState() {
+  return llmQueue.getState();
+}
+
 module.exports = {
   MAX_GLOBAL_CONCURRENCY,
+  getLlmRuntimeQueueState,
   generateReplyViaGateway,
   streamReplyViaGateway,
   streamOptimizeUserInputViaGateway,

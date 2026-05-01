@@ -12,7 +12,14 @@
     <div class="metrics metrics--compact">
       <div class="metric"><strong><%= overview.activeProviders %></strong><span>启用中的 Provider</span></div>
       <div class="metric"><strong><%= overview.totalProviders %></strong><span>Provider 总数</span></div>
-      <div class="metric"><strong><%= overview.queuedJobs %></strong><span>当前队列压力</span></div>
+      <div class="metric">
+        <strong><%= overview.queuedJobs %></strong>
+        <span>实时队列</span>
+        <small class="metric-subtle"><%= '运行' %> <%= overview.runtimeQueueActive || 0 %> / <%= '等待' %> <%= overview.runtimeQueuePending || 0 %></small>
+        <% if (overview.staleRunningJobs) { %>
+          <small class="metric-warning"><%= overview.staleRunningJobs %> 个历史挂起任务未计入</small>
+        <% } %>
+      </div>
     </div>
   </section>
 

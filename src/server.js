@@ -16,6 +16,7 @@ const config = require('./config');
 const logger = require('./lib/logger');
 const { csrfProtection } = require('./middleware/csrf');
 const { appendDailyLog } = require('./services/log-service');
+const { recoverInterruptedLlmJobs } = require('./services/llm-usage-service');
 const { waitReady: waitDbReady, getDbType } = require('./lib/db');
 const { initRedis, redisClient, isRedisReal } = require('./lib/redis');
 const { requestContext } = require('./middleware/request-context');
@@ -97,6 +98,11 @@ async function bootstrap() {
 
   await waitDbReady();
   logger.info('[bootstrap] 数据库已就绪', { dbType: getDbType() });
+
+  const recoveredJobCount = await recoverInterruptedLlmJobs();
+  if (recoveredJobCount > 0) {
+    logger.warn('[bootstrap] 已恢复上次进程遗留的 LLM 队列任务', { recoveredJobCount });
+  }
 
   await initRedis();
   logger.info('[bootstrap] Redis 初始化完成', { mode: isRedisReal() ? '真实 Redis' : '内存替代' });

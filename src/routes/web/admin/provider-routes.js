@@ -9,6 +9,7 @@ function registerAdminProviderRoutes(app, ctx) {
   const {
     requireAdmin,
     getAdminOverview,
+    getLlmRuntimeQueueState,
     listProviders,
     createProvider,
     updateProvider,
@@ -22,7 +23,7 @@ function registerAdminProviderRoutes(app, ctx) {
   app.get('/admin/providers', requireAdmin, async (req, res, next) => {
     try {
       const [overview, providers] = await Promise.all([
-        getAdminOverview(),
+        getAdminOverview({ runtimeQueueState: getLlmRuntimeQueueState ? getLlmRuntimeQueueState() : null }),
         listProviders(),
       ]);
 
