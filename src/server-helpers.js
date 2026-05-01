@@ -25,11 +25,53 @@ const { getChatModelSelector } = require('./services/llm-gateway-service');
 const { getClientNotificationBootstrap } = require('./services/notification-service');
 
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildAbsoluteUrl(pathOrUrl) {
+  const raw = String(pathOrUrl || '').trim();
+  if (!raw) {
+    return config.appUrl;
+  }
+  try {
+    return new URL(raw, config.appUrl).toString();
+  } catch (_) {
+    return raw;
+  }
+}
+
+function buildDefaultMeta(params = {}) {
+  const defaultDescription = translate(params.locale || 'zh-CN', '楼阁默认分享描述');
+  const description = String(params.description || defaultDescription).trim();
+  const image = buildAbsoluteUrl(params.image || '/public/icons/og-louge.png');
+  const url = buildAbsoluteUrl(params.url || '/');
+
+  return {
+    description,
+    image,
+    url,
+    type: params.type || 'website',
+    siteName: config.appName,
+    twitterCard: params.twitterCard || 'summary_large_image',
+  };
+}
+
 async function renderPage(res, view, params = {}) {
   const locale = res.locals.locale || 'zh-CN';
   const t = res.locals.t || ((key, vars) => translate(locale, key, vars));
   const titleSource = params.title || config.appName;
   const title = translateHtml(locale, t(titleSource));
+  const meta = buildDefaultMeta({
+    ...params.meta,
+    locale,
+    title,
+  });
   const clientNotifications = await getClientNotificationBootstrap(res.locals.currentUser || null);
   return new Promise((resolve) => {
     res.render(view, params, (viewError, html) => {
@@ -46,6 +88,8 @@ async function renderPage(res, view, params = {}) {
         currentUser: res.locals.currentUser,
         appName: config.appName,
         appUrl: config.appUrl,
+        meta,
+        escapeHtml,
         locale,
         t,
         csrfToken: res.locals.csrfToken || '',
@@ -368,11 +412,18 @@ async function renderChatPage(req, res, conversation, options = {}) {
   view.visiblePathMessages = view.pathMessages.slice(keepFromIndex);
   view.hasOlderMessages = view.pathMessages.length > view.visiblePathMessages.length;
   view.oldestVisibleMessageId = view.visiblePathMessages.length ? view.visiblePathMessages[0].id : null;
-  const chatModelSelector = await getChatModelSelector();
+  const chatModelSelector = await getChatModelSelector(req.session?.user?.id || null);
+
+  const activeMode = (chatModelSelector.options || []).some((option) => option.mode === conversation.selected_model_mode)
+    ? conversation.selected_model_mode
+    : (chatModelSelector.options || []).find((option) => option.isDefault)?.mode || (chatModelSelector.options || [])[0]?.mode || conversation.selected_model_mode || 'standard';
 
   return renderPage(res, 'chat', {
     title: req.t ? req.t('聊天') : '聊天',
-    conversation,
+    conversation: {
+      ...conversation,
+      selected_model_mode: activeMode,
+    },
     view,
     draftContent: options.draftContent || String(req.query.draft || ''),
     optimizedContent: options.optimizedContent || '',

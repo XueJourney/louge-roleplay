@@ -14,11 +14,83 @@
     const tokenField = group.querySelector('[data-token-quota-field]');
     function apply() {
       const mode = select.value;
-      if (requestField) requestField.style.display = mode === 'per_request' ? '' : 'none';
-      if (tokenField) tokenField.style.display = mode === 'per_token' ? '' : 'none';
+      if (requestField) requestField.style.display = mode === 'per_request' || mode === 'hybrid' ? '' : 'none';
+      if (tokenField) tokenField.style.display = mode === 'per_token' || mode === 'hybrid' ? '' : 'none';
     }
     select.addEventListener('change', apply);
     apply();
+  });
+  function setupPlanModelRow(row) {
+    if (!row || row.dataset.planModelInitialized === '1') return;
+    row.dataset.planModelInitialized = '1';
+    const providerSelect = row.querySelector('[data-plan-model-provider]');
+    const modelSelect = row.querySelector('[data-plan-model-select]');
+
+    function applyModelFilter() {
+      if (!providerSelect || !modelSelect) return;
+      const providerId = String(providerSelect.value || '');
+      let selectedVisible = false;
+      Array.from(modelSelect.options).forEach((option) => {
+        const optionProviderId = String(option.dataset.providerId || '');
+        const visible = !option.value || optionProviderId === providerId;
+        option.hidden = !visible;
+        option.disabled = !visible;
+        if (option.selected && visible) selectedVisible = true;
+      });
+      if (!selectedVisible) {
+        modelSelect.value = '';
+      }
+    }
+
+    providerSelect?.addEventListener('change', applyModelFilter);
+    applyModelFilter();
+
+    const keyInput = row.querySelector('[data-plan-model-key]');
+    const defaultInput = row.querySelector('[data-plan-model-default]');
+    const syncDefaultValue = () => {
+      if (defaultInput && keyInput) defaultInput.value = keyInput.value || '';
+    };
+    keyInput?.addEventListener('input', syncDefaultValue);
+    syncDefaultValue();
+
+    row.querySelector('[data-plan-model-remove]')?.addEventListener('click', () => {
+      const list = row.closest('[data-plan-model-list]');
+      if (list && list.querySelectorAll('.plan-model-row').length <= 1) {
+        row.querySelectorAll('input, select').forEach((field) => {
+          if (field.type === 'radio') field.checked = true;
+          else if (field.name === 'planModelKey') field.value = 'standard';
+          else if (field.name === 'planModelRequestMultiplier' || field.name === 'planModelTokenMultiplier') field.value = '1';
+          else if (field.tagName === 'SELECT') field.selectedIndex = 0;
+          else field.value = '';
+        });
+        syncDefaultValue();
+        applyModelFilter();
+        return;
+      }
+      const wasDefault = Boolean(defaultInput?.checked);
+      row.remove();
+      if (wasDefault && list) {
+        const firstDefault = list.querySelector('[data-plan-model-default]');
+        if (firstDefault) firstDefault.checked = true;
+      }
+    });
+  }
+
+  document.querySelectorAll('.plan-model-row').forEach(setupPlanModelRow);
+  document.querySelectorAll('[data-plan-model-add]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const form = button.closest('form');
+      const list = form?.querySelector('[data-plan-model-list]');
+      const template = document.getElementById('plan-model-row-template');
+      if (!list || !template) return;
+      const index = list.querySelectorAll('.plan-model-row').length + 1;
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = template.innerHTML.replace(/__INDEX__/g, String(index + 1)).trim();
+      const row = wrapper.firstElementChild;
+      if (!row) return;
+      list.appendChild(row);
+      setupPlanModelRow(row);
+    });
   });
 })();
 

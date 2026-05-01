@@ -5,6 +5,7 @@
 
 const axios = require('axios');
 const config = require('../config');
+const { buildVerificationEmailText, buildVerificationEmailHtml } = require('./email-template-service');
 
 async function sendVerificationEmail(email, code) {
   if (!config.resendApiKey) {
@@ -14,9 +15,9 @@ async function sendVerificationEmail(email, code) {
   await axios.post('https://api.resend.com/emails', {
     from: config.resendFrom,
     to: [email],
-    subject: '你的验证码',
-    text: `你的验证码是 ${code}，5 分钟内有效。若不是你本人操作，请忽略此邮件。`,
-    html: `<div style="font-family:Arial,sans-serif"><h2>验证码</h2><p>你的验证码是：<strong style="font-size:24px">${code}</strong></p><p>5 分钟内有效。若不是你本人操作，请忽略此邮件。</p></div>`,
+    subject: '楼阁验证码',
+    text: buildVerificationEmailText(code),
+    html: buildVerificationEmailHtml(code),
   }, {
     headers: {
       Authorization: `Bearer ${config.resendApiKey}`,

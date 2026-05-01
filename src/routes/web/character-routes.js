@@ -16,6 +16,7 @@ function registerCharacterRoutes(app, ctx) {
     addMessage,
     renderPage,
     parseIdParam,
+    resolveAllowedInitialModelMode,
     splitCharacterPromptProfile,
     buildCharacterPromptProfileFromForm
   } = ctx;
@@ -141,9 +142,10 @@ function registerCharacterRoutes(app, ctx) {
         return renderPage(res, 'message', { title: '提示', message: '角色不存在。' });
       }
 
+      const selectedModelMode = await resolveAllowedInitialModelMode(req.session.user.id, req.body.modelMode);
       const conversationId = await createConversation(req.session.user.id, characterId, {
         title: `${character.name} · 新对话`,
-        selectedModelMode: String(req.body.modelMode || 'standard').trim(),
+        selectedModelMode,
       });
       await markCharacterUsed(characterId, req.session.user.id);
 

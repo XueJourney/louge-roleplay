@@ -224,7 +224,7 @@ async function main() {
   const branch = await getConversationById(branchConversationId, userId);
   assert.equal(Number(branch.parent_conversation_id), Number(conversationId), 'branch conversation should point to parent');
 
-  const chatSelector = await getChatModelSelector();
+  const chatSelector = await getChatModelSelector(userId);
   assert.ok(Array.isArray(chatSelector.options), 'chat model selector should return options array');
 
   const req = {

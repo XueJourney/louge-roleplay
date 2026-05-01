@@ -1,12 +1,96 @@
 <!-- @file src/views/admin-plans.ejs
      @description 套餐管理页面模板。调用说明：GET /admin/plans 由 web-routes.js 渲染，POST /admin/plans/* 处理新增、编辑、删除。
 -->
+<%
+  const esc = typeof escapeHtml === 'function'
+    ? escapeHtml
+    : (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  const providerOptions = Array.isArray(locals.providers) ? locals.providers : [];
+  const providerModels = [];
+  const modelOptionsByProvider = new Map();
+  providerOptions.forEach((provider) => {
+    const options = provider.availableModels || [];
+    modelOptionsByProvider.set(Number(provider.id), options);
+    options.forEach((model) => {
+      providerModels.push({ provider, model });
+    });
+  });
+  const fallbackProvider = providerOptions[0] || null;
+  const defaultPlanModels = providerModels.slice(0, 1).map((item, index) => ({
+    modelKey: index === 0 ? 'standard' : `model-${index + 1}`,
+    label: item.model.label,
+    providerId: item.provider.id,
+    modelId: item.model.id,
+    requestMultiplier: 1,
+    tokenMultiplier: 1,
+    isDefault: index === 0,
+  }));
+
+  function renderProviderOptions(selectedProviderId = 0) {
+    return providerOptions.map((provider) => `<option value="${esc(provider.id)}" ${Number(selectedProviderId) === Number(provider.id) ? 'selected' : ''}>${esc(provider.name)}</option>`).join('');
+  }
+
+  function renderModelOptions(selectedProviderId = 0, selectedModelId = '') {
+    return providerModels.map(({ provider, model }) => `<option value="${esc(model.id)}" data-provider-id="${esc(provider.id)}" ${String(selectedModelId || '') === String(model.id) && Number(selectedProviderId) === Number(provider.id) ? 'selected' : ''}>${esc(provider.name)} · ${esc(model.label)} (${esc(model.id)})</option>`).join('');
+  }
+
+  function renderPlanModelRow(item = {}, index = 0) {
+    const rowKey = item.modelKey || (index === 0 ? 'standard' : `model-${index + 1}`);
+    const providerId = Number(item.providerId || fallbackProvider?.id || 0);
+    return `
+      <div class="plan-model-row">
+        <div class="inline-grid inline-grid--dense">
+          <label>Key<input type="text" name="planModelKey" value="${esc(rowKey)}" placeholder="standard / premium" data-plan-model-key /></label>
+          <label>前台名称<input type="text" name="planModelLabel" value="${esc(item.label || '')}" placeholder="基础模型 / 高级模型" /></label>
+        </div>
+        <div class="inline-grid inline-grid--dense">
+          <label>
+            Provider
+            <select name="planModelProviderId" data-plan-model-provider>
+              ${renderProviderOptions(providerId)}
+            </select>
+          </label>
+          <label>
+            模型 ID
+            <select name="planModelId" data-plan-model-select>
+              <option value="">不启用这一行</option>
+              ${renderModelOptions(providerId, item.modelId)}
+            </select>
+          </label>
+        </div>
+        <div class="inline-grid inline-grid--dense">
+          <label>请求倍率<input type="number" name="planModelRequestMultiplier" value="${esc(item.requestMultiplier || 1)}" min="0.01" step="0.01" /></label>
+          <label>Token 倍率<input type="number" name="planModelTokenMultiplier" value="${esc(item.tokenMultiplier || item.requestMultiplier || 1)}" min="0.01" step="0.01" /></label>
+        </div>
+        <div class="toolbar-row toolbar-row--between toolbar-row--tight">
+          <label class="checkbox-line"><input type="radio" name="planModelDefaultKey" value="${esc(rowKey)}" data-plan-model-default ${item.isDefault || index === 0 ? 'checked' : ''} /> 默认使用这个模型</label>
+          <button type="button" class="danger-button danger-button--small" data-plan-model-remove>删除模型</button>
+        </div>
+      </div>`;
+  }
+
+  function renderPlanModelRows(planModels) {
+    const rows = Array.isArray(planModels) && planModels.length
+      ? planModels
+      : (defaultPlanModels.length ? defaultPlanModels : [{ modelKey: 'standard', requestMultiplier: 1, tokenMultiplier: 1, isDefault: true }]);
+    return `<div class="plan-model-list" data-plan-model-list>${rows.map((item, index) => renderPlanModelRow(item, index)).join('')}</div>
+      <div class="toolbar-row toolbar-row--tight"><button type="button" class="secondary-button" data-plan-model-add>添加模型</button></div>`;
+  }
+
+  const planModelRowTemplate = renderPlanModelRow({ modelKey: '__KEY__', requestMultiplier: 1, tokenMultiplier: 1 }, 0)
+    .replace(/__KEY__/g, 'model-__INDEX__');
+%>
 <div class="admin-shell">
   <section class="hero-card admin-hero">
     <div class="admin-hero-copy">
       <p class="section-kicker">Plans</p>
       <h1>套餐配置</h1>
-      <p class="muted-text">套餐、额度、默认值、并发、计费模式都单独放到这页了。改套餐终于不用路过一堆 Provider 和 Prompt 表单。</p>
+      <p class="muted-text">现在模型跟着套餐走：每个套餐默认 1 个模型，也可以按需要动态添加多个模型，并分别设置请求倍率与 Token 倍率。</p>
     </div>
 
     <div class="metrics metrics--compact">
@@ -31,7 +115,7 @@
       <div>
         <p class="section-kicker">Billing</p>
         <h2>套餐方案</h2>
-        <p class="muted-text">新增表单折叠，现有套餐按卡片展开。先看摘要，确认后再编辑。</p>
+        <p class="muted-text">倍率会写入用量日志：请求套餐按请求倍率扣次数，Token 套餐按 Token 倍率扣额度；hybrid 两边都检查。</p>
       </div>
       <div class="section-actions section-actions--stack">
         <label class="search-field">
@@ -57,6 +141,7 @@
                 <select name="billingMode" data-billing-mode>
                   <option value="per_request">per_request</option>
                   <option value="per_token">per_token</option>
+                  <option value="hybrid">hybrid</option>
                 </select>
               </label>
               <label>
@@ -69,12 +154,8 @@
               </label>
             </div>
             <div class="inline-grid" data-plan-quota-group>
-              <label data-request-quota-field>
-                请求额度<input type="number" name="requestQuota" value="0" min="0" />
-              </label>
-              <label data-token-quota-field>
-                Token 额度<input type="number" name="tokenQuota" value="0" min="0" />
-              </label>
+              <label data-request-quota-field>请求额度<input type="number" name="requestQuota" value="0" min="0" /></label>
+              <label data-token-quota-field>Token 额度<input type="number" name="tokenQuota" value="0" min="0" /></label>
             </div>
             <div class="inline-grid">
               <label>优先级<input type="number" name="priorityWeight" value="0" /></label>
@@ -84,6 +165,9 @@
               <label>最大输出 Token<input type="number" name="maxOutputTokens" value="1024" min="1" /></label>
               <label>排序<input type="number" name="sortOrder" value="0" /></label>
             </div>
+            <h3>套餐可用模型</h3>
+            <p class="mini-note">默认一个模型；需要更多模型时点「添加模型」，高级模型可把请求 / Token 倍率设为 3。</p>
+            <%- renderPlanModelRows([]) %>
             <div class="inline-grid">
               <label>
                 状态
@@ -111,7 +195,7 @@
     <% if (plans.length) { %>
       <div id="plans-list" class="admin-list">
         <% plans.forEach(plan => { %>
-          <details class="admin-item admin-item--plan" data-filter-item data-filter-text="<%= [plan.name, plan.code, plan.description || '', plan.billing_mode, plan.quota_period, plan.status].join(' ') %>">
+          <details class="admin-item admin-item--plan" data-filter-item data-filter-text="<%= [plan.name, plan.code, plan.description || '', plan.billing_mode, plan.quota_period, plan.status, ...(plan.planModels || []).map(item => `${item.label} ${item.modelId}`)].join(' ') %>">
             <summary class="admin-item-summary">
               <div class="admin-item-main">
                 <strong><%= plan.name %></strong>
@@ -124,7 +208,7 @@
                 <span class="meta-chip">周期 <strong><%= plan.quota_period %></strong></span>
                 <span class="meta-chip">请求 <strong><%= plan.request_quota %></strong></span>
                 <span class="meta-chip">Token <strong><%= plan.token_quota %></strong></span>
-                <span class="meta-chip">优先级 <strong><%= plan.priority_weight %></strong></span>
+                <span class="meta-chip">模型 <strong><%= (plan.planModels || []).length %></strong></span>
                 <span class="meta-chip">并发 <strong><%= plan.concurrency_limit %></strong></span>
               </div>
             </summary>
@@ -140,6 +224,7 @@
                     <select name="billingMode" data-billing-mode>
                       <option value="per_request" <%= plan.billing_mode === 'per_request' ? 'selected' : '' %>>per_request</option>
                       <option value="per_token" <%= plan.billing_mode === 'per_token' ? 'selected' : '' %>>per_token</option>
+                      <option value="hybrid" <%= plan.billing_mode === 'hybrid' ? 'selected' : '' %>>hybrid</option>
                     </select>
                   </label>
                   <label>
@@ -163,6 +248,9 @@
                   <label>最大输出 Token<input type="number" name="maxOutputTokens" value="<%= plan.max_output_tokens %>" min="1" /></label>
                   <label>排序<input type="number" name="sortOrder" value="<%= plan.sort_order %>" /></label>
                 </div>
+                <h3>套餐可用模型</h3>
+                <p class="mini-note">当前用户只会看到这里配置的模型；可动态添加或删除，模型 Key 会保存在会话上，改套餐时会自动回落到默认可用模型。</p>
+                <%- renderPlanModelRows(plan.planModels || []) %>
                 <div class="inline-grid">
                   <label>
                     状态
@@ -199,4 +287,5 @@
   </section>
 </div>
 
-<script nonce="<%= cspNonce || '' %>" src="/public/js/admin-page.js"></script>
+<template id="plan-model-row-template"><%- planModelRowTemplate %></template>
+<script nonce="<%= locals.cspNonce || '' %>" src="/public/js/admin-page.js"></script>

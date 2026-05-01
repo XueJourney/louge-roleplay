@@ -2,6 +2,40 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)：`MAJOR.MINOR.PATCH`。
 
+## [1.2.0] - 2026-05-01
+
+### Added
+
+- 新增套餐级模型权益配置：后台可为每个套餐配置不定数量的前台可选模型，并隐藏真实 Provider/model ID。
+- 新增模型请求倍率与 Token 倍率，支持高级模型按多倍请求次数或多倍 Token 扣减额度。
+- 新增用量日志计费字段，保留原始 token/cost，同时记录模型 key、模型 ID、倍率、可计费请求单位与可计费 Token。
+- 新增模型权益解析测试 `npm run model-entitlements:test`。
+
+### Changed
+
+- 聊天页模型选择改为按当前用户套餐动态渲染；套餐不支持的模型会被拒绝或回落到默认模型。
+- 配额校验改为使用可计费请求/Token 单位，并补齐 `hybrid` 模式同时校验请求与 Token。
+- MySQL/SQLite 初始化与升级路径新增 `plans.plan_models_json`、用量计费字段，并将会话模型字段放宽为通用 model key。
+- 邮箱验证码改为更完整的响应式 HTML 卡片模板，同时保留纯文本兜底。
+- 将邮箱模板、模型 entitlement、后台模型表单解析与模型-provider 校验拆成独立服务，减轻主流程文件负担。
+
+### Fixed
+
+- 修复后台套餐计费模式已支持 `hybrid` 但老 MySQL enum 可能未升级的问题。
+- 修复后台可误选“Provider A + Provider B 模型”的隐性错配风险。
+- 修复套餐模型默认 radio 在编辑页可能错误选中多行的问题。
+
+## [1.1.4] - 2026-05-01
+
+### Added
+
+- 新增站点 favicon、Apple touch icon、PWA manifest 与 Open Graph 分享图。
+- 为公开首页与公开角色列表补充页面级 SEO/社交分享描述。
+
+### Fixed
+
+- 富文本消息中的引号高亮改为在 DOM 清洗后处理文本节点，避免高亮逻辑破坏链接、代码块或已转义 HTML。
+
 ## [1.1.3] - 2026-05-01
 
 ### Added

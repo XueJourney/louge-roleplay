@@ -23,13 +23,22 @@
  *   getActiveSubscriptionForUser(userId)         获取当前活跃订阅（含套餐信息）
  *   getCurrentUsageForUser(userId, subscription) 统计当前周期用量
  *   getUserQuotaSnapshot(userId)                 获取订阅 + 用量 + 剩余配额快照
- *   assertUserQuotaAvailable(userId, tokens)     配额不足时抛出 REQUEST/TOKEN_QUOTA_EXCEEDED
+ *   assertUserQuotaAvailable(userId, tokens, model) 配额不足时抛出 REQUEST/TOKEN_QUOTA_EXCEEDED
  *   updateUserPlan(userId, planId)               变更用户套餐（原子事务）
  */
 
 'use strict';
 
 const { query, withTransaction, getDbType } = require('../lib/db');
+const {
+  parsePlanModelsJson,
+  serializePlanModels,
+  buildDefaultPlanModelsFromProvider,
+  findPlanModel,
+  getBillableRequestUnits,
+  getBillableTokenUnits,
+} = require('./model-entitlement-service');
+const { getActiveProvider } = require('./llm-provider-service');
 
 // ─── 内部辅助函数 ─────────────────────────────────────────────────────────────
 
@@ -89,7 +98,38 @@ function normalizePlanPayload(payload = {}, current = null) {
     maxOutputTokens:  ensurePositiveInteger(   payload.maxOutputTokens  ?? current?.max_output_tokens ?? 1024, 'maxOutputTokens'),
     sortOrder:        ensureNonNegativeInteger(payload.sortOrder         ?? current?.sort_order         ?? 0,  'sortOrder'),
     isDefault:        Boolean(payload.isDefault),
+    planModels:       Array.isArray(payload.planModels) ? payload.planModels : parsePlanModelsJson(current?.plan_models_json || '[]'),
   };
+}
+
+async function hydratePlanModelsForPlan(plan) {
+  if (!plan) return null;
+  let planModels = parsePlanModelsJson(plan.plan_models_json || '[]');
+  if (!planModels.length) {
+    planModels = buildDefaultPlanModelsFromProvider(await getActiveProvider());
+  }
+  return {
+    ...plan,
+    planModels,
+    model_count: planModels.length,
+  };
+}
+
+async function hydratePlanModelsForPlans(plans = []) {
+  const fallbackProvider = plans.some((plan) => !parsePlanModelsJson(plan.plan_models_json || '[]').length)
+    ? await getActiveProvider()
+    : null;
+  return plans.map((plan) => {
+    let planModels = parsePlanModelsJson(plan.plan_models_json || '[]');
+    if (!planModels.length) {
+      planModels = buildDefaultPlanModelsFromProvider(fallbackProvider);
+    }
+    return {
+      ...plan,
+      planModels,
+      model_count: planModels.length,
+    };
+  });
 }
 
 /**
@@ -162,14 +202,15 @@ async function assignDefaultPlanToUser(conn, userId) {
  * @returns {Promise<object[]>}
  */
 async function listPlans() {
-  return query(
+  const rows = await query(
     `SELECT
        id, code, name, description, billing_mode, quota_period,
        request_quota, token_quota, priority_weight, concurrency_limit,
-       max_output_tokens, status, is_default, sort_order
+       max_output_tokens, plan_models_json, status, is_default, sort_order
      FROM plans
      ORDER BY sort_order ASC, id ASC`,
   );
+  return hydratePlanModelsForPlans(rows);
 }
 
 /**
@@ -183,13 +224,13 @@ async function findPlanById(planId) {
     `SELECT
        id, code, name, description, billing_mode, quota_period,
        request_quota, token_quota, priority_weight, concurrency_limit,
-       max_output_tokens, status, is_default, sort_order
+       max_output_tokens, plan_models_json, status, is_default, sort_order
      FROM plans
      WHERE id = ?
      LIMIT 1`,
     [planId],
   );
-  return rows[0] || null;
+  return hydratePlanModelsForPlan(rows[0] || null);
 }
 
 /**
@@ -205,9 +246,9 @@ async function createPlan(payload) {
     `INSERT INTO plans (
        code, name, description, billing_mode, quota_period,
        request_quota, token_quota, priority_weight, concurrency_limit,
-       max_output_tokens, status, is_default, sort_order,
+       max_output_tokens, plan_models_json, status, is_default, sort_order,
        created_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       String(payload.code || '').trim(),
       String(payload.name || '').trim(),
@@ -219,6 +260,7 @@ async function createPlan(payload) {
       normalized.priorityWeight,
       normalized.concurrencyLimit,
       normalized.maxOutputTokens,
+      serializePlanModels(normalized.planModels),
       normalized.status,
       normalized.isDefault ? 1 : 0,
       normalized.sortOrder,
@@ -260,6 +302,7 @@ async function updatePlan(planId, payload) {
          priority_weight = ?,
          concurrency_limit = ?,
          max_output_tokens = ?,
+         plan_models_json = ?,
          status = ?,
          is_default = ?,
          sort_order = ?,
@@ -275,6 +318,7 @@ async function updatePlan(planId, payload) {
       normalized.priorityWeight,
       normalized.concurrencyLimit,
       normalized.maxOutputTokens,
+      serializePlanModels(normalized.planModels),
       normalized.status,
       normalized.isDefault ? 1 : 0,
       normalized.sortOrder,
@@ -325,6 +369,7 @@ async function getActiveSubscriptionForUser(userId) {
        p.code AS plan_code, p.name AS plan_name, p.description AS plan_description,
        p.billing_mode, p.quota_period, p.request_quota, p.token_quota,
        p.priority_weight, p.concurrency_limit, p.max_output_tokens,
+       p.plan_models_json,
        p.status AS plan_status
      FROM user_subscriptions us
      INNER JOIN plans p ON p.id = us.plan_id
@@ -333,7 +378,7 @@ async function getActiveSubscriptionForUser(userId) {
      LIMIT 1`,
     [userId],
   );
-  return rows[0] || null;
+  return hydratePlanModelsForPlan(rows[0] || null);
 }
 
 /**
@@ -353,8 +398,8 @@ async function getCurrentUsageForUser(userId, subscription = null) {
 
   const rows = await query(
     `SELECT
-       COALESCE(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END), 0)            AS used_requests,
-       COALESCE(SUM(CASE WHEN status = 'success' THEN total_tokens ELSE 0 END), 0) AS used_tokens
+       COALESCE(SUM(CASE WHEN status = 'success' THEN billable_request_units ELSE 0 END), 0) AS used_requests,
+       COALESCE(SUM(CASE WHEN status = 'success' THEN billable_tokens ELSE 0 END), 0)        AS used_tokens
      FROM llm_usage_logs
      WHERE user_id = ?
        AND plan_id = ?
@@ -402,7 +447,7 @@ async function getUserQuotaSnapshot(userId) {
  * @returns {Promise<object>} 配额快照
  * @throws {Error} 'REQUEST_QUOTA_EXCEEDED' 或 'TOKEN_QUOTA_EXCEEDED'
  */
-async function assertUserQuotaAvailable(userId, estimatedTokens = 0) {
+async function assertUserQuotaAvailable(userId, estimatedTokens = 0, modelConfig = null) {
   const snapshot = await getUserQuotaSnapshot(userId);
   if (!snapshot) {
     throw new Error('User plan is not configured');
@@ -410,16 +455,45 @@ async function assertUserQuotaAvailable(userId, estimatedTokens = 0) {
 
   const { subscription, remainingRequests, remainingTokens } = snapshot;
   const billingMode = String(subscription.billing_mode || 'per_request');
+  const billableRequestUnits = getBillableRequestUnits(modelConfig);
+  const billableEstimatedTokens = getBillableTokenUnits(estimatedTokens, modelConfig);
 
-  if (billingMode === 'per_request' && remainingRequests <= 0) {
+  if ((billingMode === 'per_request' || billingMode === 'hybrid') && remainingRequests < billableRequestUnits) {
     throw new Error('REQUEST_QUOTA_EXCEEDED');
   }
 
-  if (billingMode === 'per_token' && Number(estimatedTokens || 0) > remainingTokens) {
+  if ((billingMode === 'per_token' || billingMode === 'hybrid') && billableEstimatedTokens > remainingTokens) {
     throw new Error('TOKEN_QUOTA_EXCEEDED');
   }
 
-  return snapshot;
+  return {
+    ...snapshot,
+    selectedModel: modelConfig || null,
+    billableRequestUnits,
+    billableEstimatedTokens,
+  };
+}
+
+function getSubscriptionModelConfig(subscription, selectedModelKey = '') {
+  const modelConfig = findPlanModel(subscription?.planModels || parsePlanModelsJson(subscription?.plan_models_json || '[]'), selectedModelKey);
+  if (!modelConfig) {
+    throw new Error('MODEL_NOT_AVAILABLE_FOR_PLAN');
+  }
+  return modelConfig;
+}
+
+function buildPlanModelOptions(subscription) {
+  return (subscription?.planModels || parsePlanModelsJson(subscription?.plan_models_json || '[]')).map((item) => ({
+    mode: item.modelKey,
+    label: item.label,
+    enabled: true,
+    requestMultiplier: item.requestMultiplier,
+    tokenMultiplier: item.tokenMultiplier,
+    providerId: item.providerId,
+    displayName: item.label,
+    hiddenModelId: item.modelId,
+    isDefault: item.isDefault,
+  }));
 }
 
 /**
@@ -460,5 +534,7 @@ module.exports = {
   getCurrentUsageForUser,
   getUserQuotaSnapshot,
   assertUserQuotaAvailable,
+  getSubscriptionModelConfig,
+  buildPlanModelOptions,
   updateUserPlan,
 };

@@ -111,8 +111,50 @@
       });
     }
 
-    function highlightQuotesInHtml(html) {
-      return String(html || '').replace(QUOTE_RE, (full) => `<span class="bubble-quote">${full}</span>`);
+    function highlightQuotesInNodeTree(root) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          if (parent.closest('pre, code, style, a')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          if (!QUOTE_RE.test(node.nodeValue || '')) {
+            QUOTE_RE.lastIndex = 0;
+            return NodeFilter.FILTER_REJECT;
+          }
+          QUOTE_RE.lastIndex = 0;
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      });
+      const textNodes = [];
+      while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+      }
+
+      textNodes.forEach((node) => {
+        const fragment = document.createDocumentFragment();
+        const text = node.nodeValue || '';
+        let lastIndex = 0;
+        QUOTE_RE.lastIndex = 0;
+        let match;
+        while ((match = QUOTE_RE.exec(text))) {
+          if (match.index > lastIndex) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+          }
+          const span = document.createElement('span');
+          span.className = 'bubble-quote';
+          span.textContent = match[0];
+          fragment.appendChild(span);
+          lastIndex = match.index + match[0].length;
+        }
+        if (lastIndex < text.length) {
+          fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+        node.replaceWith(fragment);
+      });
     }
 
     function normalizeMarkdownLines(text) {
@@ -253,7 +295,7 @@
         html = html.replace(`__CODE_BLOCK_${index}__`, snippet);
       });
 
-      return highlightQuotesInHtml(html);
+      return html;
     }
 
     function splitStreamingSegments(raw) {
@@ -380,6 +422,7 @@
       const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
       const root = doc.body.firstElementChild || doc.body;
       sanitizeNodeTree(root, scopeSelector);
+      highlightQuotesInNodeTree(root);
 
       const wrapper = document.createElement('div');
       wrapper.className = 'bubble-rich';

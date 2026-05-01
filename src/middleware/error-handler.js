@@ -52,6 +52,14 @@ function mapErrorToPresentation(error) {
     return { statusCode: 429, title: '额度不够', message: '当前 Token 额度不足，这次请求先发不出去。', errorCode: 'TOKEN_QUOTA_EXCEEDED' };
   }
 
+  if (message === 'MODEL_NOT_AVAILABLE_FOR_PLAN') {
+    return { statusCode: 403, title: '模型不可用', message: '当前套餐不支持这个模型，请切换到套餐可用模型后再试。', errorCode: 'MODEL_NOT_AVAILABLE_FOR_PLAN' };
+  }
+
+  if (message === 'User plan is not configured') {
+    return { statusCode: 403, title: '套餐未配置', message: '当前账号还没有可用套餐，请联系管理员配置后再试。', errorCode: 'USER_PLAN_NOT_CONFIGURED' };
+  }
+
   if (/rate limited|429/i.test(message)) {
     return { statusCode: 429, title: '请求太快了', message: '上游模型服务正在限流，等一会儿再试。', errorCode: 'UPSTREAM_RATE_LIMITED' };
   }

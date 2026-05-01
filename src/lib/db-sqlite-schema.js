@@ -37,6 +37,31 @@ function maskApiKey(apiKey = '') {
   return `${raw.slice(0, 4)}***${raw.slice(-4)}`;
 }
 
+function buildLegacyPlanModelsJson(provider = {}) {
+  const entries = [
+    ['standard', '标准模型', provider.standard_model || provider.model],
+    ['jailbreak', '破限模型', provider.jailbreak_model || provider.standard_model || provider.model],
+    ['force_jailbreak', '强破限模型', provider.force_jailbreak_model || provider.jailbreak_model || provider.standard_model || provider.model],
+  ];
+  const seen = new Set();
+  return JSON.stringify(entries
+    .map(([modelKey, label, modelId], index) => ({
+      modelKey,
+      label,
+      providerId: provider.id,
+      modelId: String(modelId || '').trim(),
+      requestMultiplier: 1,
+      tokenMultiplier: 1,
+      isDefault: index === 0,
+      sortOrder: index * 10,
+    }))
+    .filter((item) => {
+      if (!item.modelId || seen.has(item.modelKey)) return false;
+      seen.add(item.modelKey);
+      return true;
+    }));
+}
+
 /**
  * 初始化 SQLite 数据库表结构，并写入种子数据（套餐、默认 LLM 提供商）。
  * 所有 CREATE TABLE 使用 IF NOT EXISTS，可以安全重复调用。
@@ -146,6 +171,7 @@ function initSqliteSchema(db) {
       priority_weight  INTEGER NOT NULL DEFAULT 0,
       concurrency_limit INTEGER NOT NULL DEFAULT 1,
       max_output_tokens INTEGER NOT NULL DEFAULT 2048,
+      plan_models_json TEXT NULL,
       status           TEXT NOT NULL DEFAULT 'active',
       is_default       INTEGER NOT NULL DEFAULT 0,
       sort_order       INTEGER NOT NULL DEFAULT 0,
@@ -153,6 +179,8 @@ function initSqliteSchema(db) {
       updated_at       TEXT NOT NULL
     )
   `);
+  ensureSqliteColumn(db, 'plans', 'quota_period', "quota_period TEXT NOT NULL DEFAULT 'monthly'");
+  ensureSqliteColumn(db, 'plans', 'plan_models_json', 'plan_models_json TEXT NULL');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_plans_code ON plans (code)');
 
   // ─── 用户订阅表 ───────────────────────────────────────────────────────────────
@@ -197,6 +225,30 @@ function initSqliteSchema(db) {
       updated_at            TEXT NOT NULL
     )
   `);
+  ensureSqliteColumn(db, 'llm_providers', 'standard_model', "standard_model TEXT NOT NULL DEFAULT ''");
+  ensureSqliteColumn(db, 'llm_providers', 'jailbreak_model', "jailbreak_model TEXT NOT NULL DEFAULT ''");
+  ensureSqliteColumn(db, 'llm_providers', 'force_jailbreak_model', "force_jailbreak_model TEXT NOT NULL DEFAULT ''");
+  ensureSqliteColumn(db, 'llm_providers', 'compression_model', "compression_model TEXT NOT NULL DEFAULT ''");
+  ensureSqliteColumn(db, 'llm_providers', 'available_models_json', 'available_models_json TEXT NULL');
+  ensureSqliteColumn(db, 'llm_providers', 'max_context_tokens', 'max_context_tokens INTEGER NOT NULL DEFAULT 81920');
+  ensureSqliteColumn(db, 'llm_providers', 'trim_context_tokens', 'trim_context_tokens INTEGER NOT NULL DEFAULT 61440');
+  ensureSqliteColumn(db, 'llm_providers', 'max_concurrency', 'max_concurrency INTEGER NOT NULL DEFAULT 5');
+  ensureSqliteColumn(db, 'llm_providers', 'timeout_ms', 'timeout_ms INTEGER NOT NULL DEFAULT 60000');
+  ensureSqliteColumn(db, 'llm_providers', 'input_token_price', 'input_token_price REAL NOT NULL DEFAULT 0');
+  ensureSqliteColumn(db, 'llm_providers', 'output_token_price', 'output_token_price REAL NOT NULL DEFAULT 0');
+  db.exec(`
+    UPDATE llm_providers
+    SET
+      standard_model        = COALESCE(NULLIF(standard_model, ''), model),
+      jailbreak_model       = COALESCE(NULLIF(jailbreak_model, ''), COALESCE(NULLIF(standard_model, ''), model)),
+      force_jailbreak_model = COALESCE(NULLIF(force_jailbreak_model, ''), COALESCE(NULLIF(jailbreak_model, ''), COALESCE(NULLIF(standard_model, ''), model))),
+      compression_model     = COALESCE(NULLIF(compression_model, ''), COALESCE(NULLIF(standard_model, ''), model)),
+      available_models_json = CASE
+        WHEN available_models_json IS NULL OR available_models_json = '' OR available_models_json = '[]'
+          THEN json_array(model)
+        ELSE available_models_json
+      END
+  `);
 
   // ─── LLM 任务队列表 ───────────────────────────────────────────────────────────
   db.exec(`
@@ -229,6 +281,12 @@ function initSqliteSchema(db) {
       plan_id         INTEGER NULL,
       prompt_kind     TEXT NOT NULL DEFAULT 'chat',
       status          TEXT NOT NULL DEFAULT 'success',
+      model_key       TEXT NULL,
+      model_id        TEXT NULL,
+      request_multiplier REAL NOT NULL DEFAULT 1,
+      token_multiplier REAL NOT NULL DEFAULT 1,
+      billable_request_units INTEGER NOT NULL DEFAULT 1,
+      billable_tokens INTEGER NOT NULL DEFAULT 0,
       input_tokens    INTEGER NOT NULL DEFAULT 0,
       output_tokens   INTEGER NOT NULL DEFAULT 0,
       total_tokens    INTEGER NOT NULL DEFAULT 0,
@@ -240,6 +298,14 @@ function initSqliteSchema(db) {
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_llm_usage_logs_user ON llm_usage_logs (user_id, created_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_llm_usage_logs_request ON llm_usage_logs (request_id)');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'model_key', 'model_key TEXT NULL');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'model_id', 'model_id TEXT NULL');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'request_multiplier', 'request_multiplier REAL NOT NULL DEFAULT 1');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'token_multiplier', 'token_multiplier REAL NOT NULL DEFAULT 1');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'billable_request_units', 'billable_request_units INTEGER NOT NULL DEFAULT 1');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'billable_tokens', 'billable_tokens INTEGER NOT NULL DEFAULT 0');
+  db.exec("UPDATE llm_usage_logs SET billable_request_units = 1 WHERE billable_request_units <= 0 AND status = 'success'");
+  db.exec("UPDATE llm_usage_logs SET billable_tokens = total_tokens WHERE billable_tokens = 0 AND total_tokens > 0 AND status = 'success'");
 
   // ─── 系统提示词片段表 ─────────────────────────────────────────────────────────
   db.exec(`
@@ -355,7 +421,12 @@ function initSqliteSchema(db) {
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_character_usage_character ON character_usage_events (character_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_character_usage_user ON character_usage_events (user_id, created_at)');
+  ensureSqliteColumn(db, 'conversations', 'parent_conversation_id', 'parent_conversation_id INTEGER NULL');
+  ensureSqliteColumn(db, 'conversations', 'branched_from_message_id', 'branched_from_message_id INTEGER NULL');
+  ensureSqliteColumn(db, 'conversations', 'current_message_id', 'current_message_id INTEGER NULL');
+  ensureSqliteColumn(db, 'conversations', 'selected_model_mode', "selected_model_mode TEXT NOT NULL DEFAULT 'standard'");
   ensureSqliteColumn(db, 'conversations', 'deleted_at', 'deleted_at TEXT NULL');
+  ensureSqliteColumn(db, 'conversations', 'last_message_at', 'last_message_at TEXT NULL');
 
   // ─── 消息表 ──────────────────────────────────────────────────────────────────
   db.exec(`
@@ -424,6 +495,20 @@ function initSqliteSchema(db) {
       config.openaiModel,
       models,
     );
+  }
+
+  const activeProviderForPlanBackfill = db.prepare(`
+    SELECT id, model, standard_model, jailbreak_model, force_jailbreak_model
+    FROM llm_providers
+    WHERE is_active = 1 AND status = 'active'
+    ORDER BY id ASC
+    LIMIT 1
+  `).get();
+  if (activeProviderForPlanBackfill) {
+    const legacyPlanModelsJson = buildLegacyPlanModelsJson(activeProviderForPlanBackfill);
+    if (JSON.parse(legacyPlanModelsJson).length) {
+      db.prepare("UPDATE plans SET plan_models_json = ?, updated_at = NOW() WHERE plan_models_json IS NULL OR plan_models_json = '' OR plan_models_json = '[]'").run(legacyPlanModelsJson);
+    }
   }
 }
 

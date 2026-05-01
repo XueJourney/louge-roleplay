@@ -6,7 +6,7 @@
     <div class="admin-hero-copy">
       <p class="section-kicker">LLM</p>
       <h1>LLM 配置</h1>
-      <p class="muted-text">Provider、模型绑定、上下文、并发、超时和价格都收在这页。总算不用和套餐、Prompt 混着看了。</p>
+      <p class="muted-text">Provider 只负责接入、鉴权、模型发现、上下文、并发、超时和价格。具体给用户用哪些模型，统一到「套餐配置」里设置。</p>
     </div>
 
     <div class="metrics metrics--compact">
@@ -79,7 +79,7 @@
                 </select>
               </label>
             </div>
-            <p class="muted-text">模型先留空，保存后会自动拉取可用模型列表，再回来细选。</p>
+            <p class="muted-text">保存后会自动拉取上游可用模型列表；具体前台可选模型请到「套餐配置」里添加。</p>
             <div class="toolbar-row toolbar-row--admin">
               <button type="submit">创建 Provider</button>
             </div>
@@ -91,7 +91,7 @@
     <% if (providers.length) { %>
       <div id="providers-list" class="admin-list">
         <% providers.forEach(provider => { %>
-          <details class="provider-card admin-item admin-item--provider" data-filter-item data-filter-text="<%= [provider.name, provider.base_url, provider.status, provider.provider_type, provider.standard_model || provider.model || '', provider.jailbreak_model || '', provider.force_jailbreak_model || '', provider.compression_model || ''].join(' ') %>">
+          <details class="provider-card admin-item admin-item--provider" data-filter-item data-filter-text="<%= [provider.name, provider.base_url, provider.status, provider.provider_type, provider.model || '', ...(provider.availableModels || []).map(model => `${model.label} ${model.id}`)].join(' ') %>">
             <summary class="admin-item-summary">
               <div class="admin-item-main">
                 <strong><%= provider.name %></strong>
@@ -100,10 +100,10 @@
                 <span class="pill"><%= provider.status %></span>
               </div>
               <div class="admin-item-meta">
-                <span class="meta-chip">标准 <strong><%= provider.standard_model || provider.model || '未选' %></strong></span>
-                <span class="meta-chip">越狱 <strong><%= provider.jailbreak_model || '未选' %></strong></span>
-                <span class="meta-chip">强越狱 <strong><%= provider.force_jailbreak_model || '未选' %></strong></span>
-                <span class="meta-chip">压缩 <strong><%= provider.compression_model || '未选' %></strong></span>
+                <span class="meta-chip">模型列表 <strong><%= (provider.availableModels || []).length %></strong></span>
+                <span class="meta-chip">默认调用 <strong><%= provider.model || '未发现' %></strong></span>
+                <span class="meta-chip">上下文 <strong><%= provider.max_context_tokens || 0 %></strong></span>
+                <span class="meta-chip">并发 <strong><%= provider.max_concurrency || 0 %></strong></span>
               </div>
             </summary>
             <div class="admin-item-body">
@@ -117,46 +117,21 @@
                   <input type="text" name="apiKey" placeholder="留空不改动。当前：<%= provider.api_key_masked || '未设置' %>" />
                 </label>
 
-                <div class="context-grid">
-                  <div class="model-picker">
-                    <label>标准模型 (standard)</label>
-                    <select name="standardModel" data-current="<%= provider.standard_model || provider.model || '' %>">
-                      <% (provider.availableModels || []).forEach(option => { %>
-                        <option value="<%= option.id %>" <%= option.id === (provider.standard_model || provider.model) ? 'selected' : '' %>><%= option.label %></option>
+                <div class="model-picker model-picker--readonly">
+                  <label>上游可用模型列表</label>
+                  <% if ((provider.availableModels || []).length) { %>
+                    <div class="model-chip-list">
+                      <% (provider.availableModels || []).slice(0, 24).forEach(option => { %>
+                        <span class="meta-chip"><%= option.label %> <strong><%= option.id %></strong></span>
                       <% }) %>
-                    </select>
-                    <small>当前：<%= provider.standard_model || provider.model || '未选择' %></small>
-                  </div>
-                  <div class="model-picker">
-                    <label>越狱模型 (jailbreak)</label>
-                    <select name="jailbreakModel">
-                      <% (provider.availableModels || []).forEach(option => { %>
-                        <option value="<%= option.id %>" <%= option.id === provider.jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
-                      <% }) %>
-                    </select>
-                    <small>当前：<%= provider.jailbreak_model || '未选择' %></small>
-                  </div>
-                </div>
-
-                <div class="context-grid">
-                  <div class="model-picker">
-                    <label>强越狱模型 (force_jailbreak)</label>
-                    <select name="forceJailbreakModel">
-                      <% (provider.availableModels || []).forEach(option => { %>
-                        <option value="<%= option.id %>" <%= option.id === provider.force_jailbreak_model ? 'selected' : '' %>><%= option.label %></option>
-                      <% }) %>
-                    </select>
-                    <small>当前：<%= provider.force_jailbreak_model || '未选择' %></small>
-                  </div>
-                  <div class="model-picker">
-                    <label>压缩模型 (compression)</label>
-                    <select name="compressionModel">
-                      <% (provider.availableModels || []).forEach(option => { %>
-                        <option value="<%= option.id %>" <%= option.id === provider.compression_model ? 'selected' : '' %>><%= option.label %></option>
-                      <% }) %>
-                    </select>
-                    <small>当前：<%= provider.compression_model || '未选择' %></small>
-                  </div>
+                      <% if ((provider.availableModels || []).length > 24) { %>
+                        <span class="meta-chip">还有 <strong><%= (provider.availableModels || []).length - 24 %></strong> 个</span>
+                      <% } %>
+                    </div>
+                  <% } else { %>
+                    <p class="mini-note">还没有发现模型。勾选下方「保存时从上游重新拉取模型列表」后保存一次。</p>
+                  <% } %>
+                  <small>这里不再设置标准/破限模型；请在套餐中动态添加、删除和设置倍率。</small>
                 </div>
 
                 <div class="context-grid">

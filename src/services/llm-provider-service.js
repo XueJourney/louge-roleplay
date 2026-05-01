@@ -6,13 +6,6 @@
 const { query } = require('../lib/db');
 const { assertSafeExternalHttpUrl } = require('../lib/url-safety');
 
-const MODEL_MODE_KEYS = [
-  'standardModel',
-  'jailbreakModel',
-  'forceJailbreakModel',
-  'compressionModel',
-];
-
 function maskApiKey(apiKey = '') {
   const raw = String(apiKey || '').trim();
   if (!raw) {
@@ -75,19 +68,28 @@ function buildModelOptions(models = []) {
 }
 
 function resolveProviderModels(provider = {}) {
+  const legacyModels = [
+    provider.standard_model,
+    provider.jailbreak_model,
+    provider.force_jailbreak_model,
+    provider.compression_model,
+    provider.model,
+  ].map((item) => String(item || '').trim()).filter(Boolean);
+  const uniqueLegacyModels = [...new Set(legacyModels)];
   const raw = provider.available_models_json;
   if (!raw) {
-    return [];
+    return uniqueLegacyModels;
   }
 
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
-      return [];
+      return uniqueLegacyModels;
     }
-    return parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    const parsedModels = parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    return parsedModels.length ? [...new Set(parsedModels)] : uniqueLegacyModels;
   } catch (error) {
-    return [];
+    return uniqueLegacyModels;
   }
 }
 
@@ -110,19 +112,6 @@ function ensureNonNegativeNumber(value, fallback = 0) {
 function validateContextWindow(maxContextTokens, trimContextTokens) {
   if (trimContextTokens >= maxContextTokens) {
     throw new Error('CONTEXT_WINDOW_INVALID: trim_context_tokens must be smaller than max_context_tokens');
-  }
-}
-
-function validateProviderModels(models = [], payload = {}) {
-  const modelSet = new Set((models || []).map((item) => String(item || '').trim()).filter(Boolean));
-  for (const field of MODEL_MODE_KEYS) {
-    const value = String(payload[field] || '').trim();
-    if (!value) {
-      continue;
-    }
-    if (!modelSet.has(value)) {
-      throw new Error(`MODEL_NOT_FOUND_IN_PROVIDER: ${field}`);
-    }
   }
 }
 
@@ -185,6 +174,21 @@ async function getActiveProvider() {
   return rows[0] || null;
 }
 
+async function getProviderById(providerId, { activeOnly = true } = {}) {
+  const rows = await query(
+    `SELECT id, name, provider_type, base_url, api_key, model, standard_model, jailbreak_model,
+            force_jailbreak_model, compression_model, available_models_json,
+            max_context_tokens, trim_context_tokens,
+            is_active, status, max_concurrency, timeout_ms,
+            input_token_price, output_token_price
+     FROM llm_providers
+     WHERE id = ?${activeOnly ? " AND status = 'active'" : ''}
+     LIMIT 1`,
+    [providerId],
+  );
+  return rows[0] || null;
+}
+
 async function listProviders() {
   const rows = await query(
     `SELECT id, name, provider_type, base_url, api_key_masked, model,
@@ -206,12 +210,7 @@ async function createProvider(payload) {
   const baseUrl = normalizeBaseUrl(payload.baseUrl || '');
   await assertSafeExternalHttpUrl(baseUrl, { label: 'Provider Base URL' });
   const discovered = await fetchProviderModels(baseUrl, apiKey);
-  validateProviderModels(discovered.models, payload);
-  const fallbackModel = String(payload.standardModel || payload.model || '').trim() || discovered.defaultModel;
-  const standardModel = String(payload.standardModel || '').trim() || fallbackModel;
-  const jailbreakModel = String(payload.jailbreakModel || '').trim() || standardModel;
-  const forceJailbreakModel = String(payload.forceJailbreakModel || '').trim() || jailbreakModel;
-  const compressionModel = String(payload.compressionModel || '').trim() || standardModel;
+  const fallbackModel = String(payload.model || '').trim() || discovered.defaultModel;
   const maxContextTokens = ensurePositiveInteger(payload.maxContextTokens, 81920);
   const trimContextTokens = ensurePositiveInteger(payload.trimContextTokens, 61440);
   validateContextWindow(maxContextTokens, trimContextTokens);
@@ -232,11 +231,11 @@ async function createProvider(payload) {
       baseUrl,
       apiKey,
       maskApiKey(apiKey),
-      standardModel,
-      standardModel,
-      jailbreakModel,
-      forceJailbreakModel,
-      compressionModel,
+      fallbackModel,
+      fallbackModel,
+      fallbackModel,
+      fallbackModel,
+      fallbackModel,
       JSON.stringify(discovered.models),
       maxContextTokens,
       trimContextTokens,
@@ -270,13 +269,9 @@ async function updateProvider(providerId, payload) {
   const shouldRefreshModels = baseUrl !== current.base_url || apiKey !== current.api_key || String(payload.refreshModels || '') === '1';
   const discovered = shouldRefreshModels
     ? await fetchProviderModels(baseUrl, apiKey)
-    : { models: resolveProviderModels(current), defaultModel: current.standard_model || current.model || '' };
-  validateProviderModels(discovered.models, payload);
+    : { models: resolveProviderModels(current), defaultModel: current.model || current.standard_model || '' };
 
-  const standardModel = String(payload.standardModel || '').trim() || current.standard_model || current.model || discovered.defaultModel;
-  const jailbreakModel = String(payload.jailbreakModel || '').trim() || current.jailbreak_model || standardModel;
-  const forceJailbreakModel = String(payload.forceJailbreakModel || '').trim() || current.force_jailbreak_model || jailbreakModel;
-  const compressionModel = String(payload.compressionModel || '').trim() || current.compression_model || standardModel;
+  const fallbackModel = discovered.defaultModel || current.model || current.standard_model || '';
   const maxContextTokens = ensurePositiveInteger(payload.maxContextTokens, current.max_context_tokens || 81920);
   const trimContextTokens = ensurePositiveInteger(payload.trimContextTokens, current.trim_context_tokens || 61440);
   validateContextWindow(maxContextTokens, trimContextTokens);
@@ -312,11 +307,11 @@ async function updateProvider(providerId, payload) {
       baseUrl,
       apiKey,
       maskApiKey(apiKey),
-      standardModel,
-      standardModel,
-      jailbreakModel,
-      forceJailbreakModel,
-      compressionModel,
+      fallbackModel,
+      fallbackModel,
+      fallbackModel,
+      fallbackModel,
+      fallbackModel,
       JSON.stringify(discovered.models || resolveProviderModels(current)),
       maxContextTokens,
       trimContextTokens,
@@ -343,6 +338,7 @@ module.exports = {
   buildModelOptions,
   resolveProviderModels,
   getActiveProvider,
+  getProviderById,
   listProviders,
   createProvider,
   updateProvider,

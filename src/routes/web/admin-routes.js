@@ -41,6 +41,8 @@ function registerAdminRoutes(app, ctx) {
     query,
     renderPage,
     renderValidationMessage,
+    parsePlanModelsFromBody,
+    validatePlanModelsAgainstProviders,
     parseIntegerField,
     parseNumberField,
     parseIdParam
@@ -67,15 +69,17 @@ function registerAdminRoutes(app, ctx) {
 
   app.get('/admin/plans', requireAdmin, async (req, res, next) => {
     try {
-      const [overview, plans] = await Promise.all([
+      const [overview, plans, providers] = await Promise.all([
         getAdminOverview(),
         listPlans(),
+        listProviders(),
       ]);
 
       renderPage(res, 'admin-plans', {
         title: '套餐配置',
         overview,
         plans,
+        providers,
       });
     } catch (error) {
       next(error);
@@ -326,6 +330,16 @@ function registerAdminRoutes(app, ctx) {
         return renderValidationMessage(res, '新增套餐时，code 和 name 不能为空。');
       }
 
+      const planModels = parsePlanModelsFromBody(req.body);
+      if (!planModels.length) {
+        return renderValidationMessage(res, '每个套餐至少要配置一个可用模型。');
+      }
+      try {
+        await validatePlanModelsAgainstProviders(planModels);
+      } catch (error) {
+        return renderValidationMessage(res, '套餐模型配置无效：请确认已配置 Provider，并且每行模型都来自所选 Provider。');
+      }
+
       await createPlan({
         code,
         name,
@@ -337,6 +351,7 @@ function registerAdminRoutes(app, ctx) {
         priorityWeight: parseIntegerField(req.body.priorityWeight, { fieldLabel: '优先级权重', defaultValue: 0, min: 0 }),
         concurrencyLimit: parseIntegerField(req.body.concurrencyLimit, { fieldLabel: '并发上限', defaultValue: 1, min: 1 }),
         maxOutputTokens: parseIntegerField(req.body.maxOutputTokens, { fieldLabel: '最大输出 Token', defaultValue: 1024, min: 1 }),
+        planModels,
         status: String(req.body.status || 'active').trim(),
         isDefault: String(req.body.isDefault || '') === '1',
         sortOrder: parseIntegerField(req.body.sortOrder, { fieldLabel: '排序值', defaultValue: 0, min: 0 }),
@@ -358,6 +373,16 @@ function registerAdminRoutes(app, ctx) {
         return renderValidationMessage(res, '套餐不存在。');
       }
 
+      const planModels = parsePlanModelsFromBody(req.body);
+      if (!planModels.length) {
+        return renderValidationMessage(res, '每个套餐至少要配置一个可用模型。');
+      }
+      try {
+        await validatePlanModelsAgainstProviders(planModels);
+      } catch (error) {
+        return renderValidationMessage(res, '套餐模型配置无效：请确认已配置 Provider，并且每行模型都来自所选 Provider。');
+      }
+
       await updatePlan(planId, {
         name: String(req.body.name || '').trim(),
         description: String(req.body.description || '').trim(),
@@ -368,6 +393,7 @@ function registerAdminRoutes(app, ctx) {
         priorityWeight: parseIntegerField(req.body.priorityWeight, { fieldLabel: '优先级权重', defaultValue: 0, min: 0 }),
         concurrencyLimit: parseIntegerField(req.body.concurrencyLimit, { fieldLabel: '并发上限', defaultValue: 1, min: 1 }),
         maxOutputTokens: parseIntegerField(req.body.maxOutputTokens, { fieldLabel: '最大输出 Token', defaultValue: 1024, min: 1 }),
+        planModels,
         status: String(req.body.status || 'active').trim(),
         isDefault: String(req.body.isDefault || '') === '1',
         sortOrder: parseIntegerField(req.body.sortOrder, { fieldLabel: '排序值', defaultValue: 0, min: 0 }),
@@ -455,10 +481,6 @@ function registerAdminRoutes(app, ctx) {
         name,
         baseUrl,
         apiKey,
-        standardModel: String(req.body.standardModel || '').trim(),
-        jailbreakModel: String(req.body.jailbreakModel || '').trim(),
-        forceJailbreakModel: String(req.body.forceJailbreakModel || '').trim(),
-        compressionModel: String(req.body.compressionModel || '').trim(),
         maxContextTokens: parseIntegerField(req.body.maxContextTokens, { fieldLabel: '最大上下文 Token', defaultValue: 81920, min: 1 }),
         trimContextTokens: parseIntegerField(req.body.trimContextTokens, { fieldLabel: '裁剪上下文 Token', defaultValue: 61440, min: 1 }),
         isActive: String(req.body.isActive || '') === '1',
@@ -484,10 +506,6 @@ function registerAdminRoutes(app, ctx) {
         name: req.body.name,
         baseUrl: req.body.baseUrl,
         apiKey: req.body.apiKey,
-        standardModel: req.body.standardModel,
-        jailbreakModel: req.body.jailbreakModel,
-        forceJailbreakModel: req.body.forceJailbreakModel,
-        compressionModel: req.body.compressionModel,
         maxContextTokens: parseIntegerField(req.body.maxContextTokens, { fieldLabel: '最大上下文 Token', defaultValue: 81920, min: 1 }),
         trimContextTokens: parseIntegerField(req.body.trimContextTokens, { fieldLabel: '裁剪上下文 Token', defaultValue: 61440, min: 1 }),
         refreshModels: String(req.body.refreshModels || '') === '1' ? '1' : '0',

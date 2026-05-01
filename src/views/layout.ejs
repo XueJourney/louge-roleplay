@@ -8,6 +8,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="csrf-token" content="<%= csrfToken || '' %>" />
   <title><%= title %> - <%= appName %></title>
+  <%
+    const esc = typeof escapeHtml === 'function'
+      ? escapeHtml
+      : (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    const pageMeta = locals.meta || {};
+    const metaTitle = `${title} - ${appName}`;
+    const metaDescription = pageMeta.description || t('楼阁默认分享描述');
+    const metaImage = pageMeta.image || '/public/icons/og-louge.png';
+    const metaUrl = pageMeta.url || appUrl;
+    const metaType = pageMeta.type || 'website';
+    const metaSiteName = pageMeta.siteName || appName;
+    const twitterCard = pageMeta.twitterCard || 'summary_large_image';
+  %>
+  <meta name="description" content="<%- esc(metaDescription) %>" />
+  <meta property="og:site_name" content="<%- esc(metaSiteName) %>" />
+  <meta property="og:type" content="<%- esc(metaType) %>" />
+  <meta property="og:title" content="<%- esc(metaTitle) %>" />
+  <meta property="og:description" content="<%- esc(metaDescription) %>" />
+  <meta property="og:url" content="<%- esc(metaUrl) %>" />
+  <meta property="og:image" content="<%- esc(metaImage) %>" />
+  <meta property="og:image:secure_url" content="<%- esc(metaImage) %>" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="<%- esc(twitterCard) %>" />
+  <meta name="twitter:title" content="<%- esc(metaTitle) %>" />
+  <meta name="twitter:description" content="<%- esc(metaDescription) %>" />
+  <meta name="twitter:image" content="<%- esc(metaImage) %>" />
+  <meta itemprop="name" content="<%- esc(metaTitle) %>" />
+  <meta itemprop="description" content="<%- esc(metaDescription) %>" />
+  <meta itemprop="image" content="<%- esc(metaImage) %>" />
+  <link rel="icon" href="/public/icons/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/icon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/icon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/public/icons/icon-180.png" />
+  <link rel="manifest" href="/public/icons/site.webmanifest" />
+  <meta name="theme-color" content="#0b3f45" />
   <link rel="preconnect" href="/" />
   <link rel="stylesheet" href="/fonts/google.css?v=latin-v2" />
   <link rel="stylesheet" href="/public/styles/site-pages.css" />

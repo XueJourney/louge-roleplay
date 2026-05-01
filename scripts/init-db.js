@@ -56,6 +56,31 @@ function maskApiKey(apiKey = '') {
   return `${raw.slice(0, 4)}***${raw.slice(-4)}`;
 }
 
+function buildLegacyPlanModelsJson(provider = {}) {
+  const entries = [
+    ['standard', '标准模型', provider.standard_model || provider.model],
+    ['jailbreak', '破限模型', provider.jailbreak_model || provider.standard_model || provider.model],
+    ['force_jailbreak', '强破限模型', provider.force_jailbreak_model || provider.jailbreak_model || provider.standard_model || provider.model],
+  ];
+  const seen = new Set();
+  return JSON.stringify(entries
+    .map(([modelKey, label, modelId], index) => ({
+      modelKey,
+      label,
+      providerId: provider.id,
+      modelId: String(modelId || '').trim(),
+      requestMultiplier: 1,
+      tokenMultiplier: 1,
+      isDefault: index === 0,
+      sortOrder: index * 10,
+    }))
+    .filter((item) => {
+      if (!item.modelId || seen.has(item.modelKey)) return false;
+      seen.add(item.modelKey);
+      return true;
+    }));
+}
+
 function getRandomDigits(length) {
   let value = String(crypto.randomInt(1, 10));
   while (value.length < length) {
@@ -234,6 +259,7 @@ async function main() {
       priority_weight  INT NOT NULL DEFAULT 0,
       concurrency_limit INT NOT NULL DEFAULT 1,
       max_output_tokens INT NOT NULL DEFAULT 2048,
+      plan_models_json LONGTEXT NULL,
       status           ENUM('active','archived') NOT NULL DEFAULT 'active',
       is_default       TINYINT(1) NOT NULL DEFAULT 0,
       sort_order       INT NOT NULL DEFAULT 0,
@@ -242,6 +268,11 @@ async function main() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   await ensureColumn('plans', 'quota_period', "quota_period ENUM('daily','monthly','lifetime') NOT NULL DEFAULT 'monthly'");
+  await ensureColumn('plans', 'plan_models_json', 'plan_models_json LONGTEXT NULL');
+  await connection.query(`
+    ALTER TABLE \`plans\`
+    MODIFY COLUMN \`billing_mode\` ENUM('per_request','per_token','hybrid') NOT NULL DEFAULT 'per_request'
+  `);
 
   // ── 用户订阅表 ───────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 user_subscriptions 表...');
@@ -342,6 +373,12 @@ async function main() {
       plan_id         BIGINT NULL,
       prompt_kind     VARCHAR(32) NOT NULL DEFAULT 'chat',
       status          ENUM('success','failed') NOT NULL DEFAULT 'success',
+      model_key       VARCHAR(64) NULL,
+      model_id        VARCHAR(160) NULL,
+      request_multiplier DECIMAL(8,2) NOT NULL DEFAULT 1,
+      token_multiplier DECIMAL(8,2) NOT NULL DEFAULT 1,
+      billable_request_units INT NOT NULL DEFAULT 1,
+      billable_tokens BIGINT NOT NULL DEFAULT 0,
       input_tokens    INT NOT NULL DEFAULT 0,
       output_tokens   INT NOT NULL DEFAULT 0,
       total_tokens    INT NOT NULL DEFAULT 0,
@@ -354,6 +391,14 @@ async function main() {
       INDEX idx_llm_usage_logs_request_id (request_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  await ensureColumn('llm_usage_logs', 'model_key', 'model_key VARCHAR(64) NULL');
+  await ensureColumn('llm_usage_logs', 'model_id', 'model_id VARCHAR(160) NULL');
+  await ensureColumn('llm_usage_logs', 'request_multiplier', 'request_multiplier DECIMAL(8,2) NOT NULL DEFAULT 1');
+  await ensureColumn('llm_usage_logs', 'token_multiplier', 'token_multiplier DECIMAL(8,2) NOT NULL DEFAULT 1');
+  await ensureColumn('llm_usage_logs', 'billable_request_units', 'billable_request_units INT NOT NULL DEFAULT 1');
+  await ensureColumn('llm_usage_logs', 'billable_tokens', 'billable_tokens BIGINT NOT NULL DEFAULT 0');
+  await connection.query('UPDATE llm_usage_logs SET billable_request_units = 1 WHERE billable_request_units <= 0 AND status = \'success\'');
+  await connection.query('UPDATE llm_usage_logs SET billable_tokens = total_tokens WHERE billable_tokens = 0 AND total_tokens > 0 AND status = \'success\'');
 
   // ── 系统提示词表 ─────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 system_prompt_blocks 表...');
@@ -480,7 +525,7 @@ async function main() {
       parent_conversation_id   BIGINT NULL,
       branched_from_message_id BIGINT NULL,
       current_message_id       BIGINT NULL,
-      selected_model_mode      ENUM('standard','jailbreak','force_jailbreak') NOT NULL DEFAULT 'standard',
+      selected_model_mode      VARCHAR(64) NOT NULL DEFAULT 'standard',
       title                    VARCHAR(200) NULL,
       status                   ENUM('active','archived','deleted') DEFAULT 'active',
       deleted_at               DATETIME NULL,
@@ -494,7 +539,11 @@ async function main() {
   await ensureColumn('conversations', 'parent_conversation_id',   'parent_conversation_id BIGINT NULL');
   await ensureColumn('conversations', 'branched_from_message_id', 'branched_from_message_id BIGINT NULL');
   await ensureColumn('conversations', 'current_message_id',       'current_message_id BIGINT NULL');
-  await ensureColumn('conversations', 'selected_model_mode',      "selected_model_mode ENUM('standard','jailbreak','force_jailbreak') NOT NULL DEFAULT 'standard'");
+  await ensureColumn('conversations', 'selected_model_mode',      "selected_model_mode VARCHAR(64) NOT NULL DEFAULT 'standard'");
+  await connection.query(`
+    ALTER TABLE \`conversations\`
+    MODIFY COLUMN \`selected_model_mode\` VARCHAR(64) NOT NULL DEFAULT 'standard'
+  `);
   await ensureColumn('conversations', 'deleted_at',               'deleted_at DATETIME NULL');
   await ensureIndex('conversations', 'idx_conversations_parent',         '(parent_conversation_id)');
   await ensureIndex('conversations', 'idx_conversations_branch_message', '(branched_from_message_id)');
@@ -589,6 +638,25 @@ async function main() {
         JSON.stringify([config.openaiModel]),
       ],
     );
+  }
+
+  const [activeProvidersForPlanBackfill] = await connection.query(`
+    SELECT id, model, standard_model, jailbreak_model, force_jailbreak_model
+    FROM llm_providers
+    WHERE is_active = 1 AND status = 'active'
+    ORDER BY id ASC
+    LIMIT 1
+  `);
+  const activeProviderForPlanBackfill = activeProvidersForPlanBackfill[0] || null;
+  if (activeProviderForPlanBackfill) {
+    const legacyPlanModelsJson = buildLegacyPlanModelsJson(activeProviderForPlanBackfill);
+    if (JSON.parse(legacyPlanModelsJson).length) {
+      await connection.query(
+        "UPDATE plans SET plan_models_json = ?, updated_at = NOW() WHERE plan_models_json IS NULL OR plan_models_json = '' OR plan_models_json = '[]'",
+        [legacyPlanModelsJson],
+      );
+      console.log('[init-db]   ~ 空套餐模型配置已按当前 active provider 回填');
+    }
   }
 
   await connection.end();

@@ -73,7 +73,14 @@ function registerPublicRoutes(app, ctx) {
   app.get('/', async (req, res, next) => {
     try {
       const characters = await listFeaturedPublicCharacters(6);
-      renderPage(res, 'home', { title: '首页', characters });
+      renderPage(res, 'home', {
+        title: '首页',
+        characters,
+        meta: {
+          url: '/',
+          description: '楼阁是一个沉浸式 AI 角色对话空间，可以创建角色、公开分享，并与喜欢的人设持续展开故事。',
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -98,6 +105,12 @@ function registerPublicRoutes(app, ctx) {
         pagination: result.pagination,
         filters: result.filters,
         commentsByCharacter,
+        meta: {
+          url: `/characters/public${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`,
+          description: keyword
+            ? `在楼阁搜索「${keyword}」相关的公开角色，按热度、点赞、评论或使用量筛选。`
+            : '浏览楼阁公开角色，按综合热度、点赞、评论或使用量筛选，找到适合开聊的人设。',
+        },
       });
     } catch (error) {
       next(error);
