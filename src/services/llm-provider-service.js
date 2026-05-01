@@ -75,19 +75,28 @@ function buildModelOptions(models = []) {
 }
 
 function resolveProviderModels(provider = {}) {
+  const legacyModels = [
+    provider.standard_model,
+    provider.jailbreak_model,
+    provider.force_jailbreak_model,
+    provider.compression_model,
+    provider.model,
+  ].map((item) => String(item || '').trim()).filter(Boolean);
+  const uniqueLegacyModels = [...new Set(legacyModels)];
   const raw = provider.available_models_json;
   if (!raw) {
-    return [];
+    return uniqueLegacyModels;
   }
 
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
-      return [];
+      return uniqueLegacyModels;
     }
-    return parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    const parsedModels = parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    return parsedModels.length ? [...new Set(parsedModels)] : uniqueLegacyModels;
   } catch (error) {
-    return [];
+    return uniqueLegacyModels;
   }
 }
 

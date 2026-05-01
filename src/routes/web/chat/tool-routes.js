@@ -32,7 +32,7 @@ function registerChatToolRoutes(app, ctx) {
         return;
       }
 
-      const selectedModelMode = String(req.body.modelMode || 'standard').trim();
+      const selectedModelMode = normalizeModelKey(req.body.modelMode, DEFAULT_MODEL_KEY);
       const chatModelSelector = await getChatModelSelector(req.session.user.id);
       const allowedModelModes = new Set((chatModelSelector.options || []).map((option) => option.mode));
       if (!allowedModelModes.has(selectedModelMode)) {

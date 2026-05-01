@@ -33,10 +33,12 @@ const { query, withTransaction, getDbType } = require('../lib/db');
 const {
   parsePlanModelsJson,
   serializePlanModels,
+  buildDefaultPlanModelsFromProvider,
   findPlanModel,
   getBillableRequestUnits,
   getBillableTokenUnits,
 } = require('./model-entitlement-service');
+const { getActiveProvider } = require('./llm-provider-service');
 
 // ─── 内部辅助函数 ─────────────────────────────────────────────────────────────
 
@@ -102,7 +104,10 @@ function normalizePlanPayload(payload = {}, current = null) {
 
 async function hydratePlanModelsForPlan(plan) {
   if (!plan) return null;
-  const planModels = parsePlanModelsJson(plan.plan_models_json || '[]');
+  let planModels = parsePlanModelsJson(plan.plan_models_json || '[]');
+  if (!planModels.length) {
+    planModels = buildDefaultPlanModelsFromProvider(await getActiveProvider());
+  }
   return {
     ...plan,
     planModels,
@@ -111,8 +116,14 @@ async function hydratePlanModelsForPlan(plan) {
 }
 
 async function hydratePlanModelsForPlans(plans = []) {
+  const fallbackProvider = plans.some((plan) => !parsePlanModelsJson(plan.plan_models_json || '[]').length)
+    ? await getActiveProvider()
+    : null;
   return plans.map((plan) => {
-    const planModels = parsePlanModelsJson(plan.plan_models_json || '[]');
+    let planModels = parsePlanModelsJson(plan.plan_models_json || '[]');
+    if (!planModels.length) {
+      planModels = buildDefaultPlanModelsFromProvider(fallbackProvider);
+    }
     return {
       ...plan,
       planModels,

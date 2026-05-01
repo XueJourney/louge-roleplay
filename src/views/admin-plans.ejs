@@ -43,7 +43,7 @@
       html += `
         <div class="plan-model-row">
           <div class="inline-grid inline-grid--dense">
-            <label>Key<input type="text" name="planModelKey" value="${esc(rowKey)}" placeholder="standard / premium" /></label>
+            <label>Key<input type="text" name="planModelKey" value="${esc(rowKey)}" placeholder="standard / premium" data-plan-model-key /></label>
             <label>前台名称<input type="text" name="planModelLabel" value="${esc(item.label || '')}" placeholder="基础模型 / 高级模型" /></label>
           </div>
           <div class="inline-grid inline-grid--dense">
@@ -65,7 +65,7 @@
             <label>请求倍率<input type="number" name="planModelRequestMultiplier" value="${esc(item.requestMultiplier || 1)}" min="0.01" step="0.01" /></label>
             <label>Token 倍率<input type="number" name="planModelTokenMultiplier" value="${esc(item.tokenMultiplier || item.requestMultiplier || 1)}" min="0.01" step="0.01" /></label>
           </div>
-          <label class="checkbox-line"><input type="radio" name="planModelDefaultKey" value="${esc(rowKey)}" ${(item.isDefault || (!hasDefaultRow && index === 0)) ? 'checked' : ''} /> 默认使用这个模型</label>
+          <label class="checkbox-line"><input type="radio" name="planModelDefaultKey" value="${esc(rowKey)}" data-plan-model-default ${(item.isDefault || (!hasDefaultRow && index === 0)) ? 'checked' : ''} /> 默认使用这个模型</label>
         </div>`;
     }
     return html;

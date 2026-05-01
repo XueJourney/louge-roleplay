@@ -89,6 +89,12 @@ function getProviderModelId(provider, modelMode = 'standard') {
   if (provider?.selected_model_id) {
     return String(provider.selected_model_id || '').trim();
   }
+  if (modelMode && typeof modelMode === 'object') {
+    const explicitModelId = String(modelMode.modelId || modelMode.model_id || modelMode.id || '').trim();
+    if (explicitModelId) {
+      return explicitModelId;
+    }
+  }
   const normalizedMode = String(modelMode || 'standard').trim();
   if (normalizedMode === 'force_jailbreak') {
     return String(provider.force_jailbreak_model || provider.jailbreak_model || provider.standard_model || provider.model || '').trim();

@@ -43,6 +43,16 @@
     providerSelect.addEventListener('change', applyModelFilter);
     applyModelFilter();
   });
+  document.querySelectorAll('.plan-model-row').forEach((row) => {
+    const keyInput = row.querySelector('[data-plan-model-key]');
+    const defaultInput = row.querySelector('[data-plan-model-default]');
+    if (!keyInput || !defaultInput) return;
+    const syncDefaultValue = () => {
+      defaultInput.value = keyInput.value || '';
+    };
+    keyInput.addEventListener('input', syncDefaultValue);
+    syncDefaultValue();
+  });
 })();
 
 (function () {

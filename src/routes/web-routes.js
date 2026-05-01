@@ -451,6 +451,8 @@ function registerWebRoutes(app) {
     streamOptimizeUserInputViaGateway,
     optimizeUserInputViaGateway,
     getChatModelSelector,
+    DEFAULT_MODEL_KEY,
+    normalizeModelKey,
     parsePlanModelsFromBody,
     validatePlanModelsAgainstProviders,
     issueEmailCode,

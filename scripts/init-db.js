@@ -56,6 +56,31 @@ function maskApiKey(apiKey = '') {
   return `${raw.slice(0, 4)}***${raw.slice(-4)}`;
 }
 
+function buildLegacyPlanModelsJson(provider = {}) {
+  const entries = [
+    ['standard', '标准模型', provider.standard_model || provider.model],
+    ['jailbreak', '破限模型', provider.jailbreak_model || provider.standard_model || provider.model],
+    ['force_jailbreak', '强破限模型', provider.force_jailbreak_model || provider.jailbreak_model || provider.standard_model || provider.model],
+  ];
+  const seen = new Set();
+  return JSON.stringify(entries
+    .map(([modelKey, label, modelId], index) => ({
+      modelKey,
+      label,
+      providerId: provider.id,
+      modelId: String(modelId || '').trim(),
+      requestMultiplier: 1,
+      tokenMultiplier: 1,
+      isDefault: index === 0,
+      sortOrder: index * 10,
+    }))
+    .filter((item) => {
+      if (!item.modelId || seen.has(item.modelKey)) return false;
+      seen.add(item.modelKey);
+      return true;
+    }));
+}
+
 function getRandomDigits(length) {
   let value = String(crypto.randomInt(1, 10));
   while (value.length < length) {
@@ -613,6 +638,25 @@ async function main() {
         JSON.stringify([config.openaiModel]),
       ],
     );
+  }
+
+  const [activeProvidersForPlanBackfill] = await connection.query(`
+    SELECT id, model, standard_model, jailbreak_model, force_jailbreak_model
+    FROM llm_providers
+    WHERE is_active = 1 AND status = 'active'
+    ORDER BY id ASC
+    LIMIT 1
+  `);
+  const activeProviderForPlanBackfill = activeProvidersForPlanBackfill[0] || null;
+  if (activeProviderForPlanBackfill) {
+    const legacyPlanModelsJson = buildLegacyPlanModelsJson(activeProviderForPlanBackfill);
+    if (JSON.parse(legacyPlanModelsJson).length) {
+      await connection.query(
+        "UPDATE plans SET plan_models_json = ?, updated_at = NOW() WHERE plan_models_json IS NULL OR plan_models_json = '' OR plan_models_json = '[]'",
+        [legacyPlanModelsJson],
+      );
+      console.log('[init-db]   ~ 空套餐模型配置已按当前 active provider 回填');
+    }
   }
 
   await connection.end();
