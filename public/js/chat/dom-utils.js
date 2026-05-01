@@ -1,4 +1,4 @@
-/*
+/**
  * @file public/js/chat/dom-utils.js
  * @description 聊天页 DOM 小工具：滚动判断、菜单收起、toast、富文本挂载等。
  */

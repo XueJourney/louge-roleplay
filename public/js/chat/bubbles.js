@@ -1,4 +1,4 @@
-/*
+/**
  * @file public/js/chat/bubbles.js
  * @description 聊天页气泡 DOM 创建、临时流式气泡追加与 HTML 替换工具。
  */

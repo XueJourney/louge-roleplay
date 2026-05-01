@@ -13,6 +13,11 @@
 const { query } = require('../lib/db');
 const { redisClient } = require('../lib/redis');
 const logger = require('../lib/logger');
+const {
+  buildPathMessages,
+  decoratePathMessages,
+} = require('./conversation/message-view');
+const { fetchPathMessages } = require('./conversation/path-repository');
 
 const MESSAGE_LIST_CACHE_TTL_SECONDS = 60;
 
@@ -286,152 +291,6 @@ async function createEditedMessageVariant(conversationId, sourceMessageId, conte
       sourceMessageId: Number(sourceMessageId),
       editMode: 'fork-variant',
     }),
-  });
-}
-
-function safeParseJson(value) {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch (error) {
-    return null;
-  }
-}
-
-function stripThinkTags(value) {
-  return String(value || '')
-    .replace(/<\s*(think|thinking)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function shortText(value, limit = 40) {
-  return stripThinkTags(value).replace(/\s+/g, ' ').trim().slice(0, limit);
-}
-
-function normalizeMessageForView(message) {
-  if (!message) {
-    return null;
-  }
-  return {
-    ...message,
-    metadata: safeParseJson(message.metadata_json),
-  };
-}
-
-function buildMessageMaps(allMessages) {
-  const byId = new Map();
-
-  for (const message of allMessages) {
-    const normalized = normalizeMessageForView(message);
-    byId.set(Number(message.id), normalized);
-  }
-
-  return { byId };
-}
-
-function buildPathMessages(allMessages, leafMessageId) {
-  if (!leafMessageId) {
-    return [];
-  }
-
-  const { byId } = buildMessageMaps(allMessages);
-  const path = [];
-  const visited = new Set();
-  let currentId = Number(leafMessageId);
-
-  while (currentId && byId.has(currentId) && !visited.has(currentId)) {
-    visited.add(currentId);
-    const current = byId.get(currentId);
-    path.push(current);
-    currentId = current.parent_message_id ? Number(current.parent_message_id) : 0;
-  }
-
-  return path.reverse();
-}
-
-async function fetchPathMessages(conversationId, leafMessageId) {
-  const normalizedLeafId = Number(leafMessageId || 0);
-  if (!normalizedLeafId) {
-    return [];
-  }
-
-  const rows = await query(
-    `WITH RECURSIVE message_path AS (
-       SELECT id,
-              conversation_id,
-              sender_type,
-              content,
-              sequence_no,
-              status,
-              created_at,
-              parent_message_id,
-              branch_from_message_id,
-              edited_from_message_id,
-              prompt_kind,
-              metadata_json,
-              deleted_at,
-              0 AS reverse_depth
-       FROM messages
-       WHERE conversation_id = ? AND id = ? AND deleted_at IS NULL
-       UNION ALL
-       SELECT m.id,
-              m.conversation_id,
-              m.sender_type,
-              m.content,
-              m.sequence_no,
-              m.status,
-              m.created_at,
-              m.parent_message_id,
-              m.branch_from_message_id,
-              m.edited_from_message_id,
-              m.prompt_kind,
-              m.metadata_json,
-              m.deleted_at,
-              mp.reverse_depth + 1 AS reverse_depth
-       FROM messages m
-       JOIN message_path mp ON m.id = mp.parent_message_id
-       WHERE m.conversation_id = ? AND m.deleted_at IS NULL
-     )
-     SELECT id,
-            conversation_id,
-            sender_type,
-            content,
-            sequence_no,
-            status,
-            created_at,
-            parent_message_id,
-            branch_from_message_id,
-            edited_from_message_id,
-            prompt_kind,
-            metadata_json,
-            deleted_at
-     FROM message_path
-     ORDER BY reverse_depth DESC`,
-    [conversationId, normalizedLeafId, conversationId],
-  );
-
-  return rows.map(normalizeMessageForView);
-}
-
-function decoratePathMessages(pathMessages) {
-  return pathMessages.map((message, index, messages) => {
-    const parentMessage = index > 0 ? messages[index - 1] : null;
-    const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
-    return {
-      ...message,
-      depth: index,
-      visibleContent: stripThinkTags(message.content),
-      parentUserPreviewContent: parentMessage && parentMessage.sender_type === 'user' ? parentMessage.content : '',
-      hasVisibleContinuation: Boolean(nextMessage),
-      siblingVariants: [],
-      nextChoices: [],
-      siblingCount: 0,
-      childCount: 0,
-    };
   });
 }
 

@@ -1,4 +1,4 @@
-/*
+/**
  * @file public/js/chat/stream-client.js
  * @description 聊天页 NDJSON 流式请求消费器。
  */

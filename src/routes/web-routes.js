@@ -3,9 +3,6 @@
  * @description 站点路由注册：公开页、认证、角色、线性聊天、重写与编辑。
  */
 
-const path = require('path');
-const ejs = require('ejs');
-
 const {
   requireAuth,
   requireAdmin,
@@ -56,9 +53,9 @@ const {
   deleteConversationSafely,
   invalidateConversationCache,
 } = require('../services/conversation-service');
-const { translate, translateHtml } = require('../i18n');
+const { translate } = require('../i18n');
 const { DEFAULT_MODEL_KEY, normalizeModelKey } = require('../services/model-entitlement-service');
-const { generateReplyViaGateway, streamReplyViaGateway, streamOptimizeUserInputViaGateway, optimizeUserInputViaGateway, getChatModelSelector } = require('../services/llm-gateway-service');
+const { generateReplyViaGateway, optimizeUserInputViaGateway, getChatModelSelector } = require('../services/llm-gateway-service');
 const { issueEmailCode, issuePhoneCode, verifyEmailCode, verifyPhoneCode } = require('../services/verification-service');
 const { hashPassword, verifyPassword } = require('../services/password-service');
 const { verifyDomesticPhoneIdentity } = require('../services/phone-auth-service');
@@ -78,9 +75,7 @@ const {
   buildRegisterLogMeta,
   buildLoginLogMeta,
   renderValidationMessage,
-  writeNdjson,
   buildChatRequestContext,
-  initNdjsonStream,
   parseIntegerField,
   parseNumberField,
   parseIdParam,
@@ -94,247 +89,15 @@ const {
   renderChatPage,
   loadConversationForUserOrFail,
 } = require('../server-helpers');
-
-function mapLlmErrorToUserMessage(error) {
-  const errMsg = String(error?.message || '');
-  if (errMsg === 'REQUEST_QUOTA_EXCEEDED' || errMsg === 'TOKEN_QUOTA_EXCEEDED') {
-    return '额度不足，暂时没法继续生成。';
-  }
-  if (/aborted by downstream client/i.test(errMsg)) {
-    return '这次生成已中断。';
-  }
-  if (/gateway timeout|request timeout|provider request timeout|504/i.test(errMsg)) {
-    return '上游模型服务超时了，先歇一下再试。';
-  }
-  if (/rate limited|429/i.test(errMsg)) {
-    return '上游模型服务被限流了，等一会儿再试。';
-  }
-  return 'AI 回复失败，请稍后重试。';
-}
-
-function buildConversationCharacterPayload(conversation) {
-  return {
-    name: conversation.character_name,
-    summary: conversation.character_summary,
-    personality: conversation.personality,
-    prompt_profile_json: conversation.prompt_profile_json,
-  };
-}
-
-const CHAT_MESSAGE_PARTIAL = path.join(__dirname, '..', 'views', 'partials', 'chat-message.ejs');
-
-function renderChatMessageHtml(req, conversation, message) {
-  const locale = req.locale || req.res?.locals?.locale || 'zh-CN';
-  const t = req.t || req.res?.locals?.t || ((key, vars) => translate(locale, key, vars));
-
-  return new Promise((resolve, reject) => {
-    ejs.renderFile(CHAT_MESSAGE_PARTIAL, { conversation, message, t, locale }, {}, (error, html) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(translateHtml(locale, html));
-    });
-  });
-}
-
-async function buildChatMessagePacket(req, conversation, activeLeafId, messageId) {
-  const view = await buildConversationPathView(conversation.id, activeLeafId || messageId);
-  const message = view.pathMessages.find((item) => Number(item.id) === Number(messageId));
-  if (!message) {
-    return null;
-  }
-  return {
-    id: message.id,
-    senderType: message.sender_type,
-    html: await renderChatMessageHtml(req, conversation, message),
-  };
-}
-
-function createNdjsonResponder(req, res) {
-  let streamClosed = false;
-  const abortController = new AbortController();
-
-  initNdjsonStream(res);
-
-  const safeWrite = (payload) => {
-    if (streamClosed || res.writableEnded) {
-      return false;
-    }
-    writeNdjson(res, payload);
-    if (typeof res.flush === 'function') {
-      res.flush();
-    }
-    return true;
-  };
-
-  const heartbeatTimer = setInterval(() => {
-    safeWrite({ type: 'ping', ts: Date.now() });
-  }, 10000);
-
-  const cleanup = () => {
-    if (streamClosed) {
-      return;
-    }
-    streamClosed = true;
-    clearInterval(heartbeatTimer);
-  };
-
-  req.on('close', () => {
-    if (res.writableEnded) {
-      cleanup();
-      return;
-    }
-    cleanup();
-    if (!abortController.signal.aborted) {
-      abortController.abort();
-    }
-  });
-
-  return {
-    abortController,
-    safeWrite,
-    isClosed: () => streamClosed || res.writableEnded,
-    end: () => {
-      cleanup();
-      if (!res.writableEnded) {
-        res.end();
-      }
-    },
-    fail: (error) => {
-      if (!res.writableEnded) {
-        safeWrite({
-          type: 'error',
-          message: mapLlmErrorToUserMessage(error),
-        });
-        res.end();
-      }
-      cleanup();
-    },
-  };
-}
-
-async function streamChatReplyToNdjson({
-  requestId,
-  userId,
-  conversationId,
-  character,
-  messages,
-  userMessage,
-  systemHint = '',
-  promptKind = 'chat',
-  modelMode = 'standard',
-  signal,
-  safeWrite,
-  user = null,
-}) {
-  let lineBuffer = '';
-  let latestFullContent = '';
-  let streamed;
-  try {
-    streamed = await streamReplyViaGateway({
-      requestId,
-      userId,
-      conversationId,
-      character,
-      messages,
-      userMessage,
-      systemHint,
-      promptKind,
-      modelMode,
-      signal,
-      user,
-      onDelta: async (deltaText, fullContent) => {
-        latestFullContent = String(fullContent || '');
-        safeWrite({ type: 'delta', delta: deltaText, full: fullContent });
-        lineBuffer += deltaText;
-        const parts = lineBuffer.split(/\r?\n/);
-        lineBuffer = parts.pop() || '';
-        const committedText = fullContent.slice(0, Math.max(0, fullContent.length - lineBuffer.length));
-        parts.forEach((line) => {
-          safeWrite({
-            type: 'line',
-            line,
-            full: fullContent,
-            committed: committedText,
-            tail: lineBuffer,
-          });
-        });
-      },
-    });
-  } catch (error) {
-    if (signal && signal.aborted && latestFullContent.trim()) {
-      return latestFullContent;
-    }
-    throw error;
-  }
-
-  if (lineBuffer.trim()) {
-    safeWrite({
-      type: 'line',
-      line: lineBuffer,
-      full: streamed.content,
-      committed: streamed.content,
-      tail: '',
-    });
-  }
-
-  return streamed.content;
-}
-
-async function streamOptimizedInputToNdjson({
-  requestId,
-  userId,
-  conversationId,
-  character,
-  messages,
-  userInput,
-  modelMode = 'standard',
-  signal,
-  safeWrite,
-  user = null,
-}) {
-  let lineBuffer = '';
-  const streamed = await streamOptimizeUserInputViaGateway({
-    requestId,
-    userId,
-    conversationId,
-    character,
-    messages,
-    userInput,
-    modelMode,
-    signal,
-    user,
-    onDelta: async (deltaText, fullContent) => {
-      safeWrite({ type: 'delta', delta: deltaText, full: fullContent });
-      lineBuffer += deltaText;
-      const parts = lineBuffer.split(/\r?\n/);
-      lineBuffer = parts.pop() || '';
-      const committedText = fullContent.slice(0, Math.max(0, fullContent.length - lineBuffer.length));
-      parts.forEach((line) => {
-        safeWrite({
-          type: 'line',
-          line,
-          full: fullContent,
-          committed: committedText,
-          tail: lineBuffer,
-        });
-      });
-    },
-  });
-
-  if (lineBuffer.trim()) {
-    safeWrite({
-      type: 'line',
-      line: lineBuffer,
-      full: streamed.content,
-      committed: streamed.content,
-      tail: '',
-    });
-  }
-
-  return streamed.content;
-}
+const {
+  mapLlmErrorToUserMessage,
+  buildConversationCharacterPayload,
+  renderChatMessageHtml,
+  buildChatMessagePacket,
+  createNdjsonResponder,
+  streamChatReplyToNdjson,
+  streamOptimizedInputToNdjson,
+} = require('./web/chat-stream-utils');
 
 async function resolveAllowedInitialModelMode(userId, requestedModelMode = '') {
   try {
@@ -445,10 +208,7 @@ function registerWebRoutes(app) {
     deleteConversationSafely,
     invalidateConversationCache,
     translate,
-    translateHtml,
     generateReplyViaGateway,
-    streamReplyViaGateway,
-    streamOptimizeUserInputViaGateway,
     optimizeUserInputViaGateway,
     getChatModelSelector,
     DEFAULT_MODEL_KEY,
@@ -482,9 +242,7 @@ function registerWebRoutes(app) {
     buildRegisterLogMeta,
     buildLoginLogMeta,
     renderValidationMessage,
-    writeNdjson,
     buildChatRequestContext,
-    initNdjsonStream,
     parseIntegerField,
     parseNumberField,
     parseIdParam,
