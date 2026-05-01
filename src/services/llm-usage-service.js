@@ -44,6 +44,12 @@ async function createUsageLog({
   planId = null,
   promptKind = 'chat',
   status = 'success',
+  modelKey = null,
+  modelId = null,
+  requestMultiplier = 1,
+  tokenMultiplier = 1,
+  billableRequestUnits = 1,
+  billableTokens = null,
   inputTokens = 0,
   outputTokens = 0,
   totalTokens = 0,
@@ -54,9 +60,30 @@ async function createUsageLog({
   await query(
     `INSERT INTO llm_usage_logs (
       request_id, user_id, conversation_id, provider_id, plan_id, prompt_kind, status,
+      model_key, model_id, request_multiplier, token_multiplier, billable_request_units, billable_tokens,
       input_tokens, output_tokens, total_tokens, total_cost, latency_ms, error_message, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-    [requestId, userId, conversationId, providerId, planId, promptKind, status, inputTokens, outputTokens, totalTokens, totalCost, latencyMs, errorMessage],
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+    [
+      requestId,
+      userId,
+      conversationId,
+      providerId,
+      planId,
+      promptKind,
+      status,
+      modelKey,
+      modelId,
+      requestMultiplier,
+      tokenMultiplier,
+      billableRequestUnits,
+      billableTokens === null || billableTokens === undefined ? totalTokens : billableTokens,
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      totalCost,
+      latencyMs,
+      errorMessage,
+    ],
   );
 }
 

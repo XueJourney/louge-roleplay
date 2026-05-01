@@ -131,7 +131,9 @@
                   <input type="radio" name="modelMode" value="<%= option.mode %>" <%= (conversation.selected_model_mode || 'standard') === option.mode ? 'checked' : '' %> />
                   <div>
                     <div><strong><%= index + 1 %>. <%= option.label %></strong></div>
-                    <div class="mini-note"><%= t('当前可用') %></div>
+                    <div class="mini-note">
+                      <%= t('计费倍率') %>：<%= t('请求') %> ×<%= option.requestMultiplier %> · Token ×<%= option.tokenMultiplier %>
+                    </div>
                   </div>
                 </label>
               <% }) %>

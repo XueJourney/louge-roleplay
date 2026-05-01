@@ -12,6 +12,7 @@ function registerChatToolRoutes(app, ctx) {
     fetchPathMessages,
     cloneConversationBranch,
     optimizeUserInputViaGateway,
+    getChatModelSelector,
     renderPage,
     parseIntegerField,
     parseIdParam,
@@ -32,8 +33,10 @@ function registerChatToolRoutes(app, ctx) {
       }
 
       const selectedModelMode = String(req.body.modelMode || 'standard').trim();
-      if (!['standard', 'jailbreak', 'force_jailbreak'].includes(selectedModelMode)) {
-        return renderPage(res, 'message', { title: '提示', message: '模型模式不支持。' });
+      const chatModelSelector = await getChatModelSelector(req.session.user.id);
+      const allowedModelModes = new Set((chatModelSelector.options || []).map((option) => option.mode));
+      if (!allowedModelModes.has(selectedModelMode)) {
+        return renderPage(res, 'message', { title: '提示', message: '当前套餐不支持这个模型。' });
       }
 
       await updateConversationModelMode(conversationId, selectedModelMode);

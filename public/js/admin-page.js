@@ -14,11 +14,34 @@
     const tokenField = group.querySelector('[data-token-quota-field]');
     function apply() {
       const mode = select.value;
-      if (requestField) requestField.style.display = mode === 'per_request' ? '' : 'none';
-      if (tokenField) tokenField.style.display = mode === 'per_token' ? '' : 'none';
+      if (requestField) requestField.style.display = mode === 'per_request' || mode === 'hybrid' ? '' : 'none';
+      if (tokenField) tokenField.style.display = mode === 'per_token' || mode === 'hybrid' ? '' : 'none';
     }
     select.addEventListener('change', apply);
     apply();
+  });
+  document.querySelectorAll('[data-plan-model-provider]').forEach((providerSelect) => {
+    const row = providerSelect.closest('.plan-model-row');
+    const modelSelect = row?.querySelector('[data-plan-model-select]');
+    if (!modelSelect) return;
+
+    function applyModelFilter() {
+      const providerId = String(providerSelect.value || '');
+      let selectedVisible = false;
+      Array.from(modelSelect.options).forEach((option) => {
+        const optionProviderId = String(option.dataset.providerId || '');
+        const visible = !option.value || optionProviderId === providerId;
+        option.hidden = !visible;
+        option.disabled = !visible;
+        if (option.selected && visible) selectedVisible = true;
+      });
+      if (!selectedVisible) {
+        modelSelect.value = '';
+      }
+    }
+
+    providerSelect.addEventListener('change', applyModelFilter);
+    applyModelFilter();
   });
 })();
 

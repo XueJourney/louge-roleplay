@@ -26,6 +26,8 @@ const { listLogEntries } = require('../services/log-service');
 const { DEFAULT_SUPPORT_QR_URL, listNotificationsForAdmin, listActiveNotificationsForUser, createNotification, updateNotification, deleteNotification } = require('../services/notification-service');
 const { getAdminConversationDetail, listAdminConversations, permanentlyDeleteConversation, permanentlyDeleteMessage, restoreConversation, restoreMessage } = require('../services/admin-conversation-service');
 const { listProviders, createProvider, updateProvider } = require('../services/llm-provider-service');
+const { parsePlanModelsFromBody } = require('../services/model-form-service');
+const { validatePlanModelsAgainstProviders } = require('../services/plan-model-validation-service');
 const {
   listPromptBlocks,
   createPromptBlock,
@@ -55,6 +57,7 @@ const {
   invalidateConversationCache,
 } = require('../services/conversation-service');
 const { translate, translateHtml } = require('../i18n');
+const { DEFAULT_MODEL_KEY, normalizeModelKey } = require('../services/model-entitlement-service');
 const { generateReplyViaGateway, streamReplyViaGateway, streamOptimizeUserInputViaGateway, optimizeUserInputViaGateway, getChatModelSelector } = require('../services/llm-gateway-service');
 const { issueEmailCode, issuePhoneCode, verifyEmailCode, verifyPhoneCode } = require('../services/verification-service');
 const { hashPassword, verifyPassword } = require('../services/password-service');
@@ -333,6 +336,21 @@ async function streamOptimizedInputToNdjson({
   return streamed.content;
 }
 
+async function resolveAllowedInitialModelMode(userId, requestedModelMode = '') {
+  try {
+    const selector = await getChatModelSelector(userId);
+    const options = selector.options || [];
+    if (!options.length) {
+      return normalizeModelKey(requestedModelMode, DEFAULT_MODEL_KEY);
+    }
+    const requested = normalizeModelKey(requestedModelMode, '');
+    const matched = options.find((option) => option.mode === requested);
+    return matched?.mode || options.find((option) => option.isDefault)?.mode || options[0].mode || DEFAULT_MODEL_KEY;
+  } catch (_) {
+    return DEFAULT_MODEL_KEY;
+  }
+}
+
 const { registerPublicRoutes } = require('./web/public-routes');
 const { registerAuthRoutes } = require('./web/auth-routes');
 const { registerAdminRoutes } = require('./web/admin-routes');
@@ -433,6 +451,8 @@ function registerWebRoutes(app) {
     streamOptimizeUserInputViaGateway,
     optimizeUserInputViaGateway,
     getChatModelSelector,
+    parsePlanModelsFromBody,
+    validatePlanModelsAgainstProviders,
     issueEmailCode,
     issuePhoneCode,
     verifyEmailCode,
@@ -475,6 +495,7 @@ function registerWebRoutes(app) {
     buildNextConversationTitle,
     renderChatPage,
     loadConversationForUserOrFail,
+    resolveAllowedInitialModelMode,
     mapLlmErrorToUserMessage,
     buildConversationCharacterPayload,
     renderChatMessageHtml,

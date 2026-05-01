@@ -4,8 +4,8 @@
  */
 
 const logger = require('../lib/logger');
-const { getActiveSubscriptionForUser, assertUserQuotaAvailable } = require('./plan-service');
-const { getActiveProvider, buildModelOptions } = require('./llm-provider-service');
+const { getActiveSubscriptionForUser, assertUserQuotaAvailable, getSubscriptionModelConfig, buildPlanModelOptions } = require('./plan-service');
+const { getActiveProvider, getProviderById } = require('./llm-provider-service');
 const { createLlmJob, updateLlmJob, createUsageLog } = require('./llm-usage-service');
 const { listPromptBlocks, buildCharacterPromptItems, composeSystemPrompt, applyRuntimeTemplate, applyRuntimeTemplateToCharacter, formatRuntimeTime } = require('./prompt-engineering-service');
 const {
@@ -39,41 +39,28 @@ function buildRuntimeContext({ user = null, now = new Date() } = {}) {
   };
 }
 
-function getProviderModelId(provider, modelMode = 'standard') {
-  const normalizedMode = String(modelMode || 'standard').trim();
-  if (normalizedMode === 'force_jailbreak') {
-    return String(provider.force_jailbreak_model || provider.jailbreak_model || provider.standard_model || provider.model || '').trim();
+async function resolveProviderForPlanModel(modelConfig, activeProvider = null) {
+  if (modelConfig?.providerId) {
+    const provider = await getProviderById(modelConfig.providerId);
+    if (provider) {
+      return provider;
+    }
   }
-  if (normalizedMode === 'jailbreak') {
-    return String(provider.jailbreak_model || provider.standard_model || provider.model || '').trim();
-  }
-  if (normalizedMode === 'compression') {
-    return String(provider.compression_model || provider.standard_model || provider.model || '').trim();
-  }
-  return String(provider.standard_model || provider.model || '').trim();
+  return activeProvider;
 }
 
-function buildModelModeOptions(provider) {
-  const availableModelIds = new Set((provider?.availableModels || []).map((item) => item.id));
-  const findModel = (modelId) => (provider?.availableModels || []).find((item) => item.id === modelId);
-  const buildOption = (mode, label, modelId) => {
-    const matched = findModel(modelId);
-    return {
-      mode,
-      label,
-      enabled: Boolean(modelId),
-      hiddenModelId: modelId || '',
-      displayName: matched?.label || label,
-      searchableText: (matched?.searchText || `${label} ${modelId || ''}`).trim(),
-      inDiscoveryList: modelId ? availableModelIds.has(modelId) : false,
-    };
+function attachSelectedModel(provider, modelConfig) {
+  if (!provider || !modelConfig) {
+    return provider;
+  }
+  return {
+    ...provider,
+    selected_model_key: modelConfig.modelKey,
+    selected_model_label: modelConfig.label,
+    selected_model_id: modelConfig.modelId,
+    request_multiplier: modelConfig.requestMultiplier,
+    token_multiplier: modelConfig.tokenMultiplier,
   };
-
-  return [
-    buildOption('standard', '标准对话模型', getProviderModelId(provider, 'standard')),
-    buildOption('jailbreak', '破限模型', getProviderModelId(provider, 'jailbreak')),
-    buildOption('force_jailbreak', '强制破限模型', getProviderModelId(provider, 'force_jailbreak')),
-  ].filter((item) => item.enabled);
 }
 
 async function summarizeDiscardedMessages(provider, discardedMessages = []) {
@@ -171,7 +158,9 @@ async function executeLlmRequest({ requestId, userId, conversationId = null, cha
     throw new Error('User plan is not configured');
   }
 
-  const provider = await getActiveProvider();
+  const modelConfig = getSubscriptionModelConfig(subscription, modelMode);
+
+  const provider = await resolveProviderForPlanModel(modelConfig, await getActiveProvider());
   if (!provider) {
     logger.warn('LLM provider unavailable; fallback reply generated', {
       requestId,
@@ -191,30 +180,25 @@ async function executeLlmRequest({ requestId, userId, conversationId = null, cha
       },
       provider: null,
       plan: subscription,
-      modelMode,
-      modelOptions: [],
+      modelMode: modelConfig?.modelKey || modelMode,
+      selectedModel: modelConfig,
+      modelOptions: buildPlanModelOptions(subscription),
     };
   }
 
-  provider.availableModels = buildModelOptions((() => {
-    try {
-      return JSON.parse(provider.available_models_json || '[]');
-    } catch (error) {
-      return [];
-    }
-  })());
+  const providerForRequest = attachSelectedModel(provider, modelConfig);
 
   const runtimeContext = buildRuntimeContext({ user });
-  const promptBuild = await buildPromptMessages({ provider, character, messages, userMessage, systemHint, runtimeContext });
+  const promptBuild = await buildPromptMessages({ provider: providerForRequest, character, messages, userMessage, systemHint, runtimeContext });
   const promptMessages = promptBuild.promptMessages;
   const estimatedTokens = estimatePromptTokens(promptMessages) + Number(subscription.max_output_tokens || 0);
-  await assertUserQuotaAvailable(userId, estimatedTokens);
+  const quotaCheck = await assertUserQuotaAvailable(userId, estimatedTokens, modelConfig);
 
   const jobId = await createLlmJob({
     requestId,
     userId,
     conversationId,
-    providerId: provider.id,
+    providerId: providerForRequest.id,
     priority: Number(subscription.priority_weight || 0),
     status: 'queued',
     promptKind,
@@ -222,14 +206,16 @@ async function executeLlmRequest({ requestId, userId, conversationId = null, cha
 
   return {
     subscription,
-    provider,
+    provider: providerForRequest,
+    modelConfig,
+    quotaCheck,
     promptBuild,
     promptMessages,
     jobId,
   };
 }
 
-async function finalizeLlmJobSuccess({ jobId, startedAt, provider, subscription, requestId, userId, conversationId, promptKind, result, modelMode, promptBuild }) {
+async function finalizeLlmJobSuccess({ jobId, startedAt, provider, subscription, requestId, userId, conversationId, promptKind, result, modelMode, modelConfig, promptBuild }) {
   const totalCost = (
     (Number(result.inputTokens || 0) / 1000) * Number(provider.input_token_price || 0)
     + (Number(result.outputTokens || 0) / 1000) * Number(provider.output_token_price || 0)
@@ -250,6 +236,12 @@ async function finalizeLlmJobSuccess({ jobId, startedAt, provider, subscription,
     planId: subscription.plan_id,
     promptKind,
     status: 'success',
+    modelKey: modelConfig?.modelKey || modelMode,
+    modelId: provider.selected_model_id || result.modelId || '',
+    requestMultiplier: modelConfig?.requestMultiplier || 1,
+    tokenMultiplier: modelConfig?.tokenMultiplier || 1,
+    billableRequestUnits: Math.ceil(Number(modelConfig?.requestMultiplier || 1)),
+    billableTokens: Math.ceil(Number(result.totalTokens || 0) * Number(modelConfig?.tokenMultiplier || 1)),
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     totalTokens: result.totalTokens,
@@ -268,8 +260,9 @@ async function finalizeLlmJobSuccess({ jobId, startedAt, provider, subscription,
     },
     provider,
     plan: subscription,
-    modelMode,
-    modelOptions: buildModelModeOptions(provider),
+    modelMode: modelConfig?.modelKey || modelMode,
+    selectedModel: modelConfig || null,
+    modelOptions: buildPlanModelOptions(subscription),
     contextMeta: {
       maxContextTokens: promptBuild.maxContextTokens,
       trimContextTokens: promptBuild.trimContextTokens,
@@ -311,7 +304,7 @@ async function executeLlmQueued(requestMeta, runner) {
   if (!prepared.provider) {
     return prepared;
   }
-  const { subscription, provider, promptBuild, promptMessages, jobId } = prepared;
+  const { subscription, provider, modelConfig, promptBuild, promptMessages, jobId } = prepared;
   return llmQueue.enqueueWithPriority(async () => {
     const startedAt = new Date();
     await updateLlmJob(jobId, {
@@ -333,6 +326,7 @@ async function executeLlmQueued(requestMeta, runner) {
         promptKind: requestMeta.promptKind,
         result,
         modelMode: requestMeta.modelMode,
+        modelConfig,
         promptBuild,
       });
     } catch (error) {
@@ -352,10 +346,14 @@ async function executeLlmQueued(requestMeta, runner) {
   }, Number(subscription.priority_weight || 0));
 }
 
+function resolveCallModelMode(provider, modelMode) {
+  return provider?.selected_model_key || modelMode;
+}
+
 async function generateReplyViaGateway({ requestId, userId, conversationId = null, character, messages, userMessage, systemHint = '', promptKind = 'chat', modelMode = 'standard', signal = null, user = null }) {
   const result = await executeLlmQueued(
     { requestId, userId, conversationId, character, messages, userMessage, systemHint, promptKind, modelMode, user },
-    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { signal }),
+    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, resolveCallModelMode(provider, modelMode), { signal }),
   );
   return result.content;
 }
@@ -363,7 +361,7 @@ async function generateReplyViaGateway({ requestId, userId, conversationId = nul
 async function streamReplyViaGateway({ requestId, userId, conversationId = null, character, messages, userMessage, systemHint = '', promptKind = 'chat', modelMode = 'standard', onDelta = null, signal = null, user = null }) {
   return executeLlmQueued(
     { requestId, userId, conversationId, character, messages, userMessage, systemHint, promptKind, modelMode, user },
-    ({ provider, promptMessages, subscription }) => callProviderStream(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { onDelta, signal }),
+    ({ provider, promptMessages, subscription }) => callProviderStream(provider, promptMessages, subscription.max_output_tokens || 0, resolveCallModelMode(provider, modelMode), { onDelta, signal }),
   );
 }
 
@@ -381,7 +379,7 @@ async function streamOptimizeUserInputViaGateway({ requestId, userId, conversati
       modelMode,
       user,
     },
-    ({ provider, promptMessages, subscription }) => callProviderStream(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { onDelta, signal }),
+    ({ provider, promptMessages, subscription }) => callProviderStream(provider, promptMessages, subscription.max_output_tokens || 0, resolveCallModelMode(provider, modelMode), { onDelta, signal }),
   );
 }
 
@@ -399,15 +397,16 @@ async function optimizeUserInputViaGateway({ requestId, userId, conversationId =
       modelMode,
       user,
     },
-    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, modelMode, { signal }),
+    ({ provider, promptMessages, subscription }) => callProvider(provider, promptMessages, subscription.max_output_tokens || 0, resolveCallModelMode(provider, modelMode), { signal }),
   );
   return result.content;
 }
 
 
-async function getChatModelSelector() {
-  const provider = await getActiveProvider();
-  if (!provider) {
+async function getChatModelSelector(userId = null) {
+  const subscription = userId ? await getActiveSubscriptionForUser(userId) : null;
+  const activeProvider = await getActiveProvider();
+  if (!activeProvider && !subscription) {
     return {
       provider: null,
       options: [],
@@ -416,19 +415,13 @@ async function getChatModelSelector() {
     };
   }
 
-  provider.availableModels = buildModelOptions((() => {
-    try {
-      return JSON.parse(provider.available_models_json || '[]');
-    } catch (error) {
-      return [];
-    }
-  })());
-
+  const options = subscription ? buildPlanModelOptions(subscription) : [];
   return {
-    provider,
-    options: buildModelModeOptions(provider),
-    maxContextTokens: Number(provider.max_context_tokens || DEFAULT_MAX_CONTEXT_TOKENS),
-    trimContextTokens: Number(provider.trim_context_tokens || DEFAULT_TRIM_CONTEXT_TOKENS),
+    provider: activeProvider,
+    plan: subscription,
+    options,
+    maxContextTokens: Number(activeProvider?.max_context_tokens || DEFAULT_MAX_CONTEXT_TOKENS),
+    trimContextTokens: Number(activeProvider?.trim_context_tokens || DEFAULT_TRIM_CONTEXT_TOKENS),
   };
 }
 

@@ -185,6 +185,21 @@ async function getActiveProvider() {
   return rows[0] || null;
 }
 
+async function getProviderById(providerId, { activeOnly = true } = {}) {
+  const rows = await query(
+    `SELECT id, name, provider_type, base_url, api_key, model, standard_model, jailbreak_model,
+            force_jailbreak_model, compression_model, available_models_json,
+            max_context_tokens, trim_context_tokens,
+            is_active, status, max_concurrency, timeout_ms,
+            input_token_price, output_token_price
+     FROM llm_providers
+     WHERE id = ?${activeOnly ? " AND status = 'active'" : ''}
+     LIMIT 1`,
+    [providerId],
+  );
+  return rows[0] || null;
+}
+
 async function listProviders() {
   const rows = await query(
     `SELECT id, name, provider_type, base_url, api_key_masked, model,
@@ -343,6 +358,7 @@ module.exports = {
   buildModelOptions,
   resolveProviderModels,
   getActiveProvider,
+  getProviderById,
   listProviders,
   createProvider,
   updateProvider,

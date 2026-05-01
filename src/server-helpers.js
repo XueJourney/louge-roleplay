@@ -412,11 +412,18 @@ async function renderChatPage(req, res, conversation, options = {}) {
   view.visiblePathMessages = view.pathMessages.slice(keepFromIndex);
   view.hasOlderMessages = view.pathMessages.length > view.visiblePathMessages.length;
   view.oldestVisibleMessageId = view.visiblePathMessages.length ? view.visiblePathMessages[0].id : null;
-  const chatModelSelector = await getChatModelSelector();
+  const chatModelSelector = await getChatModelSelector(req.session?.user?.id || null);
+
+  const activeMode = (chatModelSelector.options || []).some((option) => option.mode === conversation.selected_model_mode)
+    ? conversation.selected_model_mode
+    : (chatModelSelector.options || []).find((option) => option.isDefault)?.mode || (chatModelSelector.options || [])[0]?.mode || conversation.selected_model_mode || 'standard';
 
   return renderPage(res, 'chat', {
     title: req.t ? req.t('聊天') : '聊天',
-    conversation,
+    conversation: {
+      ...conversation,
+      selected_model_mode: activeMode,
+    },
     view,
     draftContent: options.draftContent || String(req.query.draft || ''),
     optimizedContent: options.optimizedContent || '',

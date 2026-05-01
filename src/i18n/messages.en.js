@@ -874,6 +874,19 @@ const EN_MESSAGES = {
   '系统消息': 'System message',
   '关闭操作面板': 'Close actions panel',
   '浏览公开角色': 'Browse public characters',
+  '现在模型跟着套餐走：每个套餐可配置 1-6 个可用模型，并分别设置请求倍率与 Token 倍率。': 'Models are now assigned per plan: each plan can expose 1–6 models with separate request and token multipliers.',
+  '倍率会写入用量日志：请求套餐按请求倍率扣次数，Token 套餐按 Token 倍率扣额度；hybrid 两边都检查。': 'Multipliers are written into usage logs: request plans consume request units, token plans consume multiplied tokens, and hybrid checks both.',
+  '套餐可用模型': 'Plan models',
+  '留空的模型行不会保存；高级模型可把请求 / Token 倍率设为 3。': 'Blank model rows are ignored. For premium models, set request/token multipliers to 3.',
+  '当前用户只会看到这里配置的模型；模型 Key 会保存在会话上，改套餐时会自动回落到默认可用模型。': 'Users only see the models configured here. Model keys are stored on conversations and fall back to the default when unavailable.',
+  '前台名称': 'Display name',
+  '基础模型 / 高级模型': 'Basic model / premium model',
+  '不启用这一行': 'Disable this row',
+  '请求倍率': 'Request multiplier',
+  'Token 倍率': 'Token multiplier',
+  '默认使用这个模型': 'Use this model by default',
+  '模型': 'Models',
+  '计费倍率': 'Billing multiplier',
 };
 
 module.exports = { EN_MESSAGES };

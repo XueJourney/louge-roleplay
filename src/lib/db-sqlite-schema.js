@@ -146,6 +146,7 @@ function initSqliteSchema(db) {
       priority_weight  INTEGER NOT NULL DEFAULT 0,
       concurrency_limit INTEGER NOT NULL DEFAULT 1,
       max_output_tokens INTEGER NOT NULL DEFAULT 2048,
+      plan_models_json TEXT NULL,
       status           TEXT NOT NULL DEFAULT 'active',
       is_default       INTEGER NOT NULL DEFAULT 0,
       sort_order       INTEGER NOT NULL DEFAULT 0,
@@ -153,6 +154,7 @@ function initSqliteSchema(db) {
       updated_at       TEXT NOT NULL
     )
   `);
+  ensureSqliteColumn(db, 'plans', 'plan_models_json', 'plan_models_json TEXT NULL');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_plans_code ON plans (code)');
 
   // ─── 用户订阅表 ───────────────────────────────────────────────────────────────
@@ -229,6 +231,12 @@ function initSqliteSchema(db) {
       plan_id         INTEGER NULL,
       prompt_kind     TEXT NOT NULL DEFAULT 'chat',
       status          TEXT NOT NULL DEFAULT 'success',
+      model_key       TEXT NULL,
+      model_id        TEXT NULL,
+      request_multiplier REAL NOT NULL DEFAULT 1,
+      token_multiplier REAL NOT NULL DEFAULT 1,
+      billable_request_units INTEGER NOT NULL DEFAULT 1,
+      billable_tokens INTEGER NOT NULL DEFAULT 0,
       input_tokens    INTEGER NOT NULL DEFAULT 0,
       output_tokens   INTEGER NOT NULL DEFAULT 0,
       total_tokens    INTEGER NOT NULL DEFAULT 0,
@@ -240,6 +248,14 @@ function initSqliteSchema(db) {
   `);
   db.exec('CREATE INDEX IF NOT EXISTS idx_llm_usage_logs_user ON llm_usage_logs (user_id, created_at)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_llm_usage_logs_request ON llm_usage_logs (request_id)');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'model_key', 'model_key TEXT NULL');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'model_id', 'model_id TEXT NULL');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'request_multiplier', 'request_multiplier REAL NOT NULL DEFAULT 1');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'token_multiplier', 'token_multiplier REAL NOT NULL DEFAULT 1');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'billable_request_units', 'billable_request_units INTEGER NOT NULL DEFAULT 1');
+  ensureSqliteColumn(db, 'llm_usage_logs', 'billable_tokens', 'billable_tokens INTEGER NOT NULL DEFAULT 0');
+  db.exec("UPDATE llm_usage_logs SET billable_request_units = 1 WHERE billable_request_units <= 0 AND status = 'success'");
+  db.exec("UPDATE llm_usage_logs SET billable_tokens = total_tokens WHERE billable_tokens = 0 AND total_tokens > 0 AND status = 'success'");
 
   // ─── 系统提示词片段表 ─────────────────────────────────────────────────────────
   db.exec(`
