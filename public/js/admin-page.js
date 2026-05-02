@@ -303,3 +303,11 @@
     applyFilter();
   });
 })();
+
+
+(function () {
+  document.querySelectorAll('.quota-bar--admin [data-width]').forEach((bar) => {
+    const value = Math.max(0, Math.min(100, Number(bar.dataset.width || 0)));
+    bar.style.setProperty('--quota-width', String(value));
+  });
+})();

@@ -229,6 +229,64 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.admin-form-grid--site-message-compose textarea[name="body"] {
+  min-height: 320px;
+}
+
+.admin-site-message-summary {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-site-message-main {
+  align-items: flex-start;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-site-message-preview {
+  color: var(--text-soft);
+  line-height: 1.7;
+  max-width: min(100%, 920px);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-site-message-meta {
+  justify-content: flex-start;
+}
+
+.admin-inline-form {
+  display: inline-flex;
+  margin: 0;
+}
+
+.admin-small-danger-button {
+  width: auto;
+  min-width: 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(249, 112, 102, 0.28);
+  background: rgba(249, 112, 102, 0.12);
+  color: #fca5a5;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.admin-small-danger-button:hover {
+  background: rgba(249, 112, 102, 0.18);
+  box-shadow: none;
+}
+
+.admin-item--revoked {
+  opacity: 0.7;
+}
+
+.admin-item--revoked .admin-site-message-preview {
+  text-decoration: line-through;
+}
+
 .admin-form-grid__wide {
   grid-column: 1 / -1;
 }
@@ -465,4 +523,103 @@
   white-space: pre-wrap;
   color: var(--text-soft);
   line-height: 1.75;
+}
+
+/* Markdown rendering for notifications and site mail. Raw HTML is escaped by the renderer; these styles only format allowed Markdown tags. */
+.markdown-body {
+  overflow-wrap: anywhere;
+}
+
+.markdown-body > :first-child { margin-top: 0; }
+.markdown-body > :last-child { margin-bottom: 0; }
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body blockquote,
+.markdown-body pre {
+  margin: 0 0 0.86em;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin: 0.2em 0 0.55em;
+  line-height: 1.32;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.35em;
+}
+
+.markdown-body li + li {
+  margin-top: 0.25em;
+}
+
+.markdown-body blockquote {
+  padding: 0.78em 1em;
+  border-left: 3px solid rgba(124, 92, 252, 0.46);
+  border-radius: var(--radius-md);
+  background: rgba(124, 92, 252, 0.08);
+  color: var(--text-soft);
+}
+
+.markdown-body code {
+  padding: 0.12em 0.36em;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+  color: #d9ccff;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.markdown-body pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.markdown-body pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.markdown-body a {
+  color: #a5b4fc;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.markdown-body img {
+  max-width: min(100%, 420px);
+  height: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.11);
+  margin: 1em 0;
+}
+
+.site-notification-body.markdown-body,
+.site-notification-toast .markdown-body,
+.site-notification-banner .markdown-body,
+.site-message-card__body.markdown-body,
+.admin-site-message-preview.markdown-body {
+  white-space: normal;
+}
+
+.site-notification-toast .markdown-body {
+  display: block;
 }

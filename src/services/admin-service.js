@@ -4,6 +4,7 @@
  */
 
 const { query, withTransaction } = require('../lib/db');
+const { getCurrentUsageForUser } = require('./plan/subscriptions');
 
 function formatDateTimeForDb(date) {
   const pad = (value) => String(value).padStart(2, '0');
@@ -14,12 +15,85 @@ function buildStaleJobCutoff(minutes = 10) {
   return formatDateTimeForDb(new Date(Date.now() - minutes * 60 * 1000));
 }
 
+function calculateQuotaPercent(used, total) {
+  const safeUsed = Math.max(0, Number(used || 0));
+  const safeTotal = Math.max(0, Number(total || 0));
+  if (!safeTotal) return 0;
+  return Math.min(100, Math.round((safeUsed / safeTotal) * 100));
+}
+
+function getQuotaState(percent) {
+  const value = Number(percent || 0);
+  if (value >= 90) return 'danger';
+  if (value >= 70) return 'warn';
+  return 'healthy';
+}
+
+async function attachUserQuotaSnapshots(users = []) {
+  return Promise.all(users.map(async (user) => {
+    if (!user.plan_id) {
+      return {
+        ...user,
+        plan_details: null,
+        quota_snapshot: null,
+      };
+    }
+
+    const usage = await getCurrentUsageForUser(user.id, user);
+    const requestQuota = Number(user.request_quota || 0);
+    const tokenQuota = Number(user.token_quota || 0);
+    const usedRequests = Number(usage.usedRequests || 0);
+    const usedTokens = Number(usage.usedTokens || 0);
+    const remainingRequests = Math.max(0, requestQuota - usedRequests);
+    const remainingTokens = Math.max(0, tokenQuota - usedTokens);
+    const requestUsagePercent = calculateQuotaPercent(usedRequests, requestQuota);
+    const tokenUsagePercent = calculateQuotaPercent(usedTokens, tokenQuota);
+
+    return {
+      ...user,
+      used_requests: usedRequests,
+      used_tokens: usedTokens,
+      remaining_requests: remainingRequests,
+      remaining_tokens: remainingTokens,
+      request_usage_percent: requestUsagePercent,
+      token_usage_percent: tokenUsagePercent,
+      quota_state: getQuotaState(Math.max(requestUsagePercent, tokenUsagePercent)),
+      plan_details: {
+        id: user.plan_id,
+        code: user.plan_code,
+        name: user.plan_name,
+        description: user.plan_description,
+        billingMode: user.billing_mode,
+        quotaPeriod: user.quota_period,
+        requestQuota,
+        tokenQuota,
+        priorityWeight: Number(user.priority_weight || 0),
+        concurrencyLimit: Number(user.concurrency_limit || 0),
+        maxOutputTokens: Number(user.max_output_tokens || 0),
+        status: user.plan_status,
+        modelCount: Number(user.model_count || 0),
+        subscriptionStartedAt: user.subscription_started_at,
+      },
+      quota_snapshot: {
+        usage,
+        remainingRequests,
+        remainingTokens,
+        requestUsagePercent,
+        tokenUsagePercent,
+      },
+    };
+  }));
+}
+
 async function listUsersWithPlans() {
-  return query(
+  const rows = await query(
     `SELECT u.id, u.public_id, u.username, u.nickname, u.email, u.phone, u.role, u.status,
             u.country_type, u.created_at,
-            p.name AS plan_name, p.code AS plan_code, p.billing_mode,
-            p.priority_weight, p.concurrency_limit
+            us.id AS subscription_id, us.started_at AS subscription_started_at,
+            p.id AS plan_id, p.name AS plan_name, p.code AS plan_code, p.description AS plan_description,
+            p.billing_mode, p.quota_period, p.request_quota, p.token_quota,
+            p.priority_weight, p.concurrency_limit, p.max_output_tokens, p.plan_models_json,
+            p.status AS plan_status
      FROM users u
      LEFT JOIN user_subscriptions us
        ON us.user_id = u.id AND us.status = 'active'
@@ -27,6 +101,20 @@ async function listUsersWithPlans() {
        ON p.id = us.plan_id
      ORDER BY u.id ASC`,
   );
+
+  const users = rows.map((row) => ({
+    ...row,
+    model_count: (() => {
+      try {
+        const models = JSON.parse(row.plan_models_json || '[]');
+        return Array.isArray(models) ? models.length : 0;
+      } catch (_error) {
+        return 0;
+      }
+    })(),
+  }));
+
+  return attachUserQuotaSnapshots(users);
 }
 
 async function getUserBusinessDataCounts(userId) {

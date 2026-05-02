@@ -172,7 +172,7 @@
             <input type="number" name="priority" value="0" />
           </label>
           <label class="admin-form-grid__wide"><%= t('内容') %>
-            <textarea name="body" rows="4" maxlength="4000" placeholder="<%= t('写给用户看的通知内容') %>" required></textarea>
+            <textarea name="body" rows="4" maxlength="4000" placeholder="<%= t('通知正文，支持 Markdown 和换行。') %>" required></textarea>
           </label>
           <label><%= t('按钮文字') %>
             <input name="actionLabel" maxlength="80" placeholder="<%= t('例如：查看详情') %>" />
@@ -271,7 +271,7 @@
                 <input type="number" name="priority" value="<%= notification.priority %>" />
               </label>
               <label class="admin-form-grid__wide"><%= t('内容') %>
-                <textarea name="body" rows="4" maxlength="4000" required><%= notification.body %></textarea>
+                <textarea name="body" rows="4" maxlength="4000" required placeholder="<%= t('通知正文，支持 Markdown 和换行。') %>"><%= notification.body %></textarea>
               </label>
               <label><%= t('按钮文字') %>
                 <input name="actionLabel" maxlength="80" value="<%= notification.action_label || '' %>" />

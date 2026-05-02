@@ -21,7 +21,7 @@ const { listPlans, findPlanById, createPlan, updatePlan, deletePlan, getActiveSu
 const { listUsersWithPlans, getAdminOverview, safelyDeleteUserById } = require('../services/admin-service');
 const { listLogEntries } = require('../services/log-service');
 const { DEFAULT_SUPPORT_QR_URL, listNotificationsForAdmin, listActiveNotificationsForUser, createNotification, updateNotification, deleteNotification } = require('../services/notification-service');
-const { createSiteMessage, listSiteMessagesForAdmin, listInboxMessagesForUser, getUnreadSiteMessageCount, markSiteMessageRead, markAllSiteMessagesRead, getSiteMessageRealtimeSnapshot } = require('../services/site-message-service');
+const { createSiteMessage, listSiteMessagesForAdmin, listInboxMessagesForUser, getUnreadSiteMessageCount, revokeSiteMessage, markSiteMessageRead, markAllSiteMessagesRead, getSiteMessageRealtimeSnapshot } = require('../services/site-message-service');
 const { deleteAdminCharacter, ensureCharactersStatusEnumSupportsBlocked, getAdminCharacterDetail, getAdminCharacterById, listAdminCharacters, updateAdminCharacterStatus } = require('../services/admin-character-service');
 const { listPublicTags, listAllTags } = require('../services/character-tag-service');
 const { uploadTavernCards, previewTavernImport, saveImportPreview, loadImportPreview, deleteImportPreview, importPreviewExists, buildConfirmItemsFromPreview, confirmTavernImport, listImportBatches } = require('../services/tavern-card-import-service');
@@ -204,6 +204,7 @@ function registerWebRoutes(app) {
     listSiteMessagesForAdmin,
     listInboxMessagesForUser,
     getUnreadSiteMessageCount,
+    revokeSiteMessage,
     markSiteMessageRead,
     markAllSiteMessagesRead,
     getSiteMessageRealtimeSnapshot,

@@ -1,0 +1,81 @@
+.message-actions-body .editor-form {
+  min-width: min(360px, calc(100vw - 64px));
+}
+
+.message-actions-body textarea {
+  width: 100%;
+}
+
+.message-actions-body .inline-form {
+  display: block;
+  width: 100%;
+}
+
+.message-actions-body .inline-form .message-menu-item {
+  display: block;
+}
+
+.compose-card--linear .compose-details {
+  margin-top: 10px;
+}
+
+.draft-box label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.chat-transcript-panel .history-loader {
+  margin-bottom: 12px;
+}
+
+.chat-side--assistant {
+  min-width: 0;
+}
+
+.compose-card--linear {
+  padding: 14px;
+}
+
+.compose-card--linear textarea#content {
+  min-height: 92px;
+  border-radius: var(--radius-xl);
+}
+
+.compose-actions--linear {
+  margin-top: 8px;
+}
+
+.compose-details--compact {
+  min-width: 140px;
+}
+
+.compose-details--compact summary {
+  padding: 10px 12px;
+}
+
+.chat-side--assistant {
+  gap: 14px;
+}
+
+.character-card h2,
+.help-card h2 {
+  margin-bottom: 8px;
+}
+
+.help-card ul {
+  padding-left: 18px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

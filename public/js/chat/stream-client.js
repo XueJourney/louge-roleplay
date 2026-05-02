@@ -64,6 +64,7 @@
       let gotDonePacket = false;
       let gotRenderableContent = false;
       let donePacket = null;
+      let packetError = null;
 
       const handlePacket = (packet) => {
         if (!packet) return;
@@ -160,17 +161,19 @@
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
-        lines.forEach((line) => {
+        for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed) return;
+          if (!trimmed) continue;
           try {
             handlePacket(JSON.parse(trimmed));
           } catch (error) {
-            if (error instanceof Error) {
-              throw error;
-            }
+            packetError = error instanceof Error ? error : new Error(String(error || 'stream packet error'));
+            break;
           }
-        });
+        }
+        if (packetError) {
+          throw packetError;
+        }
       }
 
       if (buffer.trim()) {

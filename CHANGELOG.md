@@ -4,6 +4,34 @@
 
 ## [Unreleased]
 
+## [1.3.18] - 2026-05-02
+
+### Added
+
+- 站内信发送记录新增软撤回能力；撤回后用户收件箱、未读计数和实时轮询不再显示该站内信，后台历史保留撤回状态与时间。
+- 全体用户站内信改为历史全局消息：新注册用户会自动补收未撤回的全体用户站内信，已有用户访问站内信或轮询未读时也会自修复补齐。
+- 新增 `scripts/test-site-message-service.js` 覆盖全局站内信补发、撤回隐藏、未读计数和后台收件人数统计。
+
+### Changed
+
+- 放大站内信正文输入框，并优化后台发送记录在移动端的展示宽度，避免历史内容被挤得过窄。
+
+## [1.3.17] - 2026-05-02
+
+### Fixed
+
+- 站内信筛选没有匹配用户时不再抛 500，而是在管理页显示可读错误提示，避免误判为系统异常。
+- 修复聊天 NDJSON 流消费器中 `forEach` 内抛错无法中断外层 async 流程的问题，让前端能正确进入失败态并显示错误，而不是表现为“无法生成”。
+
+## [1.3.16] - 2026-05-02
+
+### Changed
+
+- 继续拆分过大文件：`scripts/init-db.js` 改为轻量入口，表结构、迁移、种子数据与工具函数拆入 `scripts/init-db/`。
+- `src/services/character-service.js` 保留兼容门面，将公共角色查询与角色表结构自修复拆入 `src/services/character/`。
+- `public/styles/site-pages/51-chat-polish.css` 改为聚合入口，聊天页结构/消息操作/头部菜单/响应式样式拆入 `public/styles/site-pages/chat-polish/`。
+- `public/js/chat/rich-renderer.js` 改为渲染入口，将 Markdown、净化与折叠块逻辑拆入 `public/js/chat/rich-renderer/`。
+
 ## [1.3.15] - 2026-05-02
 
 ### Changed
