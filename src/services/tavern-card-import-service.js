@@ -60,8 +60,27 @@ function uploadTavernCards(req, res, next) {
   });
 }
 
-function truncateText(value, maxLength = MAX_TEXT_FIELD) {
-  const text = String(value ?? '').replace(/\u0000/g, '').trim();
+function decodeEscapedText(value) {
+  let text = String(value ?? '').replace(/\u0000/g, '');
+  for (let i = 0; i < 2; i += 1) {
+    const next = text
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'")
+      .replace(/\\\\/g, '\\');
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
+
+function truncateText(value, maxLength = MAX_TEXT_FIELD, options = {}) {
+  const shouldDecodeEscapes = options.decodeEscapes === undefined ? true : Boolean(options.decodeEscapes);
+  const raw = shouldDecodeEscapes ? decodeEscapedText(value) : String(value ?? '').replace(/\u0000/g, '');
+  const text = raw.trim();
   return text.length > maxLength ? text.slice(0, maxLength) : text;
 }
 
@@ -481,8 +500,8 @@ function normalizeImportItemForInsert(item = {}) {
   const parsed = item.parsed || {};
   const name = truncateText(item.name || parsed.name, 100) || '未命名角色';
   return {
-    fileName: truncateText(item.fileName, 255),
-    fileHash: truncateText(item.fileHash, 64),
+    fileName: truncateText(item.fileName, 255, { decodeEscapes: false }),
+    fileHash: truncateText(item.fileHash, 64, { decodeEscapes: false }),
     name,
     summary: truncateText(item.summary || parsed.summary || `${name} · 酒馆卡导入`, 500),
     personality: truncateText(item.personality || parsed.personality || ''),
@@ -494,7 +513,7 @@ function normalizeImportItemForInsert(item = {}) {
     duplicateAction: ['skip', 'copy', 'overwrite'].includes(String(item.duplicateAction || 'copy')) ? String(item.duplicateAction || 'copy') : 'copy',
     duplicateId: Number(item.duplicate?.id || item.duplicateId || 0) || null,
     avatarPreviewDataUrl: String(item.avatarPreviewDataUrl || '').trim(),
-    sourceFormat: truncateText(parsed.sourceFormat || 'tavern-card', 80),
+    sourceFormat: truncateText(parsed.sourceFormat || 'tavern-card', 80, { decodeEscapes: false }),
     sourceCardJson: parsed.sourceCardJson || null,
     importedWorldBookJson: parsed.importedWorldBookJson || null,
     flattenedWorldBookText: truncateText(parsed.flattenedWorldBookText || '', 60000),

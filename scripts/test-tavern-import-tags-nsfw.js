@@ -108,7 +108,7 @@ async function cleanup(adminId, prefix) {
         description: '一个用于导入验收的角色描述。',
         personality: '温柔、谨慎、会解释边界。',
         scenario: '在旧书店里测试导入。',
-        first_mes: '你好，我从酒馆卡里醒来了。',
+        first_mes: '你好，{{user}}\\n我从酒馆卡里醒来了，并说：\\"我们开始吧。\\"',
         mes_example: '<START>\n{{char}}: 示例对话。',
         tags: ['验收标签A', '验收标签B', '验收标签A'],
         character_book: {
@@ -149,6 +149,12 @@ async function cleanup(adminId, prefix) {
     const result = await confirmTavernImport(adminId, items);
     assert.equal(result.successCount, 2);
     assert.equal(result.failedCount, 0);
+    const importedFirstMessage = await query('SELECT first_message FROM characters WHERE user_id = ? AND name = ?', [adminId, `${prefix}Alpha`]);
+    assert.equal(
+      importedFirstMessage[0]?.first_message,
+      '你好，{{user}}\n我从酒馆卡里醒来了，并说："我们开始吧。"',
+      '酒馆卡 first_mes 应作为楼阁开场白并解析转义字符',
+    );
 
     const duplicatePreview = await previewTavernImport([jsonFile], adminId);
     assert.equal(duplicatePreview[0]?.duplicate?.reason, 'file_hash', '重复检测应优先命中文件 hash');
