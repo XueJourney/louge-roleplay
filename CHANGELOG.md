@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [1.3.11] - 2026-05-02
+
+### Changed
+
+- 将 800 行级别的酒馆卡导入服务拆成 `src/services/tavern-import/` 下的文本规整、PNG 解析、卡片 payload 标准化、头像保存、预览存储等模块。
+- 保留 `src/services/tavern-card-import-service.js` 作为兼容门面，路由和测试入口无需改 require 路径。
+- 将千行级后台样式 `public/styles/site-pages/20-admin.css` 拆成 `public/styles/site-pages/admin/` 下的布局、列表表单、配置、审计、套餐响应式、用户权限等模块，并保留原 CSS 入口聚合导入。
+
 ## [1.3.10] - 2026-05-02
 
 ### Changed

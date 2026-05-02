@@ -1,0 +1,236 @@
+/* Admin log, character detail, and conversation audit views.
+ * Extracted from site-pages/20-admin.css; keep import order stable. */
+
+  .admin-log-filter {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .admin-log-filter-actions {
+    align-self: end;
+  }
+
+  .admin-log-file-list,
+  .admin-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .admin-log-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .admin-character-comment-card,
+  .admin-character-media-card,
+  .admin-character-detail-block,
+  .admin-character-prompt-item {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--bg-elevated);
+  }
+
+  .admin-character-detail-hero {
+    align-items: stretch;
+  }
+
+  .admin-character-media-grid,
+  .admin-character-detail-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-character-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-character-media-card img {
+    width: 100%;
+    max-height: 320px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .admin-character-media-card code {
+    overflow-wrap: anywhere;
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+
+  .admin-character-detail-block pre,
+  .admin-character-prompt-item pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 420px;
+    overflow: auto;
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.18);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.75;
+  }
+
+  .admin-character-prompt-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .admin-character-prompt-item {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .admin-character-comment-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  .admin-conversation-card,
+  .admin-character-card,
+  .admin-conversation-message {
+    padding: 18px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .admin-conversation-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .admin-conversation-preview {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  .admin-conversation-preview span {
+    display: inline-flex;
+    margin-right: 8px;
+    color: var(--brand-hover);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .admin-conversation-message-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .admin-conversation-message--user {
+    border-left: 3px solid var(--accent-blue);
+  }
+
+  .admin-conversation-message--character {
+    border-left: 3px solid var(--brand);
+  }
+
+  .admin-conversation-message--system {
+    border-left: 3px solid #f59e0b;
+  }
+
+  .admin-conversation-message-content {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 560px;
+    overflow: auto;
+    margin: 0;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.18);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .admin-conversation-message-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+
+  .admin-conversation-message-links span {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .admin-log-entry summary {
+    align-items: center;
+  }
+
+  .admin-log-meta-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-log-meta-grid span {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+    font-size: 13px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-log-meta-grid strong {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .admin-log-pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: 320px;
+    overflow: auto;
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.18);
+    color: var(--text-secondary);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .pill--level-debug { color: #93c5fd; border-color: rgba(147, 197, 253, 0.24); background: rgba(147, 197, 253, 0.1); }
+  .pill--level-info { color: var(--accent-green); border-color: rgba(52, 211, 153, 0.24); background: rgba(52, 211, 153, 0.1); }
+  .pill--level-warn { color: #fbbf24; border-color: rgba(251, 191, 36, 0.24); background: rgba(251, 191, 36, 0.1); }
+  .pill--level-error { color: #fca5a5; border-color: rgba(248, 113, 113, 0.28); background: rgba(248, 113, 113, 0.12); }
+  .pill--level-access { color: #c4b5fd; border-color: rgba(196, 181, 253, 0.24); background: rgba(196, 181, 253, 0.1); }
+  .pill--level-raw { color: var(--text-tertiary); }
+

@@ -1,0 +1,239 @@
+/* User management and permission card layouts.
+ * Extracted from site-pages/20-admin.css; keep import order stable. */
+
+  .admin-users-section {
+    gap: 18px;
+  }
+
+  .admin-users-heading {
+    align-items: center;
+  }
+
+  .search-field--large input {
+    min-height: 46px;
+    border-radius: var(--radius-full);
+    padding-inline: 16px;
+  }
+
+  .admin-users-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .admin-users-summary-card {
+    display: grid;
+    gap: 5px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(145deg, rgba(124, 92, 252, 0.08), rgba(255, 255, 255, 0.025));
+  }
+
+  .admin-users-summary-card span,
+  .user-info-label,
+  .compact-admin-form label > span {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .admin-users-summary-card strong {
+    color: var(--text);
+    font-size: 26px;
+    line-height: 1.1;
+  }
+
+  .admin-users-summary-card small,
+  .user-info-panel small {
+    color: var(--text-tertiary);
+    line-height: 1.5;
+  }
+
+  .permission-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .permission-guide-card {
+    position: sticky;
+    top: 18px;
+    display: grid;
+    gap: 10px;
+    padding: 18px;
+    border: 1px solid rgba(124, 92, 252, 0.18);
+    border-radius: var(--radius-xl);
+    background: rgba(124, 92, 252, 0.055);
+  }
+
+  .permission-guide-card h3 {
+    margin: 0;
+  }
+
+  .permission-guide-card ul {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  .user-card-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .user-permission-card {
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--duration-fast) ease, border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  }
+
+  .user-permission-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(124, 92, 252, 0.22);
+    box-shadow: var(--shadow-md);
+  }
+
+  .user-card-header {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .user-avatar {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: 18px;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--brand), var(--accent-blue));
+    box-shadow: 0 14px 34px rgba(124, 92, 252, 0.18);
+  }
+
+  .user-card-title {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .user-card-title h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .toolbar-row--tight {
+    gap: 8px;
+  }
+
+  .user-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .user-card-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .user-info-panel,
+  .compact-admin-form {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .user-info-panel strong {
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+
+  .compact-admin-form label {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .compact-admin-form select {
+    min-height: 42px;
+  }
+
+  .compact-admin-form button {
+    width: 100%;
+  }
+
+  .compact-admin-form--danger {
+    border-color: rgba(249, 112, 102, 0.16);
+    background: rgba(249, 112, 102, 0.045);
+  }
+
+  .compact-admin-form--inline {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .danger-copy {
+    color: #fca5a0;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .admin-filter-empty {
+    display: none;
+  }
+
+  .user-card-list[data-empty="true"] .admin-filter-empty {
+    display: grid;
+  }
+
+  @media (max-width: 960px) {
+    .admin-users-summary,
+    .permission-layout,
+    .user-card-grid,
+    .user-card-actions {
+      grid-template-columns: 1fr;
+    }
+
+    .permission-guide-card {
+      position: static;
+    }
+
+    .admin-users-heading {
+      align-items: flex-start;
+    }
+  }
+
+  .metric-subtle,
+  .metric-warning {
+    display: block;
+    margin-top: 6px;
+    color: #fbbf24;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .metric-subtle {
+    color: var(--text-tertiary);
+  }

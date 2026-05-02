@@ -1,0 +1,85 @@
+/* Plan/model widgets and shared admin responsive rules.
+ * Extracted from site-pages/20-admin.css; keep import order stable. */
+
+  .admin-split-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .muted-text {
+    color: var(--text-tertiary);
+    font-size: 14px;
+  }
+
+  .plan-model-row {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    margin: 12px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .preset-model-preview {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  .preset-model-preview strong {
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+
+  .inline-grid--dense {
+    gap: 10px;
+  }
+
+  .checkbox-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  [data-filter-item][hidden] {
+    display: none !important;
+  }
+
+  @media (max-width: 960px) {
+    .metrics,
+    .metrics--compact,
+    .inline-grid,
+    .context-grid,
+    .admin-log-filter,
+    .admin-log-meta-grid,
+    .admin-split-grid,
+    .admin-character-media-grid,
+    .admin-hub-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .section-heading,
+    .admin-item summary,
+    .admin-conversation-summary,
+    .prompt-block-summary,
+    .toolbar-row--between {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .admin-item-meta {
+      justify-content: flex-start;
+    }
+  }
+
+
+

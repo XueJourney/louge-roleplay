@@ -1,0 +1,209 @@
+/* Provider, prompt, model picker, and configuration widgets.
+ * Extracted from site-pages/20-admin.css; keep import order stable. */
+
+  .admin-table-shell {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--bg-elevated);
+  }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 12px 10px;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  td {
+    color: var(--text);
+  }
+
+  tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.01);
+  }
+
+  td form {
+    display: grid;
+    gap: 8px;
+  }
+
+  .inline-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .provider-card,
+  .prompt-block-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    margin-top: 0;
+    background: var(--bg-elevated);
+  }
+
+  .provider-card--flat {
+    border-style: dashed;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .prompt-block-item {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--bg-elevated);
+    cursor: grab;
+    transition: all var(--duration-fast) ease;
+    overflow: hidden;
+  }
+
+  .prompt-block-item:hover {
+    border-color: var(--border-hover);
+  }
+
+  .prompt-block-item.dragging {
+    opacity: 0.5;
+    border-color: var(--brand);
+  }
+
+  .drag-handle {
+    color: var(--text-tertiary);
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+
+  .prompt-preview {
+    white-space: pre-wrap;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+    margin-top: 8px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 13px;
+    max-height: 520px;
+    overflow: auto;
+  }
+
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background: var(--brand-subtle);
+    color: var(--brand-hover);
+    font-size: 12px;
+    margin-bottom: 0;
+  }
+
+  .drag-tip {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    margin-top: 0;
+  }
+
+  .toolbar-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-row--between {
+    justify-content: space-between;
+  }
+
+  .toolbar-row--admin button,
+  .admin-item-body > form:last-child button,
+  .prompt-block-body > form:last-child button {
+    width: auto;
+    min-width: 132px;
+  }
+
+  .toolbar-row--checkbox {
+    align-items: center;
+  }
+
+  .toolbar-row--checkbox input {
+    width: auto;
+    margin: 0;
+  }
+
+  .danger-button {
+    background: rgba(249, 112, 102, 0.1);
+    color: #fca5a0;
+    border: 1px solid rgba(249, 112, 102, 0.2);
+  }
+
+  .danger-button:hover {
+    background: rgba(249, 112, 102, 0.15);
+    box-shadow: none;
+  }
+
+  .danger-button--small {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .secondary-button {
+    border: 1px solid rgba(125, 211, 252, 0.26);
+    background: rgba(125, 211, 252, 0.08);
+    color: #bae6fd;
+  }
+
+  .hidden-field {
+    display: none;
+  }
+
+  .model-picker {
+    display: grid;
+    gap: 8px;
+  }
+
+  .model-picker select {
+    min-height: 42px;
+  }
+
+  .model-picker small {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .model-picker--readonly {
+    margin-bottom: 14px;
+    padding: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.2);
+  }
+
+  .model-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .context-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+

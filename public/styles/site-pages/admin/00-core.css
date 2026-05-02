@@ -1,0 +1,225 @@
+/* Admin shell, cards, nav, metrics, and hub layout.
+ * Extracted from site-pages/20-admin.css; keep import order stable. */
+
+/* Source: src/views/admin.ejs */
+  .admin-shell {
+    display: grid;
+    gap: 22px;
+    animation: fadeIn var(--duration-slow) var(--ease-out) both;
+  }
+
+  .hero-card,
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-2xl);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .admin-hero {
+    gap: 22px;
+  }
+
+  .admin-hero-copy {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+
+  .section-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    color: var(--brand-hover);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .section-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .section-actions--stack {
+    display: grid;
+    gap: 10px;
+    min-width: min(320px, 100%);
+  }
+
+  .quick-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    color: var(--text-soft);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .quick-link:hover {
+    border-color: rgba(124, 92, 252, 0.25);
+    background: rgba(124, 92, 252, 0.08);
+    color: var(--text);
+  }
+
+  .search-field {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .search-field span {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .admin-section {
+    display: grid;
+    gap: 16px;
+  }
+
+  .admin-fold {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+  }
+
+  .admin-fold summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 16px 18px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .admin-fold summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .admin-fold summary::after {
+    content: '展开';
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .admin-fold[open] summary::after {
+    content: '收起';
+  }
+
+  .admin-fold-body {
+    padding: 0 18px 18px;
+  }
+
+  .admin-hub-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .admin-hub-grid--four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-hub-grid--tools {
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  }
+
+  .admin-hub-card {
+    display: grid;
+    gap: 10px;
+    padding: 20px;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text);
+    transition: transform var(--duration-fast) ease, border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  }
+
+  .admin-hub-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(124, 92, 252, 0.24);
+    box-shadow: var(--shadow-md);
+  }
+
+  .admin-hub-card strong {
+    font-size: 18px;
+  }
+
+  .admin-hub-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.7;
+  }
+
+  .admin-subnav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .quick-link.is-active {
+    background: rgba(124, 92, 252, 0.14);
+    border-color: rgba(124, 92, 252, 0.22);
+    color: var(--text);
+  }
+
+  .metrics--compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 4px;
+  }
+
+  .metric {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    border-left: 3px solid var(--brand);
+  }
+
+  .metric:nth-child(2) { border-left-color: var(--accent-green); }
+  .metric:nth-child(3) { border-left-color: var(--accent-blue); }
+  .metric:nth-child(4) { border-left-color: #f59e0b; }
+
+  .metric strong {
+    display: block;
+    font-size: 24px;
+    color: var(--text);
+  }
+
+  .metric span {
+    color: var(--text-tertiary);
+    font-size: 13px;
+  }
+
