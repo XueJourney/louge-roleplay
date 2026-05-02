@@ -51,7 +51,7 @@
               </form>
             <% } %>
           </div>
-          <div class="site-message-card__body"><%= message.body %></div>
+          <div class="site-message-card__body markdown-body"><%- message.body_html || escapeHtml(message.body || '') %></div>
         </article>
       <% }) %>
     </div>

@@ -6,6 +6,7 @@
 'use strict';
 
 const { query, getDbType, waitReady, withTransaction } = require('../lib/db');
+const { markdownToHtml } = require('./markdown-service');
 
 class SiteMessageValidationError extends Error {
   constructor(message, code = 'SITE_MESSAGE_VALIDATION_ERROR') {
@@ -267,7 +268,9 @@ async function listSiteMessagesForAdmin(limit = 50) {
      LEFT JOIN users ru ON ru.id = sm.revoked_by_admin_user_id
      ORDER BY sm.id DESC`,
     [],
-  ).then((rows) => rows.slice(0, Math.max(1, Math.min(100, Number(limit || 50)))));
+  ).then((rows) => rows
+    .slice(0, Math.max(1, Math.min(100, Number(limit || 50))))
+    .map((message) => ({ ...message, body_html: markdownToHtml(message.body) })));
 }
 
 async function ensureGlobalMessagesForUser(userId) {
@@ -318,7 +321,9 @@ async function listInboxMessagesForUser(userId, { unreadOnly = false, limit = 50
   }
   sql += ' ORDER BY smr.is_read ASC, sm.is_important DESC, sm.id DESC';
   const rows = await query(sql, params);
-  return rows.slice(0, Math.max(1, Math.min(100, Number(limit || 50))));
+  return rows
+    .slice(0, Math.max(1, Math.min(100, Number(limit || 50))))
+    .map((message) => ({ ...message, body_html: markdownToHtml(message.body) }));
 }
 
 async function getUnreadSiteMessageCount(userId) {

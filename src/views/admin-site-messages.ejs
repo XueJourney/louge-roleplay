@@ -28,7 +28,7 @@
       <div>
         <p class="section-kicker">Compose</p>
         <h2><%= t('发送站内信') %></h2>
-        <p class="muted-text"><%= t('选择投递范围后发送。指定用户模式可填写多个用户 ID，用逗号、空格或换行分隔。') %></p>
+        <p class="muted-text"><%= t('选择投递范围后发送。指定用户模式可填写多个用户 ID，用逗号、空格或换行分隔。正文支持 Markdown。') %></p>
       </div>
     </div>
 
@@ -73,7 +73,7 @@
         <span><%= t('标记为重要') %></span>
       </label>
       <label class="admin-form-grid__wide"><%= t('内容') %>
-        <textarea name="body" rows="7" maxlength="6000" required placeholder="<%= t('站内信正文，支持换行。') %>"></textarea>
+        <textarea name="body" rows="7" maxlength="6000" required placeholder="<%= t('站内信正文，支持 Markdown 和换行。') %>"></textarea>
       </label>
       <div class="toolbar-row toolbar-row--admin admin-form-grid__wide">
         <button type="submit"><%= t('发送站内信') %></button>
@@ -121,7 +121,7 @@
           <div class="admin-item-summary admin-site-message-summary">
             <div class="admin-item-main admin-site-message-main">
               <strong><%= message.title %></strong>
-              <span class="admin-site-message-preview"><%= String(message.body || '').slice(0, 180) %><%= String(message.body || '').length > 180 ? '…' : '' %></span>
+              <div class="admin-site-message-preview markdown-body"><%- message.body_html || escapeHtml(message.body || '') %></div>
             </div>
             <div class="admin-item-meta admin-site-message-meta">
               <% if (Number(message.is_revoked || 0) === 1) { %><span class="pill pill--level-warn"><%= t('已撤回') %></span><% } %>

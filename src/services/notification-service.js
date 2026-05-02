@@ -7,6 +7,7 @@
 
 const { query, getDbType, waitReady } = require('../lib/db');
 const logger = require('../lib/logger');
+const { markdownToHtml } = require('./markdown-service');
 
 const DEFAULT_SUPPORT_QR_URL = 'https://work.weixin.qq.com/u/vc4a43a573988025fe?v=5.0.7.68221&bb=66637a4084';
 
@@ -362,6 +363,7 @@ async function listActiveNotificationsForUser(user = null, options = {}) {
       id: notification.id,
       title: notification.title,
       body: notification.body,
+      bodyHtml: markdownToHtml(notification.body),
       notificationType: notification.notification_type,
       audience: notification.audience,
       displayScopes: notification.displayScopes,

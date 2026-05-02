@@ -9,6 +9,14 @@
   const inactiveUsers = Number(overview?.inactiveUsers || 0);
   const roleLabel = (role) => role === 'admin' ? '管理员' : '普通用户';
   const statusLabel = (status) => status === 'active' ? '正常' : (status || '未知');
+  const safeNum = (value) => {
+    const num = Number(value || 0);
+    return Number.isFinite(num) ? num : 0;
+  };
+  const formatNum = (value) => safeNum(value).toLocaleString('zh-CN');
+  const quotaPeriodLabel = (period) => ({ daily: t('每日'), monthly: t('每月'), lifetime: t('永久') }[period] || period || t('未知'));
+  const billingModeLabel = (mode) => ({ per_request: t('按请求'), per_token: t('按 Token'), hybrid: t('混合计费') }[mode] || mode || t('未知'));
+  const quotaTone = (state) => state === 'danger' ? 'danger' : (state === 'warn' ? 'warn' : 'healthy');
 %>
 <div class="admin-shell">
   <section class="hero-card admin-hero">
@@ -98,7 +106,7 @@
       <div>
         <p class="section-kicker">Users & Access</p>
         <h2>用户与权限</h2>
-        <p class="muted-text">把原来横向表格改成用户卡片：身份、联系方式、套餐和可操作项都收在同一张卡里，手机上也不会挤坏。</p>
+        <p class="muted-text"><%= t('用户当前套餐、请求余量、Token 余量和关键限制都收进卡片里；后台不用再来回翻日志确认余额。') %></p>
       </div>
       <div class="section-actions section-actions--stack">
         <label class="search-field search-field--large">
@@ -137,7 +145,7 @@
         <h3>权限调整前确认</h3>
         <ul>
           <li>授予管理员会开放后台入口，请确认账号归属。</li>
-          <li>切换套餐会立即影响模型可见范围、倍率和额度。</li>
+          <li><%= t('切换套餐会立即影响模型可见范围、倍率和额度；卡片内余量按当前套餐周期实时计算。') %></li>
           <li>联系方式为空时，优先用用户名或公开 ID 识别用户。</li>
           <li><%= t('禁用会阻止账号继续登录；删除会级联移除该用户角色、会话、订阅和用量日志。') %></li>
         </ul>
@@ -185,17 +193,73 @@
                 <strong><%= u.created_at || '—' %></strong>
                 <small><%= t('用户 ID') %>：<%= u.id %></small>
               </section>
-              <section class="user-info-panel">
+              <section class="user-info-panel user-plan-panel">
                 <span class="user-info-label">当前套餐</span>
                 <% if (u.plan_name) { %>
                   <strong><%= u.plan_name %> <span class="muted-text">(<%= u.plan_code %>)</span></strong>
-                  <small><%= u.billing_mode %> · <%= '优先级' %> <%= u.priority_weight %> · <%= '并发' %> <%= u.concurrency_limit %></small>
+                  <small><%= billingModeLabel(u.billing_mode) %><%= t('· 刷新 ·') %><%= quotaPeriodLabel(u.quota_period) %> · <%= '优先级' %> <%= u.priority_weight %> · <%= '并发' %> <%= u.concurrency_limit %></small>
+                  <% if (u.plan_description) { %><small class="user-plan-description"><%= u.plan_description %></small><% } %>
                 <% } else { %>
                   <strong>未绑定套餐</strong>
                   <small>该用户可能无法正常使用付费模型。</small>
                 <% } %>
               </section>
             </div>
+
+            <% if (u.quota_snapshot) { %>
+              <% const tone = quotaTone(u.quota_state); %>
+              <section class="user-quota-panel user-quota-panel--<%= tone %>" aria-label="<%= t('用户套餐余量') %>">
+                <div class="user-quota-heading">
+                  <div>
+                    <span class="user-info-label"><%= t('套餐余量') %></span>
+                    <strong><%= quotaPeriodLabel(u.quota_period) %>额度快照</strong>
+                  </div>
+                  <span class="quota-health-pill quota-health-pill--<%= tone %>"><%= tone === 'danger' ? t('接近耗尽') : (tone === 'warn' ? t('使用较高') : t('余量正常')) %></span>
+                </div>
+                <div class="user-quota-grid">
+                  <div class="user-quota-meter">
+                    <div class="quota-row-head">
+                      <span><%= t('请求余量') %></span>
+                      <strong><%= formatNum(u.remaining_requests) %> / <%= formatNum(u.request_quota) %></strong>
+                    </div>
+                    <div class="quota-bar quota-bar--admin"><span data-width="<%= u.request_usage_percent %>"></span></div>
+                    <div class="dashboard-item-meta user-quota-meta">
+                      <span><%= t('已用') %> <%= formatNum(u.used_requests) %></span>
+                      <span><%= u.request_usage_percent %>%</span>
+                    </div>
+                  </div>
+                  <div class="user-quota-meter">
+                    <div class="quota-row-head">
+                      <span><%= t('Token 余量') %></span>
+                      <strong><%= formatNum(u.remaining_tokens) %> / <%= formatNum(u.token_quota) %></strong>
+                    </div>
+                    <div class="quota-bar quota-bar--admin"><span data-width="<%= u.token_usage_percent %>"></span></div>
+                    <div class="dashboard-item-meta user-quota-meta">
+                      <span><%= t('已用') %> <%= formatNum(u.used_tokens) %></span>
+                      <span><%= u.token_usage_percent %>%</span>
+                    </div>
+                  </div>
+                </div>
+                <dl class="user-plan-detail-list">
+                  <div><dt><%= t('计费') %></dt><dd><%= billingModeLabel(u.billing_mode) %></dd></div>
+                  <div><dt><%= t('周期') %></dt><dd><%= quotaPeriodLabel(u.quota_period) %></dd></div>
+                  <div><dt><%= t('最大输出') %></dt><dd><%= formatNum(u.max_output_tokens) %></dd></div>
+                  <div><dt><%= t('可用模型') %></dt><dd><%= formatNum(u.model_count) %></dd></div>
+                  <div><dt><%= t('订阅开始') %></dt><dd><%= u.subscription_started_at || '—' %></dd></div>
+                </dl>
+              </section>
+            <% } else { %>
+              <section class="user-quota-panel user-quota-panel--empty" aria-label="<%= t('用户套餐余量') %>">
+                <div class="user-quota-heading">
+                  <div>
+                    <span class="user-info-label"><%= t('套餐余量') %></span>
+                    <strong><%= t('暂无有效套餐') %></strong>
+                  </div>
+                  <span class="quota-health-pill quota-health-pill--danger"><%= t('不可用') %></span>
+                </div>
+                <p class="muted-text"><%= t('为该用户切换到有效套餐后，这里会显示请求和 Token 的实时剩余额度。') %></p>
+              </section>
+            <% } %>
 
             <div class="user-card-actions">
               <form class="compact-admin-form" method="post" action="/admin/users/<%= u.id %>/role">
