@@ -10,8 +10,8 @@
     </div>
 
     <div class="metrics metrics--compact">
-      <div class="metric"><strong><%= promptBlocks.length %></strong><span>片段总数</span></div>
-      <div class="metric"><strong><%= promptBlocks.filter(block => block.is_enabled).length %></strong><span>启用中的片段</span></div>
+      <div class="metric"><strong><%= overview.totalPromptBlocks || 0 %></strong><span>片段总数</span></div>
+      <div class="metric"><strong><%= overview.enabledPromptBlocks || 0 %></strong><span>启用中的片段</span></div>
       <div class="metric"><strong><%= promptPreviewMeta.modeLabel %></strong><span>当前预览模式</span></div>
     </div>
   </section>

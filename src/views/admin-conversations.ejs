@@ -12,7 +12,7 @@
     <div class="metrics metrics--compact">
       <div class="metric"><strong><%= conversationResult.total %></strong><span><%= t('匹配会话') %></span></div>
       <div class="metric"><strong><%= conversationResult.page %> / <%= conversationResult.totalPages %></strong><span><%= t('当前页') %></span></div>
-      <div class="metric"><strong><%= conversationResult.conversations.reduce((sum, item) => sum + Number(item.message_count || 0), 0) %></strong><span><%= t('本页消息数') %></span></div>
+      <div class="metric"><strong><%= conversationResult.stats.totalMessages || 0 %></strong><span><%= t('匹配消息数') %></span></div>
     </div>
   </section>
 

@@ -78,9 +78,9 @@
     </div>
 
     <div class="metrics metrics--compact">
-      <div class="metric"><strong><%= plans.length %></strong><span>套餐总数</span></div>
+      <div class="metric"><strong><%= overview.totalPlans %></strong><span>套餐总数</span></div>
       <div class="metric"><strong><%= overview.activeSubscriptions %></strong><span>有效订阅</span></div>
-      <div class="metric"><strong><%= plans.filter(plan => plan.is_default).length %></strong><span>默认套餐数</span></div>
+      <div class="metric"><strong><%= overview.defaultPlans %></strong><span>默认套餐数</span></div>
     </div>
   </section>
 

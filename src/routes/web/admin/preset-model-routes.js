@@ -21,12 +21,14 @@ function registerAdminPresetModelRoutes(app, ctx) {
 
   app.get('/admin/models', requireAdmin, async (req, res, next) => {
     try {
-      const [providers, presetModels] = await Promise.all([
+      const [overview, providers, presetModels] = await Promise.all([
+        ctx.getAdminOverview(),
         listProviders(),
         listPresetModels({ includeDisabled: true }),
       ]);
       renderPage(res, 'admin-models', {
         title: '预设模型',
+        overview,
         providers,
         presetModels,
       });

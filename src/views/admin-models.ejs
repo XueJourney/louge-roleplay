@@ -12,6 +12,7 @@
       .replace(/'/g, '&#39;');
   const providerOptions = Array.isArray(locals.providers) ? locals.providers : [];
   const presetRows = Array.isArray(locals.presetModels) ? locals.presetModels : [];
+  const overview = locals.overview || {};
 
   function renderProviderOptions(selectedProviderId = 0) {
     return providerOptions.map((provider) => `<option value="${esc(provider.id)}" ${Number(selectedProviderId) === Number(provider.id) ? 'selected' : ''}>${esc(provider.name)}</option>`).join('');
@@ -36,9 +37,9 @@
       <p class="muted-text">先把模型 ID、前台显示名和描述整理成可复用模型库；套餐里只选择预设模型并设置倍率，后台会清爽很多。</p>
     </div>
     <div class="metrics metrics--compact">
-      <div class="metric"><strong><%= presetRows.length %></strong><span>预设模型</span></div>
-      <div class="metric"><strong><%= presetRows.filter(model => model.status === 'active').length %></strong><span>启用</span></div>
-      <div class="metric"><strong><%= providerOptions.length %></strong><span>Provider</span></div>
+      <div class="metric"><strong><%= overview.totalPresetModels || 0 %></strong><span>预设模型</span></div>
+      <div class="metric"><strong><%= overview.activePresetModels || 0 %></strong><span>启用</span></div>
+      <div class="metric"><strong><%= overview.totalProviders || 0 %></strong><span>Provider</span></div>
     </div>
   </section>
 

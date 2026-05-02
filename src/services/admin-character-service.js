@@ -117,6 +117,32 @@ function parsePromptProfileItems(value) {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+async function getCharacterFilterStats(options = {}) {
+  const { whereSql, params } = buildCharacterWhere(options);
+  const rows = await query(
+    `SELECT
+       COUNT(*) AS total_characters,
+       COALESCE(SUM((SELECT COUNT(*) FROM conversations conv WHERE conv.character_id = c.id)), 0) AS total_conversations,
+       COALESCE(SUM((SELECT COUNT(*) FROM conversations conv WHERE conv.character_id = c.id AND conv.status <> 'deleted')), 0) AS active_conversations,
+       COALESCE(SUM((SELECT COUNT(*) FROM character_likes cl WHERE cl.character_id = c.id)), 0) AS total_likes,
+       COALESCE(SUM((SELECT COUNT(*) FROM character_comments cc WHERE cc.character_id = c.id AND cc.status = 'visible')), 0) AS total_comments,
+       COALESCE(SUM((SELECT COUNT(*) FROM character_usage_events cue WHERE cue.character_id = c.id)), 0) AS total_usage_events
+     FROM characters c
+     JOIN users u ON u.id = c.user_id
+     ${whereSql}`,
+    params,
+  );
+  const row = rows[0] || {};
+  return {
+    totalCharacters: Number(row.total_characters || 0),
+    totalConversations: Number(row.total_conversations || 0),
+    activeConversations: Number(row.active_conversations || 0),
+    totalLikes: Number(row.total_likes || 0),
+    totalComments: Number(row.total_comments || 0),
+    totalUsageEvents: Number(row.total_usage_events || 0),
+  };
+}
+
 async function listAdminCharacters(options = {}) {
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(options.pageSize || DEFAULT_PAGE_SIZE)));
   const requestedPage = Math.max(1, Number(options.page || 1));
@@ -163,7 +189,10 @@ async function listAdminCharacters(options = {}) {
     params,
   );
 
-  const filterUsers = await listCharacterFilterUsers();
+  const [filterUsers, stats] = await Promise.all([
+    listCharacterFilterUsers(),
+    getCharacterFilterStats(options),
+  ]);
 
   const rowsWithTags = await attachTagsToCharacters(rows);
 
@@ -186,6 +215,10 @@ async function listAdminCharacters(options = {}) {
     page,
     pageSize,
     totalPages,
+    stats: {
+      ...stats,
+      totalCharacters: total,
+    },
     filters: normalized,
     filterOptions: { users: filterUsers },
   };
@@ -365,5 +398,6 @@ module.exports = {
   getAdminCharacterDetail,
   getAdminCharacterById,
   listAdminCharacters,
+  getCharacterFilterStats,
   updateAdminCharacterStatus,
 };

@@ -8,6 +8,7 @@ const { isValidationError } = require('./admin-route-utils');
 function registerAdminPromptRoutes(app, ctx) {
   const {
     requireAdmin,
+    getAdminOverview,
     listPromptBlocks,
     createPromptBlock,
     updatePromptBlock,
@@ -22,7 +23,10 @@ function registerAdminPromptRoutes(app, ctx) {
 
   app.get('/admin/prompts', requireAdmin, async (req, res, next) => {
     try {
-      const promptBlocks = await listPromptBlocks();
+      const [overview, promptBlocks] = await Promise.all([
+        getAdminOverview(),
+        listPromptBlocks(),
+      ]);
       const promptPreview = buildPromptPreview({
         promptBlocks: promptBlocks.map((item) => ({
           key: item.block_key,
@@ -40,6 +44,7 @@ function registerAdminPromptRoutes(app, ctx) {
 
       renderPage(res, 'admin-prompts', {
         title: 'Prompt 配置',
+        overview,
         promptBlocks,
         promptPreview,
         promptPreviewMeta,
