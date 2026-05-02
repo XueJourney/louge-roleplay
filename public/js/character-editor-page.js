@@ -89,11 +89,11 @@
         <div class="prompt-grid">
           <label>
             key
-            <input type="text" name="extraPromptItemKey" placeholder="${t('比如：禁忌 / 世界规则 / 特殊要求')}" />
+            <input type="text" name="extraPromptItemKey" maxlength="5000" placeholder="${t('比如：禁忌 / 世界规则 / 特殊要求')}" />
           </label>
           <label>
             value
-            <textarea name="extraPromptItemValue" rows="4" placeholder="${t('写这个补充片段的内容')}"></textarea>
+            <textarea name="extraPromptItemValue" rows="4" maxlength="5000" placeholder="${t('写这个补充片段的内容')}"></textarea>
           </label>
           <label>
             ${t('启用')}

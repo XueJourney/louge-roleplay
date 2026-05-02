@@ -158,7 +158,18 @@ async function executeLlmRequest({ requestId, userId, conversationId = null, cha
     throw new Error('User plan is not configured');
   }
 
-  const modelConfig = getSubscriptionModelConfig(subscription, modelMode);
+  const rawModelMode = String(modelMode || '').trim();
+  const modelOptions = buildPlanModelOptions(subscription);
+  const modelConfig = getSubscriptionModelConfig(subscription, rawModelMode);
+  if (rawModelMode && rawModelMode !== modelConfig.modelKey) {
+    logger.warn('Requested LLM model mode is unavailable for plan; using fallback model', {
+      requestId,
+      userId,
+      conversationId,
+      requestedModelMode: rawModelMode,
+      fallbackModelMode: modelConfig.modelKey,
+    });
+  }
 
   const provider = await resolveProviderForPlanModel(modelConfig, await getActiveProvider());
   if (!provider) {
@@ -182,7 +193,7 @@ async function executeLlmRequest({ requestId, userId, conversationId = null, cha
       plan: subscription,
       modelMode: modelConfig?.modelKey || modelMode,
       selectedModel: modelConfig,
-      modelOptions: buildPlanModelOptions(subscription),
+      modelOptions,
     };
   }
 
@@ -208,6 +219,7 @@ async function executeLlmRequest({ requestId, userId, conversationId = null, cha
     subscription,
     provider: providerForRequest,
     modelConfig,
+    modelOptions,
     quotaCheck,
     promptBuild,
     promptMessages,
@@ -215,7 +227,7 @@ async function executeLlmRequest({ requestId, userId, conversationId = null, cha
   };
 }
 
-async function finalizeLlmJobSuccess({ jobId, startedAt, provider, subscription, requestId, userId, conversationId, promptKind, result, modelMode, modelConfig, promptBuild }) {
+async function finalizeLlmJobSuccess({ jobId, startedAt, provider, subscription, requestId, userId, conversationId, promptKind, result, modelMode, modelConfig, modelOptions, promptBuild }) {
   const totalCost = (
     (Number(result.inputTokens || 0) / 1000) * Number(provider.input_token_price || 0)
     + (Number(result.outputTokens || 0) / 1000) * Number(provider.output_token_price || 0)
@@ -262,7 +274,7 @@ async function finalizeLlmJobSuccess({ jobId, startedAt, provider, subscription,
     plan: subscription,
     modelMode: modelConfig?.modelKey || modelMode,
     selectedModel: modelConfig || null,
-    modelOptions: buildPlanModelOptions(subscription),
+    modelOptions: modelOptions || buildPlanModelOptions(subscription),
     contextMeta: {
       maxContextTokens: promptBuild.maxContextTokens,
       trimContextTokens: promptBuild.trimContextTokens,
@@ -304,7 +316,7 @@ async function executeLlmQueued(requestMeta, runner) {
   if (!prepared.provider) {
     return prepared;
   }
-  const { subscription, provider, modelConfig, promptBuild, promptMessages, jobId } = prepared;
+  const { subscription, provider, modelConfig, modelOptions, promptBuild, promptMessages, jobId } = prepared;
   return llmQueue.enqueueWithPriority(async () => {
     const startedAt = new Date();
     await updateLlmJob(jobId, {
@@ -327,6 +339,7 @@ async function executeLlmQueued(requestMeta, runner) {
         result,
         modelMode: requestMeta.modelMode,
         modelConfig,
+        modelOptions,
         promptBuild,
       });
     } catch (error) {

@@ -4,7 +4,8 @@
  */
 
 const { query, getDbType } = require('../lib/db');
-const { normalizeStoredImagePath } = require('./upload-service');
+const { MAX_CHARACTER_FIELD_LENGTH, clampCharacterField } = require('../constants/character-limits');
+const { normalizeStoredImagePath, deleteStoredImageIfOwned } = require('./upload-service');
 const {
   attachTagsToCharacters,
   getCharacterTags,
@@ -89,10 +90,10 @@ async function createCharacter(userId, payload) {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, NOW(), NOW())`,
     [
       userId,
-      payload.name,
-      payload.summary,
-      payload.personality,
-      payload.firstMessage,
+      clampCharacterField(payload.name),
+      clampCharacterField(payload.summary),
+      clampCharacterField(payload.personality),
+      clampCharacterField(payload.firstMessage),
       stringifyPromptProfile(payload.promptProfileJson || '[]'),
       visibility,
       normalizeStoredImagePath(payload.avatarImagePath),
@@ -120,10 +121,10 @@ async function updateCharacter(characterId, userId, payload) {
          updated_at = NOW()
      WHERE id = ? AND user_id = ?`,
     [
-      payload.name,
-      payload.summary,
-      payload.personality,
-      payload.firstMessage,
+      clampCharacterField(payload.name),
+      clampCharacterField(payload.summary),
+      clampCharacterField(payload.personality),
+      clampCharacterField(payload.firstMessage),
       stringifyPromptProfile(payload.promptProfileJson || '[]'),
       visibility,
       payload.isNsfw ? 1 : 0,
@@ -354,6 +355,10 @@ async function ensureMysqlIndex(tableName, indexName, columnsSql) {
 
 async function ensureCharacterImageColumns() {
   if (getDbType() === 'mysql') {
+    await query(`ALTER TABLE \`characters\` MODIFY COLUMN \`name\` VARCHAR(${MAX_CHARACTER_FIELD_LENGTH}) NOT NULL`);
+    await query(`ALTER TABLE \`characters\` MODIFY COLUMN \`summary\` VARCHAR(${MAX_CHARACTER_FIELD_LENGTH}) NOT NULL`);
+    await query('ALTER TABLE `characters` MODIFY COLUMN `personality` TEXT NULL');
+    await query('ALTER TABLE `characters` MODIFY COLUMN `first_message` TEXT NULL');
     await ensureMysqlColumn('characters', 'avatar_image_path', '`avatar_image_path` VARCHAR(500) NULL');
     await ensureMysqlColumn('characters', 'background_image_path', '`background_image_path` VARCHAR(500) NULL');
     await ensureMysqlColumn('characters', 'is_nsfw', '`is_nsfw` TINYINT(1) NOT NULL DEFAULT 0');

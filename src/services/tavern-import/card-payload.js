@@ -6,20 +6,41 @@
 'use strict';
 
 const { parseTagInput } = require('../character-tag-service');
+const { MAX_CHARACTER_FIELD_LENGTH, clampCharacterField } = require('../../constants/character-limits');
 const { MAX_TEXT_FIELD } = require('./constants');
 const {
   truncateText,
   normalizeExtensions,
   pickFirst,
-  normalizeLineBreaks,
   normalizeTavernTemplateText,
   joinSections,
+  normalizeLineBreaks,
 } = require('./text-utils');
 
-function createPromptItem(key, value, sortOrder, context = {}) {
-  const normalizedValue = normalizeTavernTemplateText(value, context);
+const LOUGE_PROMPT_SOFT_LIMIT = 10000;
+const MAX_PROMPT_ITEM_VALUE_LENGTH = MAX_TEXT_FIELD;
+
+function truncateMiddle(text, maxLength) {
+  const normalized = normalizeLineBreaks(text);
+  const limit = Math.max(0, Number(maxLength || 0));
+  if (!limit || normalized.length <= limit) return normalized;
+  if (limit <= 32) return normalized.slice(0, limit);
+  const marker = '\n……（已压缩，保留首尾关键信息）……\n';
+  const side = Math.max(8, Math.floor((limit - marker.length) / 2));
+  return `${normalized.slice(0, side)}${marker}${normalized.slice(-side)}`.slice(0, limit);
+}
+
+function createPromptItem(key, value, sortOrder, context = {}, options = {}) {
+  const maxLength = Number(options.maxLength || MAX_PROMPT_ITEM_VALUE_LENGTH);
+  const normalizedValue = truncateText(normalizeTavernTemplateText(value, context), maxLength);
   if (!normalizedValue) return null;
-  return { key, value: normalizedValue, sortOrder, isEnabled: true };
+  return { key: clampCharacterField(key), value: normalizedValue, sortOrder, isEnabled: true };
+}
+
+function estimatePromptItemsLength(items = []) {
+  return (Array.isArray(items) ? items : [])
+    .filter(Boolean)
+    .reduce((total, item) => total + String(item.key || '').length + String(item.value || '').length + 8, 0);
 }
 
 function normalizeAlternateGreetings(root, data, context = {}) {
@@ -86,31 +107,72 @@ function findWorldBooks(root, data) {
   return books;
 }
 
-function flattenWorldBooks(root, data, context = {}) {
-  const charName = String(context.charName || pickFirst(data.name, root.name, data.char_name, root.char_name)).trim();
-  const entries = findWorldBooks(root, data).flatMap((book) => normalizeWorldBookEntries(book, { charName }));
-  if (!entries.length) {
-    return { entries: [], text: '', raw: null, warning: '' };
-  }
-  const text = [
-    '【世界书 / 背景资料】',
-    '',
-    '以下内容来自原酒馆卡世界书。楼阁当前不支持关键词触发式世界书，因此已将其完整合并进角色设定中。',
-    '',
-    ...entries.map((entry, index) => [
+function formatWorldBookEntries(entries = [], options = {}) {
+  const compressed = Boolean(options.compressed);
+  const targetLength = Number(options.targetLength || 0);
+  const header = compressed
+    ? [
+      '【世界书 / 背景资料（压缩版）】',
+      '',
+      '以下内容来自原酒馆卡世界书。楼阁当前不支持关键词触发式世界书，因此已将其压缩合并进角色设定中；关键词会作为阅读提示保留。',
+      '',
+    ]
+    : [
+      '【世界书 / 背景资料】',
+      '',
+      '以下内容来自原酒馆卡世界书。楼阁当前不支持关键词触发式世界书，因此已将其完整合并进角色设定中。',
+      '',
+    ];
+
+  const availableForEntries = compressed && targetLength
+    ? Math.max(600, targetLength - header.join('\n').length)
+    : 0;
+  const perEntryBudget = compressed && entries.length
+    ? Math.max(120, Math.floor(availableForEntries / entries.length))
+    : 0;
+
+  const body = entries.map((entry, index) => {
+    const metaLines = [
       `${index + 1}. 条目名称：${entry.name || `条目 ${index + 1}`}`,
       entry.keys.length ? `关键词：${entry.keys.join(', ')}` : '',
       entry.secondaryKeys.length ? `次级关键词：${entry.secondaryKeys.join(', ')}` : '',
       entry.enabled ? '' : '状态：原条目为停用，已随卡片一并保留。',
       '内容：',
-      entry.content,
-    ].filter(Boolean).join('\n')),
-  ].join('\n');
+    ].filter(Boolean);
+    const metaLength = metaLines.join('\n').length + 2;
+    const contentBudget = compressed ? Math.max(80, perEntryBudget - metaLength) : 0;
+    const content = compressed ? truncateMiddle(entry.content, contentBudget) : entry.content;
+    return [...metaLines, content].join('\n');
+  });
+
+  let text = [...header, ...body].join('\n');
+  if (compressed && targetLength && text.length > targetLength) {
+    text = truncateMiddle(text, targetLength);
+  }
+  return text;
+}
+
+function flattenWorldBooks(root, data, context = {}, options = {}) {
+  const charName = String(context.charName || pickFirst(data.name, root.name, data.char_name, root.char_name)).trim();
+  const rawBooks = findWorldBooks(root, data);
+  const entries = rawBooks.flatMap((book) => normalizeWorldBookEntries(book, { charName }));
+  if (!entries.length) {
+    return { entries: [], text: '', raw: null, warning: '', compressed: false, originalLength: 0 };
+  }
+
+  const compressed = Boolean(options.compressed);
+  const text = formatWorldBookEntries(entries, {
+    compressed,
+    targetLength: Number(options.targetLength || 0),
+  });
+  const originalText = compressed ? formatWorldBookEntries(entries, { compressed: false }) : text;
   return {
     entries,
     text: truncateText(text, 60000),
-    raw: findWorldBooks(root, data),
-    warning: text.length > 12000 ? '世界书内容较长，可能影响上下文' : '',
+    raw: rawBooks,
+    warning: compressed ? '世界书内容较长，已按楼阁 1 万字提示词软上限压缩后写入角色卡' : (text.length > LOUGE_PROMPT_SOFT_LIMIT ? '世界书内容较长，可能影响上下文' : ''),
+    compressed,
+    originalLength: originalText.length,
   };
 }
 
@@ -118,9 +180,8 @@ function normalizeCardPayload(cardJson) {
   const root = cardJson && typeof cardJson === 'object' ? cardJson : {};
   const data = root.data && typeof root.data === 'object' ? root.data : root;
   const extensions = normalizeExtensions(data.extensions || root.extensions);
-  const name = pickFirst(data.name, root.name, data.char_name, root.char_name);
+  const name = clampCharacterField(pickFirst(data.name, root.name, data.char_name, root.char_name));
   const templateContext = { charName: name };
-  const worldBook = flattenWorldBooks(root, data, templateContext);
   const description = normalizeTavernTemplateText(pickFirst(data.description, root.description, data.personality, root.personality), templateContext);
   const personality = normalizeTavernTemplateText(pickFirst(data.personality, root.personality), templateContext);
   const scenario = normalizeTavernTemplateText(pickFirst(data.scenario, root.scenario), templateContext);
@@ -130,10 +191,9 @@ function normalizeCardPayload(cardJson) {
   const postHistory = normalizeTavernTemplateText(pickFirst(data.post_history_instructions, root.post_history_instructions, extensions.post_history_instructions), templateContext);
   const firstMessage = normalizeTavernTemplateText(pickFirst(data.first_mes, root.first_mes, data.first_message, root.first_message), templateContext);
   const alternateGreetings = normalizeAlternateGreetings(root, data, templateContext);
-  const summary = pickFirst(data.summary, root.summary, description).slice(0, 500);
-  const personalityWithWorldBook = joinSections([personality || description, worldBook.text]);
+  const summary = clampCharacterField(pickFirst(data.summary, root.summary, description));
 
-  const promptItems = [
+  const basePromptItems = [
     createPromptItem('角色名', name, 0, templateContext),
     createPromptItem('角色简介', summary, 1, templateContext),
     createPromptItem('角色设定', description, 2, templateContext),
@@ -144,14 +204,27 @@ function normalizeCardPayload(cardJson) {
     createPromptItem('后历史指令', postHistory, 7, templateContext),
     createPromptItem('创作者备注', creatorNotes, 8, templateContext),
     alternateGreetings.length ? createPromptItem('备用开场白', alternateGreetings.map((item, index) => `${index + 1}. ${item}`).join('\n\n'), 9, templateContext) : null,
-    createPromptItem('世界书 / 背景资料', worldBook.text, 10, templateContext),
   ].filter(Boolean);
 
+  let worldBook = flattenWorldBooks(root, data, templateContext);
+  let worldBookItem = createPromptItem('世界书 / 背景资料', worldBook.text, 10, templateContext);
+  const projectedPromptLength = estimatePromptItemsLength([...basePromptItems, worldBookItem]);
+  if (worldBook.text && projectedPromptLength > LOUGE_PROMPT_SOFT_LIMIT) {
+    const baseLength = estimatePromptItemsLength(basePromptItems);
+    const worldBookBudget = Math.max(1200, LOUGE_PROMPT_SOFT_LIMIT - baseLength - 120);
+    worldBook = flattenWorldBooks(root, data, templateContext, { compressed: true, targetLength: worldBookBudget });
+    worldBookItem = createPromptItem('世界书 / 背景资料（压缩）', worldBook.text, 10, templateContext, { maxLength: Math.max(worldBookBudget, 1200) });
+  }
+
+  const promptItems = [...basePromptItems, worldBookItem].filter(Boolean);
+  const finalPromptLength = estimatePromptItemsLength(promptItems);
+  const personalityWithWorldBook = joinSections([personality || description, worldBook.text]);
+
   return {
-    name,
-    summary: summary || `${name || '未命名角色'} · 酒馆卡导入`,
-    personality: personalityWithWorldBook,
-    firstMessage,
+    name: clampCharacterField(name),
+    summary: summary || `${clampCharacterField(name) || '未命名角色'} · 酒馆卡导入`,
+    personality: clampCharacterField(personalityWithWorldBook),
+    firstMessage: clampCharacterField(firstMessage),
     promptProfileItems: promptItems,
     tags: collectTagsFromCard(root, data),
     sourceFormat: String(root.spec || root.spec_version || data.spec || data.spec_version || 'tavern-card').slice(0, 80),
@@ -160,11 +233,14 @@ function normalizeCardPayload(cardJson) {
     flattenedWorldBookText: worldBook.text,
     promptStats: {
       promptItemCount: promptItems.length,
+      promptTextLength: finalPromptLength,
       worldBookEntryCount: worldBook.entries.length,
+      worldBookOriginalLength: worldBook.originalLength,
+      worldBookCompressed: worldBook.compressed,
       alternateGreetingCount: alternateGreetings.length,
       hasFirstMessage: Boolean(firstMessage),
     },
-    warnings: [worldBook.warning, name ? '' : '缺少角色名称，请手动填写'].filter(Boolean),
+    warnings: [worldBook.warning, finalPromptLength > LOUGE_PROMPT_SOFT_LIMIT ? '压缩后提示词仍超过 1 万字，请人工复核' : '', name ? '' : '缺少角色名称，请手动填写'].filter(Boolean),
   };
 }
 
@@ -177,4 +253,6 @@ module.exports = {
   findWorldBooks,
   flattenWorldBooks,
   createPromptItem,
+  estimatePromptItemsLength,
+  LOUGE_PROMPT_SOFT_LIMIT,
 };

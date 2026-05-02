@@ -28,8 +28,8 @@ async function main() {
     [userId, `会话服务测试角色 ${suffix}`],
   );
   const characterId = characterRow.insertId;
+  const conversationIds = [];
   let sourceConversationId = null;
-  let clonedConversationId = null;
 
   try {
     sourceConversationId = await createConversation(userId, characterId, {
@@ -58,18 +58,28 @@ async function main() {
       selectedModelMode: 'force_jailbreak',
       title: 'cloned conversation',
     });
-    clonedConversationId = cloneResult.conversationId;
+    const clonedConversationId = cloneResult.conversationId;
+    conversationIds.push(clonedConversationId);
 
     const clonedConversation = await getConversationById(clonedConversationId, userId);
     assert.ok(clonedConversation, 'cloned conversation should be visible to owner');
     assert.equal(clonedConversation.selected_model_mode, 'force_jailbreak', 'clone should preserve selected model mode');
     assert.equal(Number(clonedConversation.current_message_id), Number(cloneResult.leafMessageId), 'clone current leaf should point to cloned leaf');
 
+    const fallbackConversationId = await createConversation(userId, characterId, {
+      title: 'fallback model conversation',
+      selectedModelMode: 'standard',
+    });
+    conversationIds.push(fallbackConversationId);
+    const fallbackConversation = await getConversationById(fallbackConversationId, userId);
+    assert.ok(fallbackConversation, 'fallback conversation should be visible to owner');
+    assert.notEqual(fallbackConversation.selected_model_mode, '', 'model fallback should keep a non-empty mode');
+
     console.log('Conversation service regression test passed.');
   } finally {
-    if (clonedConversationId) {
-      await query('DELETE FROM messages WHERE conversation_id = ?', [clonedConversationId]);
-      await query('DELETE FROM conversations WHERE id = ?', [clonedConversationId]);
+    for (const conversationId of conversationIds) {
+      await query('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
+      await query('DELETE FROM conversations WHERE id = ?', [conversationId]);
     }
     if (sourceConversationId) {
       await query('DELETE FROM messages WHERE conversation_id = ?', [sourceConversationId]);

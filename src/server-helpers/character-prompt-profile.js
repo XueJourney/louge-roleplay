@@ -4,6 +4,7 @@
  */
 
 const { parsePromptItemsFromForm, normalizePromptItems } = require('../services/prompt-engineering-service');
+const { clampCharacterField } = require('../constants/character-limits');
 
 function splitCharacterPromptProfile(promptProfileJson) {
   let items = [];
@@ -70,17 +71,23 @@ function buildCharacterPromptProfileFromForm(body) {
   });
 
   const structuredItems = [
-    { key: '角色名', value: String(body.name || '').trim(), sortOrder: 0, isEnabled: true },
-    { key: '角色简介', value: String(body.summary || '').trim(), sortOrder: 1, isEnabled: true },
-    { key: '角色', value: String(body.role || '').trim(), sortOrder: 2, isEnabled: true },
-    { key: '描述角色性格', value: String(body.traitDescription || '').trim(), sortOrder: 3, isEnabled: true },
-    { key: '当前场景', value: String(body.currentScene || '').trim(), sortOrder: 4, isEnabled: true },
-    { key: '当前背景', value: String(body.currentBackground || '').trim(), sortOrder: 5, isEnabled: true },
+    { key: '角色名', value: clampCharacterField(body.name), sortOrder: 0, isEnabled: true },
+    { key: '角色简介', value: clampCharacterField(body.summary), sortOrder: 1, isEnabled: true },
+    { key: '角色', value: clampCharacterField(body.role), sortOrder: 2, isEnabled: true },
+    { key: '描述角色性格', value: clampCharacterField(body.traitDescription), sortOrder: 3, isEnabled: true },
+    { key: '当前场景', value: clampCharacterField(body.currentScene), sortOrder: 4, isEnabled: true },
+    { key: '当前背景', value: clampCharacterField(body.currentBackground), sortOrder: 5, isEnabled: true },
   ].filter((item) => item.value);
+
+  const clampedExtraItems = extraItems.map((item) => ({
+    ...item,
+    key: clampCharacterField(item.key),
+    value: clampCharacterField(item.value),
+  }));
 
   return normalizePromptItems([
     ...structuredItems,
-    ...extraItems.map((item, index) => ({ ...item, sortOrder: structuredItems.length + index })),
+    ...clampedExtraItems.map((item, index) => ({ ...item, sortOrder: structuredItems.length + index })),
   ]);
 }
 

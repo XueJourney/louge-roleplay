@@ -54,14 +54,21 @@
       <div class="admin-import-dropzone-icon">PNG / JSON</div>
       <div>
         <strong>解析前不会写入数据库</strong>
-        <p class="muted-text">建议一次导入同一系列角色；系统会按文件 hash 和同管理员同名角色提示重复项。</p>
+        <p class="muted-text"><%= t('建议一次导入同一系列角色；系统会按文件 hash 和同管理员同名角色提示重复项。PNG 内嵌图片只用于解析元数据预览，不会保存为角色头像。') %></p>
       </div>
     </div>
     <form method="POST" action="/admin/characters/import/preview" enctype="multipart/form-data" class="settings-form">
       <div class="field-group upload-field">
         <label for="cards">选择角色卡文件</label>
         <input id="cards" name="cards" type="file" multiple accept=".png,.json,application/json,image/png" required />
-        <div class="mini-note">这里只做解析预览；真正入库要在下一步确认。</div>
+        <div class="mini-note"><%= t('支持一次多选，也可以多次点击选择来追加文件；这里只做解析预览，真正入库要在下一步确认。') %></div>
+        <div class="admin-import-selected-files" data-import-file-panel hidden>
+          <div class="admin-import-selected-files-head">
+            <strong data-import-file-count><%= t('已选择 {count} 个文件', { count: 0 }) %></strong>
+            <button class="btn-ghost admin-import-clear-files" type="button" data-import-file-clear><%= t('清空') %></button>
+          </div>
+          <ul data-import-file-list></ul>
+        </div>
       </div>
       <div class="settings-form-actions">
         <button class="submit-btn" type="submit">解析并预览</button>
@@ -110,13 +117,8 @@
                 <% } else { %>
                   <div class="admin-import-preview-layout">
                     <aside class="admin-import-preview-side">
-                      <% if (item.avatarPreviewDataUrl) { %>
-                        <div class="upload-preview upload-preview--avatar admin-import-avatar-preview">
-                          <img src="<%= item.avatarPreviewDataUrl %>" alt="<%= item.parsed.name || item.fileName %>" />
-                        </div>
-                      <% } else { %>
-                        <div class="admin-import-avatar-placeholder">无头像</div>
-                      <% } %>
+                      <div class="admin-import-avatar-placeholder"><%= t('不导入头像') %></div>
+                      <div class="mini-note"><%= t('酒馆卡 PNG 图片不会保存为楼阁角色头像；需要头像时请在角色编辑页手动上传。') %></div>
                       <div class="admin-import-mini-stats">
                         <span>提示片段 <strong><%= item.parsed.promptStats?.promptItemCount || (item.parsed.promptProfileItems || []).length %></strong></span>
                         <span>世界书 <strong><%= item.parsed.promptStats?.worldBookEntryCount || 0 %></strong></span>
@@ -127,11 +129,11 @@
                   <div class="admin-import-grid">
                     <div class="field-group">
                       <label>角色名</label>
-                      <input data-field="name" maxlength="100" value="<%= item.parsed.name %>" />
+                      <input data-field="name" maxlength="5000" value="<%= item.parsed.name %>" />
                     </div>
                     <div class="field-group tag-field-group admin-import-tag-field">
                       <label>标签</label>
-                      <input data-field="tags" data-tag-input maxlength="300" value="<%= (item.parsed.tags || []).join(', ') %>" placeholder="输入标签后按回车，比如：奇幻、日常、治愈" />
+                      <input data-field="tags" data-tag-input maxlength="5000" value="<%= (item.parsed.tags || []).join(', ') %>" placeholder="输入标签后按回车，比如：奇幻、日常、治愈" />
                     </div>
                     <div class="field-group">
                       <label>公开状态</label>
@@ -162,7 +164,7 @@
                   </div>
                   <div class="field-group">
                     <label>一句话简介</label>
-                    <textarea data-field="summary" maxlength="500"><%= item.parsed.summary || '' %></textarea>
+                    <textarea data-field="summary" maxlength="5000"><%= item.parsed.summary || '' %></textarea>
                   </div>
                   <% if (item.parsed.firstMessage) { %>
                     <div class="admin-import-opening-preview">
@@ -222,6 +224,64 @@
 </div>
 
 <script nonce="<%= cspNonce || '' %>">
+  (() => {
+    const input = document.getElementById('cards');
+    const panel = document.querySelector('[data-import-file-panel]');
+    const count = document.querySelector('[data-import-file-count]');
+    const list = document.querySelector('[data-import-file-list]');
+    const clear = document.querySelector('[data-import-file-clear]');
+    if (!input || !panel || !count || !list || typeof DataTransfer === 'undefined') return;
+
+    const t = window.AI_ROLEPLAY_I18N?.t || ((key, vars = {}) => String(key).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`));
+    const selected = new Map();
+    const fileKey = (file) => [file.name, file.size, file.lastModified].join('::');
+    const formatFileSize = (size) => {
+      if (!Number.isFinite(size) || size <= 0) return '0 KB';
+      if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+      return `${Math.ceil(size / 1024)} KB`;
+    };
+    const syncInputFiles = () => {
+      const transfer = new DataTransfer();
+      selected.forEach((file) => transfer.items.add(file));
+      input.files = transfer.files;
+      input.required = selected.size === 0;
+    };
+    const renderSelectedFiles = () => {
+      panel.hidden = selected.size === 0;
+      count.textContent = t('已选择 {count} 个文件', { count: selected.size });
+      list.innerHTML = '';
+      selected.forEach((file, key) => {
+        const item = document.createElement('li');
+        const name = document.createElement('span');
+        const meta = document.createElement('small');
+        const remove = document.createElement('button');
+        name.textContent = file.name;
+        meta.textContent = formatFileSize(file.size);
+        remove.type = 'button';
+        remove.textContent = t('移除');
+        remove.addEventListener('click', () => {
+          selected.delete(key);
+          syncInputFiles();
+          renderSelectedFiles();
+        });
+        item.append(name, meta, remove);
+        list.append(item);
+      });
+    };
+
+    input.addEventListener('change', () => {
+      Array.from(input.files || []).forEach((file) => selected.set(fileKey(file), file));
+      syncInputFiles();
+      renderSelectedFiles();
+    });
+
+    clear?.addEventListener('click', () => {
+      selected.clear();
+      syncInputFiles();
+      renderSelectedFiles();
+    });
+  })();
+
   document.getElementById('tavernImportConfirmForm')?.addEventListener('submit', (event) => {
     const items = Array.from(document.querySelectorAll('[data-import-item]')).map((card) => {
       const raw = { index: Number(card.getAttribute('data-index') || 0), ok: card.getAttribute('data-ok') === '1' };

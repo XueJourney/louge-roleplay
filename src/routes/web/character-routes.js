@@ -23,7 +23,8 @@ function registerCharacterRoutes(app, ctx) {
     parseIdParam,
     resolveAllowedInitialModelMode,
     splitCharacterPromptProfile,
-    buildCharacterPromptProfileFromForm
+    buildCharacterPromptProfileFromForm,
+    clampCharacterField,
   } = ctx;
 
   app.get('/characters/new', requireAuth, (req, res) => {
@@ -76,10 +77,10 @@ function registerCharacterRoutes(app, ctx) {
       const uploadedPaths = getUploadedCharacterImagePaths(req.files);
       const promptProfileItems = buildCharacterPromptProfileFromForm(req.body);
       const payload = {
-        name: String(req.body.name || '').trim(),
-        summary: String(req.body.summary || '').trim(),
-        personality: String(req.body.traitDescription || '').trim(),
-        firstMessage: String(req.body.firstMessage || '').trim(),
+        name: clampCharacterField(req.body.name),
+        summary: clampCharacterField(req.body.summary),
+        personality: clampCharacterField(req.body.traitDescription),
+        firstMessage: clampCharacterField(req.body.firstMessage),
         promptProfileJson: JSON.stringify(promptProfileItems),
         visibility: String(req.body.visibility || 'public').trim() === 'private' ? 'private' : 'public',
         isNsfw: String(req.body.isNsfw || '').trim() === '1',
@@ -111,10 +112,10 @@ function registerCharacterRoutes(app, ctx) {
       const backgroundImagePath = uploadedPaths.backgroundImagePath || character.background_image_path || null;
       const promptProfileItems = buildCharacterPromptProfileFromForm(req.body);
       const payload = {
-        name: String(req.body.name || '').trim(),
-        summary: String(req.body.summary || '').trim(),
-        personality: String(req.body.traitDescription || '').trim(),
-        firstMessage: String(req.body.firstMessage || '').trim(),
+        name: clampCharacterField(req.body.name),
+        summary: clampCharacterField(req.body.summary),
+        personality: clampCharacterField(req.body.traitDescription),
+        firstMessage: clampCharacterField(req.body.firstMessage),
         promptProfileJson: JSON.stringify(promptProfileItems),
         visibility: String(req.body.visibility || 'public').trim() === 'private' ? 'private' : 'public',
         isNsfw: String(req.body.isNsfw || '').trim() === '1',

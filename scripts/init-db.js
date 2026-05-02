@@ -588,8 +588,8 @@ async function main() {
     CREATE TABLE IF NOT EXISTS characters (
       id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
       user_id             BIGINT NOT NULL,
-      name                VARCHAR(100) NOT NULL,
-      summary             VARCHAR(500) NOT NULL,
+      name                VARCHAR(5000) NOT NULL,
+      summary             VARCHAR(5000) NOT NULL,
       personality         TEXT NULL,
       first_message       TEXT NULL,
       prompt_profile_json JSON NULL,
@@ -612,6 +612,10 @@ async function main() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   await ensureColumn('characters', 'prompt_profile_json', 'prompt_profile_json JSON NULL');
+  await connection.query('ALTER TABLE `characters` MODIFY COLUMN `name` VARCHAR(5000) NOT NULL');
+  await connection.query('ALTER TABLE `characters` MODIFY COLUMN `summary` VARCHAR(5000) NOT NULL');
+  await connection.query('ALTER TABLE `characters` MODIFY COLUMN `personality` TEXT NULL');
+  await connection.query('ALTER TABLE `characters` MODIFY COLUMN `first_message` TEXT NULL');
   await ensureColumn('characters', 'avatar_image_path', 'avatar_image_path VARCHAR(500) NULL');
   await ensureColumn('characters', 'background_image_path', 'background_image_path VARCHAR(500) NULL');
   await ensureColumn('characters', 'visibility', "visibility ENUM('public','private','unlisted') DEFAULT 'public'");

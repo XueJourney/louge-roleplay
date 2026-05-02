@@ -13,6 +13,7 @@
 const { query } = require('../lib/db');
 const { redisClient } = require('../lib/redis');
 const logger = require('../lib/logger');
+const { getActiveSubscriptionForUser, getSubscriptionModelConfig } = require('./plan-service');
 const {
   buildPathMessages,
   decoratePathMessages,
@@ -58,6 +59,17 @@ async function invalidateConversationCache(conversationId) {
 }
 
 async function createConversation(userId, characterId, options = {}) {
+  let selectedModelMode = String(options.selectedModelMode || '').trim();
+  if (!selectedModelMode || selectedModelMode === 'standard') {
+    try {
+      const subscription = await getActiveSubscriptionForUser(userId);
+      const defaultModel = getSubscriptionModelConfig(subscription, selectedModelMode);
+      selectedModelMode = defaultModel?.modelKey || selectedModelMode || 'standard';
+    } catch (_) {
+      selectedModelMode = selectedModelMode || 'standard';
+    }
+  }
+
   const result = await query(
     `INSERT INTO conversations (
       user_id,
@@ -77,7 +89,7 @@ async function createConversation(userId, characterId, options = {}) {
       characterId,
       options.parentConversationId || null,
       options.branchedFromMessageId || null,
-      options.selectedModelMode || 'standard',
+      selectedModelMode,
       options.title || '新对话',
     ],
   );

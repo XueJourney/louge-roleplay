@@ -30,6 +30,67 @@
   margin: 4px 0 0;
 }
 
+.admin-import-selected-files {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-import-selected-files[hidden] {
+  display: none;
+}
+
+.admin-import-selected-files-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-import-selected-files ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-import-selected-files li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.admin-import-selected-files li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-import-selected-files small {
+  color: var(--text-tertiary);
+}
+
+.admin-import-selected-files button {
+  border: 0;
+  background: transparent;
+  color: #c4b5fd;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-import-clear-files {
+  padding: 0;
+}
+
 .admin-import-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -141,5 +202,13 @@
   .admin-import-preview-side,
   .admin-import-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-import-selected-files li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-import-selected-files small {
+    grid-column: 1 / -1;
   }
 }

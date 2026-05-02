@@ -10,8 +10,8 @@ const multer = require('multer');
 const { query, withTransaction } = require('../lib/db');
 const { setCharacterTags, parseTagInput } = require('./character-tag-service');
 const { MAX_IMPORT_FILES, MAX_IMPORT_FILE_BYTES } = require('./tavern-import/constants');
+const { MAX_CHARACTER_FIELD_LENGTH, clampCharacterField } = require('../constants/character-limits');
 const { truncateText, safeJsonParse, normalizeTavernTemplateText } = require('./tavern-import/text-utils');
-const { buildAvatarPreviewDataUrl, storeImportedAvatarFromPreview } = require('./tavern-import/avatar-storage');
 const { extractCardJsonFromPng } = require('./tavern-import/png-parser');
 const { normalizeCardPayload } = require('./tavern-import/card-payload');
 const { saveImportPreview, loadImportPreview, deleteImportPreview, importPreviewExists } = require('./tavern-import/preview-store');
@@ -76,7 +76,7 @@ function parseTavernFile(file) {
   }
   const parsed = normalizeCardPayload(cardJson);
   if (!parsed.name) {
-    parsed.name = originalName.replace(/\.[^.]+$/, '').slice(0, 100) || '未命名角色';
+    parsed.name = originalName.replace(/\.[^.]+$/, '').slice(0, MAX_CHARACTER_FIELD_LENGTH) || '未命名角色';
     parsed.warnings.push('缺少角色名称，已先使用文件名');
   }
   return parsed;
@@ -119,7 +119,7 @@ async function previewTavernImport(files = [], adminUserId) {
         ...base,
         ok: true,
         parsed,
-        avatarPreviewDataUrl: buildAvatarPreviewDataUrl(file),
+        avatarPreviewDataUrl: '',
         duplicate,
         warnings: [...parsed.warnings, duplicate ? '检测到可能重复的角色' : ''].filter(Boolean),
       });
@@ -138,21 +138,21 @@ function parseConfirmPayload(body = {}) {
 
 function normalizeImportItemForInsert(item = {}) {
   const parsed = item.parsed || {};
-  const name = truncateText(item.name || parsed.name, 100) || '未命名角色';
+  const name = clampCharacterField(item.name || parsed.name) || '未命名角色';
   return {
     fileName: truncateText(item.fileName, 255, { decodeEscapes: false }),
     fileHash: truncateText(item.fileHash, 64, { decodeEscapes: false }),
     name,
-    summary: truncateText(item.summary || parsed.summary || `${name} · 酒馆卡导入`, 500),
-    personality: truncateText(item.personality || parsed.personality || ''),
-    firstMessage: truncateText(item.firstMessage || parsed.firstMessage || '', 2000),
+    summary: clampCharacterField(item.summary || parsed.summary || `${name} · 酒馆卡导入`),
+    personality: clampCharacterField(item.personality || parsed.personality || ''),
+    firstMessage: clampCharacterField(item.firstMessage || parsed.firstMessage || ''),
     promptProfileItems: Array.isArray(parsed.promptProfileItems) ? parsed.promptProfileItems : [],
     tags: parseTagInput(item.tags || parsed.tags || []),
     visibility: String(item.visibility || 'public') === 'private' ? 'private' : 'public',
     isNsfw: Boolean(item.isNsfw),
     duplicateAction: ['skip', 'copy', 'overwrite'].includes(String(item.duplicateAction || 'copy')) ? String(item.duplicateAction || 'copy') : 'copy',
     duplicateId: Number(item.duplicate?.id || item.duplicateId || 0) || null,
-    avatarPreviewDataUrl: String(item.avatarPreviewDataUrl || '').trim(),
+    avatarPreviewDataUrl: '',
     sourceFormat: truncateText(parsed.sourceFormat || 'tavern-card', 80, { decodeEscapes: false }),
     sourceCardJson: parsed.sourceCardJson || null,
     importedWorldBookJson: parsed.importedWorldBookJson || null,
@@ -175,7 +175,7 @@ function buildConfirmItemsFromPreview(previewItems = [], body = {}) {
       isNsfw: Boolean(patch.isNsfw),
       duplicateAction: patch.duplicateAction,
       duplicateId: Number(patch.duplicateId || previewItem.duplicate?.id || 0) || null,
-      avatarPreviewDataUrl: previewItem.avatarPreviewDataUrl || '',
+      avatarPreviewDataUrl: '',
     };
   });
 }
@@ -212,7 +212,7 @@ async function confirmTavernImport(adminUserId, submittedItems = []) {
           await conn.execute(
             `UPDATE characters
              SET name = ?, summary = ?, personality = ?, first_message = ?, prompt_profile_json = ?, visibility = ?, is_nsfw = ?,
-                 avatar_image_path = COALESCE(?, avatar_image_path), source_type = 'tavern', source_format = ?, source_file_name = ?, source_file_hash = ?, source_card_json = ?, imported_world_book_json = ?,
+                 avatar_image_path = avatar_image_path, source_type = 'tavern', source_format = ?, source_file_name = ?, source_file_hash = ?, source_card_json = ?, imported_world_book_json = ?,
                  flattened_world_book_text = ?, import_batch_id = ?, updated_at = NOW()
              WHERE id = ?`,
             [
@@ -223,7 +223,6 @@ async function confirmTavernImport(adminUserId, submittedItems = []) {
               JSON.stringify(item.promptProfileItems),
               item.visibility,
               item.isNsfw ? 1 : 0,
-              await storeImportedAvatarFromPreview(item),
               item.sourceFormat,
               item.fileName,
               item.fileHash,
@@ -252,7 +251,7 @@ async function confirmTavernImport(adminUserId, submittedItems = []) {
               item.firstMessage,
               JSON.stringify(item.promptProfileItems),
               item.visibility,
-              await storeImportedAvatarFromPreview(item),
+              null,
               item.isNsfw ? 1 : 0,
               item.sourceFormat,
               item.fileName,
