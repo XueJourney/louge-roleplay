@@ -1092,6 +1092,15 @@ const EN_MESSAGES = {
   '备用开场': 'Alternate openings',
   '查看解析摘要与提示词片段': 'View parsing summary and prompt segments',
   '世界书': 'World book',
+  '输入标签后按回车': 'Type a tag and press Enter',
+  '新增标签': 'Add tag',
+  '移除标签 {tag}': 'Remove tag {tag}',
+  '已选择 {count}/{max} 个标签': '{count}/{max} tags selected',
+  '常用标签': 'Popular tags',
+  '输入标签后按回车，比如：奇幻、日常、治愈': 'Type a tag and press Enter, e.g. fantasy, slice-of-life, healing',
+  '输入标签后按回车，比如：奇幻、治愈、日常': 'Type a tag and press Enter, e.g. fantasy, healing, slice-of-life',
+  '输入标签后按回车筛选': 'Type a tag and press Enter to filter',
+  '输入后按 Enter 或逗号生成标签；会自动去重、去掉 # 号，最多保留 12 个。公开角色大厅可以按“包含任一 / 包含全部”搜索。': 'Type a tag and press Enter or comma to create it. Duplicates and # are cleaned automatically; up to 12 tags are kept. The public character hall can search by “any” or “all” tags.',
 };
 
 module.exports = { EN_MESSAGES };

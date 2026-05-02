@@ -52,10 +52,10 @@
         <div class="mini-note">会作为 `【[当前背景]】{ ... }` 进入提示词；留空就不拼接。</div>
       </div>
 
-      <div class="field-group">
+      <div class="field-group tag-field-group">
         <label for="tags">标签</label>
-        <input id="tags" name="tags" maxlength="300" placeholder="多个标签用逗号分隔，比如：奇幻, 治愈, 日常" value="<%= form?.tagsText || '' %>" />
-        <div class="mini-note">角色支持多标签；公开角色大厅可以按“包含任一 / 包含全部”搜索。</div>
+        <input id="tags" name="tags" data-tag-input maxlength="300" placeholder="输入标签后按回车，比如：奇幻、治愈、日常" value="<%= form?.tagsText || '' %>" />
+        <div class="mini-note">输入后按 Enter 或逗号生成标签；会自动去重、去掉 # 号，最多保留 12 个。公开角色大厅可以按“包含任一 / 包含全部”搜索。</div>
       </div>
 
       <div class="field-group">

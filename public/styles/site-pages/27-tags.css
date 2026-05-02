@@ -1,0 +1,143 @@
+/* @file public/styles/site-pages/27-tags.css
+ * @description 统一标签输入、标签建议、标签 chip 展示样式。
+ */
+
+.tag-field-group {
+  align-content: start;
+}
+
+.tag-input-source {
+  display: none !important;
+}
+
+.tag-input-shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.105);
+  background: rgba(9, 9, 20, 0.48);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  cursor: text;
+  transition: border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+
+.tag-input-shell:focus-within {
+  border-color: rgba(155, 124, 255, 0.48);
+  background: rgba(9, 9, 20, 0.62);
+  box-shadow: 0 0 0 3px rgba(155, 124, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.tag-input-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.tag-input-chip,
+.tag-suggestion-chip,
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.12), rgba(155, 124, 255, 0.08));
+  color: #c7d2fe;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.tag-input-chip button {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #eef2ff;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tag-input-chip button:hover {
+  background: rgba(248, 113, 113, 0.24);
+  color: #fecaca;
+}
+
+.tag-input-editor {
+  flex: 1 1 150px;
+  min-width: 130px;
+  height: 30px;
+  padding: 0 4px;
+  border: 0 !important;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text);
+}
+
+.tag-input-meta {
+  flex: 0 0 100%;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.tag-suggestion-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.tag-suggestion-chip {
+  cursor: pointer;
+}
+
+.tag-suggestion-chip:hover,
+.tag-chip:hover {
+  border-color: rgba(155, 124, 255, 0.4);
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(155, 124, 255, 0.14));
+  color: #eef2ff;
+}
+
+.tag-suggestion-chip span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.public-tag-filter-field {
+  min-width: min(100%, 280px);
+}
+
+.admin-import-tag-field .tag-input-shell {
+  min-height: 44px;
+}
+
+@media (max-width: 640px) {
+  .tag-input-shell {
+    min-height: 52px;
+  }
+
+  .tag-input-editor {
+    flex-basis: 100%;
+  }
+}

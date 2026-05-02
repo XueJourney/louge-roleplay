@@ -60,12 +60,19 @@
         <label for="publicCharacterKeyword">搜索角色</label>
         <input id="publicCharacterKeyword" name="q" value="<%= currentFilters.keyword || '' %>" maxlength="80" placeholder="搜索角色名、简介或创建者" />
       </div>
-      <div class="field-group">
+      <div class="field-group tag-field-group public-tag-filter-field">
         <label for="publicCharacterTags">标签</label>
-        <input id="publicCharacterTags" name="tags" value="<%= activeTagsText %>" maxlength="160" placeholder="多个标签用逗号分隔" list="publicCharacterTagOptions" />
+        <input id="publicCharacterTags" name="tags" data-tag-input data-tag-placeholder="输入标签后按回车筛选" value="<%= activeTagsText %>" maxlength="160" placeholder="输入标签后按回车筛选" list="publicCharacterTagOptions" />
         <datalist id="publicCharacterTagOptions">
           <% tagOptions.forEach(tag => { %><option value="<%= tag.name %>"><% }) %>
         </datalist>
+        <% if (tagOptions.length) { %>
+          <div class="tag-suggestion-row" aria-label="常用标签">
+            <% tagOptions.slice(0, 16).forEach(tag => { %>
+              <button class="tag-suggestion-chip" type="button" data-tag-suggestion="<%= tag.name %>">#<%= tag.name %><% if (tag.usage_count) { %><span><%= tag.usage_count %></span><% } %></button>
+            <% }) %>
+          </div>
+        <% } %>
       </div>
       <div class="field-group">
         <label for="publicCharacterTagMode">标签模式</label>

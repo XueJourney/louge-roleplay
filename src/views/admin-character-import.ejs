@@ -127,9 +127,9 @@
                       <label>角色名</label>
                       <input data-field="name" maxlength="100" value="<%= item.parsed.name %>" />
                     </div>
-                    <div class="field-group">
-                      <label>标签（逗号分隔）</label>
-                      <input data-field="tags" maxlength="300" value="<%= (item.parsed.tags || []).join(', ') %>" placeholder="奇幻, 日常, 治愈" />
+                    <div class="field-group tag-field-group admin-import-tag-field">
+                      <label>标签</label>
+                      <input data-field="tags" data-tag-input maxlength="300" value="<%= (item.parsed.tags || []).join(', ') %>" placeholder="输入标签后按回车，比如：奇幻、日常、治愈" />
                     </div>
                     <div class="field-group">
                       <label>公开状态</label>
