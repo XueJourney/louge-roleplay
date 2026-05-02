@@ -214,6 +214,7 @@ const EN_MESSAGES = {
   "直接输入想说的话，或者点发送让角色先开口。": "Type what you want to say, or press send to let the character open first.",
   "输入消息": "Message input",
   "Enter 发送，Shift+Enter 换行。": "Press Enter to send; Shift+Enter for a new line.",
+  "PC 端 Enter 发送，Shift+Enter 换行；移动端回车只换行。": "On desktop, Enter sends and Shift+Enter inserts a new line. On mobile, Enter only inserts a new line.",
   "润色输入": "Polish input",
   "先润色这句话": "Polish this line first",
   "把想润色的话放这里。": "Put the line you want polished here.",

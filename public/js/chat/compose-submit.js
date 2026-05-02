@@ -115,10 +115,18 @@
       }
     }
 
+    function isMobileLikeInputDevice() {
+      const ua = String(window.navigator?.userAgent || '');
+      const hasTouch = Number(window.navigator?.maxTouchPoints || 0) > 0;
+      const coarsePointer = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+      const mobileUa = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
+      return mobileUa || (hasTouch && coarsePointer);
+    }
+
     form.addEventListener('submit', handleMainComposeSubmit);
 
     textarea.addEventListener('keydown', (event) => {
-      if (event.isComposing || event.key !== 'Enter' || event.shiftKey) {
+      if (event.isComposing || event.key !== 'Enter' || event.shiftKey || isMobileLikeInputDevice()) {
         return;
       }
       event.preventDefault();

@@ -58,7 +58,7 @@
         <label class="sr-only" for="content"><%= t('输入消息') %></label>
         <textarea id="content" name="content" maxlength="4000" placeholder="<%= t(view.messageCount === 0 ? '第一次可以直接点发送开始对话；也可以先输入你想说的话。' : '输入你想说的话…') %>"><%= draftContent || '' %></textarea>
         <div class="compose-actions compose-actions--linear">
-          <span class="mini-note"><%= t('Enter 发送，Shift+Enter 换行。') %></span>
+          <span class="mini-note"><%= t('PC 端 Enter 发送，Shift+Enter 换行；移动端回车只换行。') %></span>
           <button class="submit-btn" type="submit"><%= t(view.messageCount === 0 ? '开始 / 发送' : '发送') %></button>
         </div>
       </form>
