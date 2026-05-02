@@ -53,11 +53,9 @@
           <article class="character-card">
             <% if (character.avatar_image_path) { %>
               <div class="character-avatar character-avatar--image"><img src="<%= character.avatar_image_path %>" alt="<%= character.name %>" /></div>
-            <% } else { %>
-              <div class="character-avatar"><%= character.name.charAt(0) %></div>
             <% } %>
             <h3><a href="/characters/public/<%= character.id %>"><%= character.name %></a></h3>
-            <p><%= character.summary || '这个角色还没有写简介。' %></p>
+            <p class="character-summary character-summary--clamped"><%= character.summary || '这个角色还没有写简介。' %></p>
             <div class="character-card-stats">
               <span>🔥 <%= character.heat_score || 0 %></span>
               <span>♥ <%= character.like_count || 0 %></span>

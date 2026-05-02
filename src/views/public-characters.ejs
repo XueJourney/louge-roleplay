@@ -124,14 +124,12 @@
           <div class="public-character-head">
             <% if (character.avatar_image_path) { %>
               <div class="character-avatar character-avatar--image"><img src="<%= character.avatar_image_path %>" alt="<%= character.name %>" /></div>
-            <% } else { %>
-              <div class="character-avatar"><%= character.name.charAt(0) %></div>
             <% } %>
             <div>
               <h2><a href="/characters/public/<%= character.id %>"><%= character.name %></a></h2>
             </div>
           </div>
-          <p class="public-character-summary"><%= character.summary || '这个角色还没有写简介。' %></p>
+          <p class="public-character-summary public-character-summary--clamped"><%= character.summary || '这个角色还没有写简介。' %></p>
           <% if (Array.isArray(character.tags) && character.tags.length) { %>
             <div class="tag-list">
               <% character.tags.forEach(tag => { %>

@@ -197,8 +197,6 @@
                 <div class="character-dashboard-card-head">
                   <% if (character.avatar_image_path) { %>
                     <div class="dashboard-character-avatar"><img src="<%= character.avatar_image_path %>" alt="<%= character.name %>" /></div>
-                  <% } else { %>
-                    <div class="dashboard-character-avatar"><%= character.name.charAt(0) %></div>
                   <% } %>
                   <div class="character-card-topline">
                     <span class="meta-pill"><%= t(character.visibility === 'private' ? '私有' : '公开') %></span>
@@ -206,7 +204,7 @@
                   </div>
                 </div>
                 <h3><%= character.name %></h3>
-                <p><%= character.summary || t('这个角色还没有写简介。') %></p>
+                <p class="dashboard-character-summary dashboard-character-summary--clamped"><%= character.summary || t('这个角色还没有写简介。') %></p>
                 <div class="dashboard-item-meta">
                   <span><%= t('创建时间：{createdAt}', { createdAt: character.created_at }) %></span>
                 </div>

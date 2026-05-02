@@ -133,7 +133,15 @@
   }
 
   .public-character-summary {
-    min-height: 52px;
+    min-height: calc(1.7em * 4);
+  }
+
+  .public-character-summary--clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+    max-height: calc(1.7em * 4);
   }
 
   .public-character-actions form,

@@ -160,6 +160,15 @@
     line-height: 1.7;
   }
 
+  .character-summary--clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+    min-height: calc(1.7em * 4);
+    max-height: calc(1.7em * 4);
+  }
+
   .character-meta {
     display: flex;
     flex-wrap: wrap;

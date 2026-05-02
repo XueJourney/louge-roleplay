@@ -99,11 +99,33 @@ async function listProviders() {
 
 async function getAdminOverview({ runtimeQueueState = null } = {}) {
   const staleJobCutoff = buildStaleJobCutoff(10);
-  const [userRows] = await Promise.all([
-    query('SELECT COUNT(*) AS total_users FROM users'),
-  ]);
-  const [providerRows, activePlanRows, staleQueueRows, usageRows] = await Promise.all([
-    query('SELECT COUNT(*) AS total_providers, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_providers FROM llm_providers'),
+  const [userRows, planBoundRows, providerRows, planRows, presetModelRows, promptBlockRows, activePlanRows, staleQueueRows, usageRows] = await Promise.all([
+    query(`SELECT
+             COUNT(*) AS total_users,
+             SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_users,
+             SUM(CASE WHEN role = 'admin' THEN 1 ELSE 0 END) AS admin_users,
+             SUM(CASE WHEN status <> 'active' THEN 1 ELSE 0 END) AS inactive_users
+           FROM users`),
+    query(`SELECT COUNT(DISTINCT u.id) AS plan_bound_users
+           FROM users u
+           JOIN user_subscriptions us ON us.user_id = u.id AND us.status = 'active'`),
+    query(`SELECT
+             COUNT(*) AS total_providers,
+             SUM(CASE WHEN is_active = 1 AND status = 'active' THEN 1 ELSE 0 END) AS active_providers
+           FROM llm_providers`),
+    query(`SELECT
+             COUNT(*) AS total_plans,
+             SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_plans,
+             SUM(CASE WHEN is_default = 1 THEN 1 ELSE 0 END) AS default_plans
+           FROM plans`),
+    query(`SELECT
+             COUNT(*) AS total_preset_models,
+             SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_preset_models
+           FROM preset_models`),
+    query(`SELECT
+             COUNT(*) AS total_prompt_blocks,
+             SUM(CASE WHEN is_enabled = 1 THEN 1 ELSE 0 END) AS enabled_prompt_blocks
+           FROM system_prompt_blocks`),
     query("SELECT COUNT(*) AS active_subscriptions FROM user_subscriptions WHERE status = 'active'"),
     query("SELECT COUNT(*) AS stale_running_jobs FROM llm_jobs WHERE status = 'running' AND updated_at < ?", [staleJobCutoff]),
     query("SELECT COUNT(*) AS total_requests, COALESCE(SUM(total_cost), 0) AS total_cost FROM llm_usage_logs"),
@@ -113,8 +135,19 @@ async function getAdminOverview({ runtimeQueueState = null } = {}) {
 
   return {
     totalUsers: Number(userRows[0]?.total_users || 0),
+    activeUsers: Number(userRows[0]?.active_users || 0),
+    adminUsers: Number(userRows[0]?.admin_users || 0),
+    inactiveUsers: Number(userRows[0]?.inactive_users || 0),
+    planBoundUsers: Number(planBoundRows[0]?.plan_bound_users || 0),
     totalProviders: Number(providerRows[0]?.total_providers || 0),
     activeProviders: Number(providerRows[0]?.active_providers || 0),
+    totalPlans: Number(planRows[0]?.total_plans || 0),
+    activePlans: Number(planRows[0]?.active_plans || 0),
+    defaultPlans: Number(planRows[0]?.default_plans || 0),
+    totalPresetModels: Number(presetModelRows[0]?.total_preset_models || 0),
+    activePresetModels: Number(presetModelRows[0]?.active_preset_models || 0),
+    totalPromptBlocks: Number(promptBlockRows[0]?.total_prompt_blocks || 0),
+    enabledPromptBlocks: Number(promptBlockRows[0]?.enabled_prompt_blocks || 0),
     activeSubscriptions: Number(activePlanRows[0]?.active_subscriptions || 0),
     queuedJobs: liveRuntimeJobs,
     runtimeQueueActive: Number(runtimeQueueState?.activeCount || 0),

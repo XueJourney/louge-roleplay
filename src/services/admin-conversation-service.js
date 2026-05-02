@@ -109,6 +109,29 @@ async function listConversationFilterOptions() {
   };
 }
 
+async function getConversationFilterStats(options = {}) {
+  const { whereSql, params } = buildConversationWhere(options);
+  const rows = await query(
+    `SELECT
+       COUNT(*) AS total_conversations,
+       COALESCE(SUM((SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id)), 0) AS total_messages,
+       SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END) AS active_conversations,
+       SUM(CASE WHEN c.status = 'deleted' THEN 1 ELSE 0 END) AS deleted_conversations
+     FROM conversations c
+     JOIN users u ON u.id = c.user_id
+     JOIN characters ch ON ch.id = c.character_id
+     ${whereSql}`,
+    params,
+  );
+  const row = rows[0] || {};
+  return {
+    totalConversations: Number(row.total_conversations || 0),
+    totalMessages: Number(row.total_messages || 0),
+    activeConversations: Number(row.active_conversations || 0),
+    deletedConversations: Number(row.deleted_conversations || 0),
+  };
+}
+
 async function listAdminConversations(options = {}) {
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(options.pageSize || DEFAULT_PAGE_SIZE)));
   const requestedPage = Math.max(1, Number(options.page || 1));
@@ -160,7 +183,10 @@ async function listAdminConversations(options = {}) {
     params,
   );
 
-  const filterOptions = await listConversationFilterOptions();
+  const [filterOptions, stats] = await Promise.all([
+    listConversationFilterOptions(),
+    getConversationFilterStats(options),
+  ]);
 
   return {
     conversations: rows.map((row) => ({
@@ -179,6 +205,10 @@ async function listAdminConversations(options = {}) {
     page,
     pageSize,
     totalPages,
+    stats: {
+      ...stats,
+      totalConversations: total,
+    },
     filters: normalized,
     filterOptions,
   };
@@ -195,7 +225,8 @@ async function getAdminConversationDetail(conversationId) {
        u.nickname,
        ch.name AS character_name,
        ch.summary AS character_summary,
-       ch.visibility AS character_visibility
+       ch.visibility AS character_visibility,
+       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS message_count
      FROM conversations c
      JOIN users u ON u.id = c.user_id
      JOIN characters ch ON ch.id = c.character_id
@@ -229,6 +260,7 @@ async function getAdminConversationDetail(conversationId) {
   return {
     conversation: {
       ...conversation,
+      message_count: Number(conversation.message_count || 0),
       display_created_at: formatDateTime(conversation.created_at),
       display_updated_at: formatDateTime(conversation.updated_at),
       display_last_message_at: formatDateTime(conversation.last_message_at),
@@ -307,6 +339,7 @@ async function permanentlyDeleteMessage(conversationId, messageId) {
 
 module.exports = {
   getAdminConversationDetail,
+  getConversationFilterStats,
   permanentlyDeleteConversation,
   permanentlyDeleteMessage,
   restoreConversation,

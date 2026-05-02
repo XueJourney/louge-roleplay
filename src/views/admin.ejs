@@ -3,10 +3,10 @@
 -->
 <%
   const adminUsers = Array.isArray(users) ? users : [];
-  const activeUsers = adminUsers.filter((u) => String(u.status || '') === 'active').length;
-  const adminCount = adminUsers.filter((u) => String(u.role || '') === 'admin').length;
-  const planBoundCount = adminUsers.filter((u) => Boolean(u.plan_name || u.plan_code)).length;
-  const inactiveUsers = Math.max(adminUsers.length - activeUsers, 0);
+  const adminCount = Number(overview?.adminUsers || 0);
+  const activeUsers = Number(overview?.activeUsers || 0);
+  const planBoundCount = Number(overview?.planBoundUsers || 0);
+  const inactiveUsers = Number(overview?.inactiveUsers || 0);
   const roleLabel = (role) => role === 'admin' ? '管理员' : '普通用户';
   const statusLabel = (status) => status === 'active' ? '正常' : (status || '未知');
 %>
