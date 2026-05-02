@@ -80,7 +80,7 @@ async function ensureTagByName(name, conn = null) {
 
   const existing = await runSql(
     conn,
-    'SELECT id, name, slug FROM tags WHERE slug = ? OR name IN (?, ?) LIMIT 1',
+    `SELECT id, name, slug FROM tags WHERE slug = ? OR name IN (${getTagSearchNames(normalizedName).map(() => '?').join(',')}) LIMIT 1`,
     [slug, ...getTagSearchNames(normalizedName)],
   );
   if (existing[0]) {
@@ -99,10 +99,11 @@ async function ensureTagByName(name, conn = null) {
     if (!/duplicate|unique|uniq/i.test(String(error?.message || ''))) {
       throw error;
     }
+    const searchNames = getTagSearchNames(normalizedName);
     const rows = await runSql(
       conn,
-      'SELECT id, name, slug FROM tags WHERE slug = ? OR name IN (?, ?) LIMIT 1',
-      [slug, ...getTagSearchNames(normalizedName)],
+      `SELECT id, name, slug FROM tags WHERE slug = ? OR name IN (${searchNames.map(() => '?').join(',')}) LIMIT 1`,
+      [slug, ...searchNames],
     );
     return rows[0] || null;
   }

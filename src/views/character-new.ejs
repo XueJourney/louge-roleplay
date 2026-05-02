@@ -19,42 +19,42 @@
     <form method="POST" action="<%= mode === 'edit' ? `/characters/${character.id}/edit` : '/characters/new' %>" id="character-form" enctype="multipart/form-data">
       <div class="field-group">
         <label for="name">角色名</label>
-        <input id="name" name="name" maxlength="100" placeholder="比如：沈砚、阿迟、旧书店老板" value="<%= form?.name || '' %>" />
+        <input id="name" name="name" maxlength="5000" placeholder="比如：沈砚、阿迟、旧书店老板" value="<%= form?.name || '' %>" />
       </div>
 
       <div class="field-group">
         <label for="summary">一句话简介</label>
-        <textarea id="summary" name="summary" maxlength="500" placeholder="会进入提示词。用于一句话说明这是谁，不写废话。"><%= form?.summary || '' %></textarea>
+        <textarea id="summary" name="summary" maxlength="5000" placeholder="会进入提示词。用于一句话说明这是谁，不写废话。"><%= form?.summary || '' %></textarea>
         <div class="mini-note">会作为 `【[角色简介]】{ ... }` 进入提示词；留空就不拼接。</div>
       </div>
 
       <div class="field-group">
         <label for="role">角色</label>
-        <textarea id="role" name="role" maxlength="1200" placeholder="会进入提示词。写清身份、定位、和用户的关系。"><%= form?.role || '' %></textarea>
+        <textarea id="role" name="role" maxlength="5000" placeholder="会进入提示词。写清身份、定位、和用户的关系。"><%= form?.role || '' %></textarea>
         <div class="mini-note">会作为 `【[角色]】{ ... }` 进入提示词；留空就不拼接。</div>
       </div>
 
       <div class="field-group large">
         <label for="traitDescription">描述角色性格</label>
-        <textarea id="traitDescription" name="traitDescription" maxlength="3000" placeholder="会进入提示词。写性格、说话方式、边界、习惯，不要写成散漫设定集。"><%= form?.traitDescription || '' %></textarea>
+        <textarea id="traitDescription" name="traitDescription" maxlength="5000" placeholder="会进入提示词。写性格、说话方式、边界、习惯，不要写成散漫设定集。"><%= form?.traitDescription || '' %></textarea>
         <div class="mini-note">会作为 `【[描述角色性格]】{ ... }` 进入提示词；留空就不拼接。</div>
       </div>
 
       <div class="field-group">
         <label for="currentScene">当前场景</label>
-        <textarea id="currentScene" name="currentScene" maxlength="2000" placeholder="会进入提示词。写此刻角色和用户所处的即时场景。"><%= form?.currentScene || '' %></textarea>
+        <textarea id="currentScene" name="currentScene" maxlength="5000" placeholder="会进入提示词。写此刻角色和用户所处的即时场景。"><%= form?.currentScene || '' %></textarea>
         <div class="mini-note">会作为 `【[当前场景]】{ ... }` 进入提示词；留空就不拼接。</div>
       </div>
 
       <div class="field-group">
         <label for="currentBackground">当前背景</label>
-        <textarea id="currentBackground" name="currentBackground" maxlength="2500" placeholder="会进入提示词。写支撑当前场景的背景信息、上下文、前情。"><%= form?.currentBackground || '' %></textarea>
+        <textarea id="currentBackground" name="currentBackground" maxlength="5000" placeholder="会进入提示词。写支撑当前场景的背景信息、上下文、前情。"><%= form?.currentBackground || '' %></textarea>
         <div class="mini-note">会作为 `【[当前背景]】{ ... }` 进入提示词；留空就不拼接。</div>
       </div>
 
       <div class="field-group tag-field-group">
         <label for="tags">标签</label>
-        <input id="tags" name="tags" data-tag-input maxlength="300" placeholder="输入标签后按回车，比如：奇幻、治愈、日常" value="<%= form?.tagsText || '' %>" />
+        <input id="tags" name="tags" data-tag-input maxlength="5000" placeholder="输入标签后按回车，比如：奇幻、治愈、日常" value="<%= form?.tagsText || '' %>" />
         <div class="mini-note">输入后按 Enter 或逗号生成标签；会自动去重、去掉 # 号，最多保留 12 个。公开角色大厅可以按“包含任一 / 包含全部”搜索。</div>
       </div>
 
@@ -85,7 +85,7 @@
             </div>
           <% } %>
           <input id="avatarImage" name="avatarImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-          <div class="mini-note">不上传就使用默认首字头像；重新上传会替换旧头像。支持 jpg/png/webp/gif，单图不超过 3MB。</div>
+          <div class="mini-note"><%= t('可选；不上传就不显示头像。重新上传会替换旧头像。支持 jpg/png/webp/gif，单图不超过 3MB。') %></div>
         </div>
 
         <div class="field-group upload-field">
@@ -102,7 +102,7 @@
 
       <div class="field-group large">
         <label for="firstMessage">开场白</label>
-        <textarea id="firstMessage" name="firstMessage" maxlength="2000" placeholder="这句不会写入 system 提示词，只会在首次开始对话时作为角色发出的第一句。"><%= form?.firstMessage || '' %></textarea>
+        <textarea id="firstMessage" name="firstMessage" maxlength="5000" placeholder="这句不会写入 system 提示词，只会在首次开始对话时作为角色发出的第一句。"><%= form?.firstMessage || '' %></textarea>
         <div class="mini-note">不会进入提示词。仅当用户首次开始这段对话时使用：若填写了开场白，系统会先记一条用户消息 `［开始一次新的对话］`，再由角色发出这句开场白。</div>
       </div>
       <div class="field-group">
@@ -117,11 +117,11 @@
             <div class="prompt-grid">
               <label>
                 key
-                <input type="text" name="extraPromptItemKey" value="<%= item.key %>" placeholder="比如：禁忌 / 世界规则 / 特殊要求" />
+                <input type="text" name="extraPromptItemKey" maxlength="5000" value="<%= item.key %>" placeholder="比如：禁忌 / 世界规则 / 特殊要求" />
               </label>
               <label>
                 value
-                <textarea name="extraPromptItemValue" rows="4" placeholder="写这个补充片段的内容"><%= item.value %></textarea>
+                <textarea name="extraPromptItemValue" rows="4" maxlength="5000" placeholder="写这个补充片段的内容"><%= item.value %></textarea>
               </label>
               <label>
                 启用

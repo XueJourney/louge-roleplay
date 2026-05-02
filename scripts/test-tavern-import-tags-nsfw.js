@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * @file scripts/test-tavern-import-tags-nsfw.js
- * @description 覆盖酒馆卡解析/导入、标签 AND/OR、NSFW 隐藏、世界书压平与 PNG 头像保存的回归测试。
+ * @description 覆盖酒馆卡解析/导入、标签 AND/OR、NSFW 隐藏、世界书压平与 PNG 图片不导入头像的回归测试。
  */
 
 'use strict';
@@ -145,7 +145,7 @@ async function cleanup(adminId, prefix) {
     assert.match(preview[0].parsed.flattenedWorldBookText, /世界书内容必须压平成角色提示词/);
     assert.match(preview[0].parsed.flattenedWorldBookText, new RegExp(`${prefix}Alpha 会称呼 \{user\}`), '世界书应解析 {{char}} 并保留运行时用户占位符');
     assert.match(JSON.stringify(preview[0].parsed.promptProfileItems), /备用开场/, '备用开场白应进入提示词片段预览');
-    assert.ok(preview[1].avatarPreviewDataUrl.startsWith('data:image/png;base64,'));
+    assert.equal(preview[1].avatarPreviewDataUrl, '', '酒馆卡导入不应提取或保存 PNG 图片作为角色头像');
 
     const importablePreview = preview.slice(0, 2);
     const adjustments = importablePreview.map((item, index) => ({
@@ -196,7 +196,7 @@ async function cleanup(adminId, prefix) {
     assert.equal(andResult.characters.some((item) => item.name === `${prefix}PngAvatar`), false, 'AND 多标签不应命中缺少标签B的角色');
 
     const createdRows = await query('SELECT id, avatar_image_path, source_file_hash, flattened_world_book_text FROM characters WHERE user_id = ? AND name = ?', [adminId, `${prefix}PngAvatar`]);
-    assert.ok(createdRows[0]?.avatar_image_path, 'PNG 酒馆卡应保存头像');
+    assert.equal(createdRows[0]?.avatar_image_path || '', '', 'PNG 酒馆卡不应保存为角色头像');
     assert.ok(createdRows[0]?.source_file_hash, '应保存文件 hash 以便重复检测');
 
     const detailHidden = await getPublicCharacterDetail(createdRows[0].id, { includeNsfw: false });

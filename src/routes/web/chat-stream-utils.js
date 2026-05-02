@@ -40,6 +40,12 @@ function mapLlmErrorToUserMessage(error) {
   if (/rate limited|429/i.test(errMsg)) {
     return '上游模型服务被限流了，等一会儿再试。';
   }
+  if (/AI provider error:\s*(5\d\d|502|503)/i.test(errMsg)) {
+    return '上游模型服务暂时不可用，稍后重试会更稳一些。';
+  }
+  if (/AI provider error:\s*4\d\d/i.test(errMsg)) {
+    return '上游模型请求被拒绝，请联系管理员检查模型或密钥配置。';
+  }
   return 'AI 回复失败，请稍后重试。';
 }
 

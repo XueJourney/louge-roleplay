@@ -1,6 +1,6 @@
 {
   "name": "ai-roleplay-site",
-  "version": "1.3.14",
+  "version": "1.3.15",
   "description": "Minimal multi-user AI roleplay website",
   "main": "src/server.js",
   "scripts": {
@@ -27,6 +27,7 @@
     "i18n:check": "node scripts/check-i18n-completeness.js",
     "model-entitlements:test": "node scripts/test-model-entitlements.js",
     "tavern-import:test": "node scripts/test-tavern-import-tags-nsfw.js",
+    "character-delete:test": "node scripts/test-character-delete-service.js",
     "prompt-template:test": "node scripts/test-prompt-template.js"
   },
   "dependencies": {

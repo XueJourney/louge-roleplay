@@ -58,7 +58,7 @@ const {
   invalidateConversationCache,
 } = require('../services/conversation-service');
 const { translate } = require('../i18n');
-const { DEFAULT_MODEL_KEY, normalizeModelKey } = require('../services/model-entitlement-service');
+const { DEFAULT_MODEL_KEY, normalizeModelKey, findPlanModel } = require('../services/model-entitlement-service');
 const { generateReplyViaGateway, optimizeUserInputViaGateway, getChatModelSelector, getLlmRuntimeQueueState } = require('../services/llm-gateway-service');
 const { issueEmailCode, issuePhoneCode, verifyEmailCode, verifyPhoneCode } = require('../services/verification-service');
 const { hashPassword, verifyPassword } = require('../services/password-service');
@@ -70,6 +70,7 @@ const logger = require('../lib/logger');
 const config = require('../config');
 const { query, getDbType } = require('../lib/db');
 const { redisClient, isRedisReal } = require('../lib/redis');
+const { clampCharacterField } = require('../constants/character-limits');
 
 const {
   renderPage,
@@ -113,7 +114,20 @@ async function resolveAllowedInitialModelMode(userId, requestedModelMode = '') {
     }
     const requested = normalizeModelKey(requestedModelMode, '');
     const matched = options.find((option) => option.mode === requested);
-    return matched?.mode || options.find((option) => option.isDefault)?.mode || options[0].mode || DEFAULT_MODEL_KEY;
+    if (matched) {
+      return matched.mode;
+    }
+    const fallbackModel = findPlanModel(options.map((option) => ({
+      modelKey: option.mode,
+      label: option.label,
+      description: option.description,
+      providerId: option.providerId,
+      modelId: option.hiddenModelId,
+      requestMultiplier: option.requestMultiplier,
+      tokenMultiplier: option.tokenMultiplier,
+      isDefault: option.isDefault,
+    })), requested || DEFAULT_MODEL_KEY);
+    return fallbackModel?.modelKey || options.find((option) => option.isDefault)?.mode || options[0].mode || DEFAULT_MODEL_KEY;
   } catch (_) {
     return DEFAULT_MODEL_KEY;
   }
@@ -270,6 +284,7 @@ function registerWebRoutes(app) {
     getDbType,
     redisClient,
     isRedisReal,
+    clampCharacterField,
     renderPage,
     renderRegisterPage,
     getClientIp,

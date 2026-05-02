@@ -148,8 +148,19 @@ function findPlanModel(planModels = [], selectedModelKey = '') {
     return null;
   }
   const key = normalizeModelKey(selectedModelKey, '');
-  return normalized.find((item) => item.modelKey === key)
-    || normalized.find((item) => item.isDefault)
+  const exactMatch = normalized.find((item) => item.modelKey === key);
+  if (exactMatch) {
+    return exactMatch;
+  }
+  if (key === DEFAULT_MODEL_KEY) {
+    return [...normalized].sort((a, b) => (
+      Number(a.requestMultiplier || 1) - Number(b.requestMultiplier || 1)
+      || Number(a.tokenMultiplier || 1) - Number(b.tokenMultiplier || 1)
+      || Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
+      || a.modelKey.localeCompare(b.modelKey)
+    ))[0] || null;
+  }
+  return normalized.find((item) => item.isDefault)
     || normalized[0]
     || null;
 }
