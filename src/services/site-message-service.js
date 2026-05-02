@@ -94,6 +94,9 @@ async function ensureSiteMessageSchema() {
         filter_status ENUM('any','active','blocked') NOT NULL DEFAULT 'any',
         filter_plan_code VARCHAR(50) NULL,
         is_important TINYINT(1) NOT NULL DEFAULT 0,
+        is_revoked TINYINT(1) NOT NULL DEFAULT 0,
+        revoked_at DATETIME NULL,
+        revoked_by_admin_user_id BIGINT NULL,
         recipient_count INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
@@ -118,6 +121,15 @@ async function ensureSiteMessageSchema() {
     await query("ALTER TABLE site_messages ADD COLUMN is_important TINYINT(1) NOT NULL DEFAULT 0").catch((error) => {
       if (!isDuplicateColumnError(error)) throw error;
     });
+    await query("ALTER TABLE site_messages ADD COLUMN is_revoked TINYINT(1) NOT NULL DEFAULT 0").catch((error) => {
+      if (!isDuplicateColumnError(error)) throw error;
+    });
+    await query('ALTER TABLE site_messages ADD COLUMN revoked_at DATETIME NULL').catch((error) => {
+      if (!isDuplicateColumnError(error)) throw error;
+    });
+    await query('ALTER TABLE site_messages ADD COLUMN revoked_by_admin_user_id BIGINT NULL').catch((error) => {
+      if (!isDuplicateColumnError(error)) throw error;
+    });
     await query('CREATE INDEX idx_site_messages_created ON site_messages (created_at)').catch((error) => {
       if (!isDuplicateIndexError(error)) throw error;
     });
@@ -135,6 +147,9 @@ async function ensureSiteMessageSchema() {
       filter_status TEXT NOT NULL DEFAULT 'any',
       filter_plan_code TEXT NULL,
       is_important INTEGER NOT NULL DEFAULT 0,
+      is_revoked INTEGER NOT NULL DEFAULT 0,
+      revoked_at TEXT NULL,
+      revoked_by_admin_user_id INTEGER NULL,
       recipient_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -153,6 +168,18 @@ async function ensureSiteMessageSchema() {
   await query('CREATE UNIQUE INDEX IF NOT EXISTS uniq_site_message_recipient ON site_message_recipients (message_id, user_id)');
   await query('CREATE INDEX IF NOT EXISTS idx_site_message_recipients_user_read ON site_message_recipients (user_id, is_read, created_at)');
   await query('CREATE INDEX IF NOT EXISTS idx_site_messages_created ON site_messages (created_at)');
+  await query('ALTER TABLE site_messages ADD COLUMN is_important INTEGER NOT NULL DEFAULT 0').catch((error) => {
+    if (!isDuplicateColumnError(error)) throw error;
+  });
+  await query('ALTER TABLE site_messages ADD COLUMN is_revoked INTEGER NOT NULL DEFAULT 0').catch((error) => {
+    if (!isDuplicateColumnError(error)) throw error;
+  });
+  await query('ALTER TABLE site_messages ADD COLUMN revoked_at TEXT NULL').catch((error) => {
+    if (!isDuplicateColumnError(error)) throw error;
+  });
+  await query('ALTER TABLE site_messages ADD COLUMN revoked_by_admin_user_id INTEGER NULL').catch((error) => {
+    if (!isDuplicateColumnError(error)) throw error;
+  });
 }
 
 async function resolveRecipients(data) {
@@ -228,23 +255,63 @@ async function createSiteMessage(payload, senderAdminUserId = null) {
 async function listSiteMessagesForAdmin(limit = 50) {
   await ensureSiteMessageSchema();
   return query(
-    `SELECT sm.*, u.username AS sender_username
+    `SELECT sm.*, COALESCE(rc.actual_recipient_count, sm.recipient_count) AS recipient_count,
+            u.username AS sender_username, ru.username AS revoked_by_username
      FROM site_messages sm
+     LEFT JOIN (
+       SELECT message_id, COUNT(*) AS actual_recipient_count
+       FROM site_message_recipients
+       GROUP BY message_id
+     ) rc ON rc.message_id = sm.id
      LEFT JOIN users u ON u.id = sm.sender_admin_user_id
+     LEFT JOIN users ru ON ru.id = sm.revoked_by_admin_user_id
      ORDER BY sm.id DESC`,
     [],
   ).then((rows) => rows.slice(0, Math.max(1, Math.min(100, Number(limit || 50)))));
 }
 
-async function listInboxMessagesForUser(userId, { unreadOnly = false, limit = 50 } = {}) {
+async function ensureGlobalMessagesForUser(userId) {
   await ensureSiteMessageSchema();
+  const normalizedUserId = Number(userId);
+  if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) return;
+
+  const globalMessages = await query(
+    `SELECT id, created_at
+     FROM site_messages
+     WHERE target_mode = 'all' AND COALESCE(is_revoked, 0) = 0
+     ORDER BY id ASC`,
+  );
+  if (!globalMessages.length) return;
+
+  const dbType = getDbType();
+  await withTransaction(async (conn) => {
+    for (const message of globalMessages) {
+      if (dbType === 'mysql') {
+        await conn.execute(
+          `INSERT IGNORE INTO site_message_recipients (message_id, user_id, is_read, created_at)
+           VALUES (?, ?, 0, ?)`,
+          [Number(message.id), normalizedUserId, message.created_at],
+        );
+      } else {
+        await conn.execute(
+          `INSERT OR IGNORE INTO site_message_recipients (message_id, user_id, is_read, created_at)
+           VALUES (?, ?, 0, ?)`,
+          [Number(message.id), normalizedUserId, message.created_at],
+        );
+      }
+    }
+  });
+}
+
+async function listInboxMessagesForUser(userId, { unreadOnly = false, limit = 50 } = {}) {
+  await ensureGlobalMessagesForUser(userId);
   const params = [Number(userId)];
   let sql = `
     SELECT smr.id AS recipient_id, smr.is_read, smr.read_at, smr.created_at AS delivered_at,
            sm.id, sm.title, sm.body, sm.is_important, sm.created_at
     FROM site_message_recipients smr
     JOIN site_messages sm ON sm.id = smr.message_id
-    WHERE smr.user_id = ?
+    WHERE smr.user_id = ? AND COALESCE(sm.is_revoked, 0) = 0
   `;
   if (unreadOnly) {
     sql += ' AND smr.is_read = 0';
@@ -255,9 +322,26 @@ async function listInboxMessagesForUser(userId, { unreadOnly = false, limit = 50
 }
 
 async function getUnreadSiteMessageCount(userId) {
-  await ensureSiteMessageSchema();
-  const rows = await query('SELECT COUNT(*) AS count FROM site_message_recipients WHERE user_id = ? AND is_read = 0', [Number(userId)]);
+  await ensureGlobalMessagesForUser(userId);
+  const rows = await query(
+    `SELECT COUNT(*) AS count
+     FROM site_message_recipients smr
+     JOIN site_messages sm ON sm.id = smr.message_id
+     WHERE smr.user_id = ? AND smr.is_read = 0 AND COALESCE(sm.is_revoked, 0) = 0`,
+    [Number(userId)],
+  );
   return Number(rows[0]?.count || 0);
+}
+
+async function revokeSiteMessage(messageId, adminUserId = null) {
+  await ensureSiteMessageSchema();
+  const result = await query(
+    `UPDATE site_messages
+     SET is_revoked = 1, revoked_at = NOW(), revoked_by_admin_user_id = ?, updated_at = NOW()
+     WHERE id = ? AND COALESCE(is_revoked, 0) = 0`,
+    [adminUserId ? Number(adminUserId) : null, Number(messageId)],
+  );
+  return Number(result?.affectedRows || 0) > 0;
 }
 
 async function markSiteMessageRead(userId, messageId) {
@@ -289,8 +373,10 @@ module.exports = {
   ensureSiteMessageSchema,
   createSiteMessage,
   listSiteMessagesForAdmin,
+  ensureGlobalMessagesForUser,
   listInboxMessagesForUser,
   getUnreadSiteMessageCount,
+  revokeSiteMessage,
   markSiteMessageRead,
   markAllSiteMessagesRead,
   getSiteMessageRealtimeSnapshot,

@@ -1165,6 +1165,10 @@ const EN_MESSAGES = {
   '查看站内信': 'View site mail',
   '有新的站内信待查看': 'New site mail is waiting',
   '暂无未读站内信': 'No unread site mail',
+  '已撤回': 'Revoked',
+  '撤回于': 'Revoked at',
+  '撤回': 'Revoke',
+  '确定撤回这条站内信？撤回后用户收件箱和未读提醒中将不再显示。': 'Revoke this site mail? After revocation, it will no longer appear in user inboxes or unread reminders.',
 };
 
 module.exports = { EN_MESSAGES };

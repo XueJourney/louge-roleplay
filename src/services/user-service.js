@@ -69,11 +69,12 @@ async function createUser({
   role = 'user',
   status = 'active',
 }) {
+  let createdUserId = null;
   for (let retry = 0; retry < 5; retry += 1) {
     const publicId = await generateUniqueUserPublicId(async (candidate) => Boolean(await findUserByPublicId(candidate)));
 
     try {
-      return await withTransaction(async (conn) => {
+      createdUserId = await withTransaction(async (conn) => {
         const [result] = await conn.execute(
           `INSERT INTO users (
             public_id, username, password_hash, email, phone, country_type,
@@ -90,6 +91,7 @@ async function createUser({
 
         return userId;
       });
+      break;
     } catch (error) {
       if (/public_id|uniq_users_public_id|duplicate/i.test(String(error?.message || '')) && retry < 4) {
         continue;
@@ -98,7 +100,20 @@ async function createUser({
     }
   }
 
-  throw new Error('Unable to allocate unique user ID');
+  if (!createdUserId) {
+    throw new Error('Unable to allocate unique user ID');
+  }
+
+  // 注册主事务已完成后再补发历史全局站内信；失败不回滚注册流程，避免通知异常阻断开户。
+  try {
+    const { ensureGlobalMessagesForUser } = require('./site-message-service');
+    await ensureGlobalMessagesForUser(createdUserId);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('[user-service] Failed to attach global site messages for new user', { userId: createdUserId, error: error.message });
+  }
+
+  return createdUserId;
 }
 
 /**

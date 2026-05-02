@@ -32,7 +32,7 @@
       </div>
     </div>
 
-    <form method="post" action="/admin/site-messages/send" class="admin-form-grid admin-form-grid--notifications">
+    <form method="post" action="/admin/site-messages/send" class="admin-form-grid admin-form-grid--notifications admin-form-grid--site-message-compose">
       <label><%= t('投递范围') %>
         <select name="targetMode">
           <option value="all"><%= t('全体用户') %></option>
@@ -117,16 +117,24 @@
         <p class="muted-text"><%= t('还没有发送过站内信。') %></p>
       <% } %>
       <% messageList.forEach(message => { %>
-        <article class="admin-item admin-item--notification">
-          <div class="admin-item-summary">
-            <div class="admin-item-main">
+        <article class="admin-item admin-item--notification <%= Number(message.is_revoked || 0) === 1 ? 'admin-item--revoked' : '' %>">
+          <div class="admin-item-summary admin-site-message-summary">
+            <div class="admin-item-main admin-site-message-main">
               <strong><%= message.title %></strong>
-              <span><%= String(message.body || '').slice(0, 120) %><%= String(message.body || '').length > 120 ? '…' : '' %></span>
+              <span class="admin-site-message-preview"><%= String(message.body || '').slice(0, 180) %><%= String(message.body || '').length > 180 ? '…' : '' %></span>
             </div>
-            <div class="admin-item-meta">
+            <div class="admin-item-meta admin-site-message-meta">
+              <% if (Number(message.is_revoked || 0) === 1) { %><span class="pill pill--level-warn"><%= t('已撤回') %></span><% } %>
               <% if (Number(message.is_important || 0) === 1) { %><span class="pill pill--level-warn"><%= t('重要') %></span><% } %>
               <span class="pill pill--brand"><%= t('收件人 {count}', { count: Number(message.recipient_count || 0) }) %></span>
               <span class="pill pill--level-raw"><%= formatDate(message.created_at) %></span>
+              <% if (Number(message.is_revoked || 0) === 1) { %>
+                <span class="pill pill--level-raw"><%= t('撤回于') %> <%= formatDate(message.revoked_at) %></span>
+              <% } else { %>
+                <form method="post" action="/admin/site-messages/<%= message.id %>/revoke" class="admin-inline-form" data-confirm-message="<%= t('确定撤回这条站内信？撤回后用户收件箱和未读提醒中将不再显示。') %>">
+                  <button class="admin-small-danger-button" type="submit"><%= t('撤回') %></button>
+                </form>
+              <% } %>
             </div>
           </div>
         </article>
