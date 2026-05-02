@@ -13,6 +13,8 @@ const DEFAULT_SUPPORT_QR_URL = 'https://work.weixin.qq.com/u/vc4a43a573988025fe?
 const VALID_NOTIFICATION_TYPES = new Set(['general', 'new_user', 'support', 'error', 'maintenance']);
 const VALID_DISPLAY_POSITIONS = new Set(['modal', 'toast', 'banner']);
 const VALID_AUDIENCES = new Set(['all', 'guest', 'user', 'admin']);
+const VALID_DISPLAY_SCOPES = new Set(['global', 'home', 'dashboard', 'chat', 'characters', 'profile', 'admin']);
+const DEFAULT_DISPLAY_SCOPES = ['global'];
 
 const TRUTHY_VALUES = new Set(['1', 'true', 'on', 'yes', 'y']);
 
@@ -29,6 +31,32 @@ function normalizeString(value, maxLength = 255) {
 function normalizeChoice(value, allowedSet, fallback) {
   const normalized = normalizeString(value, 80);
   return allowedSet.has(normalized) ? normalized : fallback;
+}
+
+function normalizeDisplayScopes(value) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '').split(',');
+  const scopes = source
+    .map((item) => normalizeString(item, 40))
+    .filter((item) => VALID_DISPLAY_SCOPES.has(item));
+  const uniqueScopes = Array.from(new Set(scopes));
+  if (!uniqueScopes.length || uniqueScopes.includes('global')) {
+    return [...DEFAULT_DISPLAY_SCOPES];
+  }
+  return uniqueScopes;
+}
+
+function encodeDisplayScopes(value) {
+  return normalizeDisplayScopes(value).join(',');
+}
+
+function decodeDisplayScopes(value) {
+  return normalizeDisplayScopes(value);
+}
+
+function isDuplicateColumnError(error) {
+  return /duplicate column|already exists/i.test(String(error?.message || ''));
 }
 
 function normalizeOptionalDate(value) {
@@ -48,6 +76,7 @@ function toNumber(value, fallback = null) {
 
 function decodeNotification(row) {
   if (!row) return null;
+  const displayScopes = decodeDisplayScopes(row.display_scopes || row.display_scope || 'global');
   return {
     ...row,
     id: Number(row.id),
@@ -57,6 +86,8 @@ function decodeNotification(row) {
     new_user_only: Number(row.new_user_only || 0),
     priority: Number(row.priority || 0),
     display_duration_ms: Number(row.display_duration_ms || 0),
+    display_scopes: displayScopes.join(','),
+    displayScopes,
   };
 }
 
@@ -76,6 +107,7 @@ async function ensureNotificationSchema() {
         body TEXT NOT NULL,
         notification_type ENUM('general','new_user','support','error','maintenance') NOT NULL DEFAULT 'general',
         audience ENUM('all','guest','user','admin') NOT NULL DEFAULT 'all',
+        display_scopes VARCHAR(160) NOT NULL DEFAULT 'global',
         display_position ENUM('modal','toast','banner') NOT NULL DEFAULT 'modal',
         display_duration_ms INT NOT NULL DEFAULT 0,
         force_display TINYINT(1) NOT NULL DEFAULT 0,
@@ -94,6 +126,13 @@ async function ensureNotificationSchema() {
         INDEX idx_notifications_audience (audience, notification_type)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
+    await query("ALTER TABLE notifications ADD COLUMN display_scopes VARCHAR(160) NOT NULL DEFAULT 'global' AFTER audience").catch((error) => {
+      if (!isDuplicateColumnError(error)) throw error;
+    });
+    await query("UPDATE notifications SET display_scopes = 'global' WHERE display_scopes IS NULL OR display_scopes = ''");
+    await query('CREATE INDEX idx_notifications_display_scopes ON notifications (display_scopes)').catch((error) => {
+      if (!/duplicate key|already exists/i.test(String(error?.message || ''))) throw error;
+    });
     return;
   }
 
@@ -104,6 +143,7 @@ async function ensureNotificationSchema() {
       body TEXT NOT NULL,
       notification_type TEXT NOT NULL DEFAULT 'general',
       audience TEXT NOT NULL DEFAULT 'all',
+      display_scopes TEXT NOT NULL DEFAULT 'global',
       display_position TEXT NOT NULL DEFAULT 'modal',
       display_duration_ms INTEGER NOT NULL DEFAULT 0,
       force_display INTEGER NOT NULL DEFAULT 0,
@@ -122,6 +162,11 @@ async function ensureNotificationSchema() {
   `);
   await query('CREATE INDEX IF NOT EXISTS idx_notifications_active_window ON notifications (is_active, starts_at, ends_at)');
   await query('CREATE INDEX IF NOT EXISTS idx_notifications_audience ON notifications (audience, notification_type)');
+  await query("ALTER TABLE notifications ADD COLUMN display_scopes TEXT NOT NULL DEFAULT 'global'").catch((error) => {
+    if (!isDuplicateColumnError(error)) throw error;
+  });
+  await query("UPDATE notifications SET display_scopes = 'global' WHERE display_scopes IS NULL OR display_scopes = ''");
+  await query('CREATE INDEX IF NOT EXISTS idx_notifications_display_scopes ON notifications (display_scopes)');
 }
 
 async function seedSupportNotificationIfEmpty() {
@@ -131,10 +176,10 @@ async function seedSupportNotificationIfEmpty() {
 
   await query(
     `INSERT INTO notifications (
-      title, body, notification_type, audience, display_position, display_duration_ms,
+      title, body, notification_type, audience, display_scopes, display_position, display_duration_ms,
       force_display, show_once, new_user_only, support_qr_url, action_label, action_url,
       starts_at, ends_at, is_active, priority, created_at, updated_at
-    ) VALUES (?, ?, 'support', 'all', 'modal', 0, 0, 0, 0, ?, ?, ?, NULL, NULL, 1, 10, NOW(), NOW())`,
+    ) VALUES (?, ?, 'support', 'all', 'global', 'modal', 0, 0, 0, 0, ?, ?, ?, NULL, NULL, 1, 10, NOW(), NOW())`,
     [
       '需要客服协助？',
       '如果遇到报错、额度异常或页面状态不对，可以打开客服入口，使用微信扫码联系工作人员。',
@@ -173,6 +218,7 @@ function buildNotificationPayload(payload = {}) {
     body,
     notificationType,
     audience: normalizeChoice(payload.audience, VALID_AUDIENCES, 'all'),
+    displayScopes: encodeDisplayScopes(payload.displayScopes || payload.display_scopes || payload.displayScope || payload.display_scope),
     displayPosition: normalizeChoice(payload.displayPosition || payload.display_position, VALID_DISPLAY_POSITIONS, 'modal'),
     displayDurationMs: Math.max(0, toNumber(payload.displayDurationMs || payload.display_duration_ms, 0)),
     forceDisplay: normalizeBoolean(payload.forceDisplay || payload.force_display),
@@ -193,15 +239,16 @@ async function createNotification(payload) {
   const data = buildNotificationPayload(payload);
   const result = await query(
     `INSERT INTO notifications (
-      title, body, notification_type, audience, display_position, display_duration_ms,
+      title, body, notification_type, audience, display_scopes, display_position, display_duration_ms,
       force_display, show_once, new_user_only, support_qr_url, action_label, action_url,
       starts_at, ends_at, is_active, priority, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       data.title,
       data.body,
       data.notificationType,
       data.audience,
+      data.displayScopes,
       data.displayPosition,
       data.displayDurationMs,
       data.forceDisplay,
@@ -228,7 +275,7 @@ async function updateNotification(id, payload) {
   const data = buildNotificationPayload(payload);
   await query(
     `UPDATE notifications
-     SET title = ?, body = ?, notification_type = ?, audience = ?, display_position = ?, display_duration_ms = ?,
+     SET title = ?, body = ?, notification_type = ?, audience = ?, display_scopes = ?, display_position = ?, display_duration_ms = ?,
          force_display = ?, show_once = ?, new_user_only = ?, support_qr_url = ?, action_label = ?, action_url = ?,
          starts_at = ?, ends_at = ?, is_active = ?, priority = ?, updated_at = NOW()
      WHERE id = ?`,
@@ -237,6 +284,7 @@ async function updateNotification(id, payload) {
       data.body,
       data.notificationType,
       data.audience,
+      data.displayScopes,
       data.displayPosition,
       data.displayDurationMs,
       data.forceDisplay,
@@ -259,6 +307,17 @@ async function deleteNotification(id) {
   await query('DELETE FROM notifications WHERE id = ?', [Number(id)]);
 }
 
+function normalizePageScope(value) {
+  return VALID_DISPLAY_SCOPES.has(String(value || '').trim())
+    ? String(value || '').trim()
+    : 'global';
+}
+
+function isNotificationVisibleOnPage(notification, pageScope) {
+  const scopes = decodeDisplayScopes(notification?.display_scopes || notification?.displayScopes || 'global');
+  return scopes.includes('global') || scopes.includes(normalizePageScope(pageScope));
+}
+
 function isNotificationVisibleToUser(notification, user) {
   if (!notification || Number(notification.is_active || 0) !== 1) return false;
   const audience = String(notification.audience || 'all');
@@ -277,6 +336,7 @@ function isNotificationVisibleToUser(notification, user) {
 async function listActiveNotificationsForUser(user = null, options = {}) {
   await seedSupportNotificationIfEmpty();
   const supportOnly = normalizeBoolean(options.supportOnly || false) === 1;
+  const pageScope = normalizePageScope(options.pageScope || options.displayScope || 'global');
   const params = [];
   let sql = `
     SELECT * FROM notifications
@@ -297,12 +357,14 @@ async function listActiveNotificationsForUser(user = null, options = {}) {
   return rows
     .map(decodeNotification)
     .filter((notification) => isNotificationVisibleToUser(notification, user))
+    .filter((notification) => supportOnly || isNotificationVisibleOnPage(notification, pageScope))
     .map((notification) => ({
       id: notification.id,
       title: notification.title,
       body: notification.body,
       notificationType: notification.notification_type,
       audience: notification.audience,
+      displayScopes: notification.displayScopes,
       displayPosition: notification.display_position,
       displayDurationMs: notification.display_duration_ms,
       forceDisplay: notification.force_display === 1,
@@ -315,9 +377,9 @@ async function listActiveNotificationsForUser(user = null, options = {}) {
     }));
 }
 
-async function getClientNotificationBootstrap(user = null) {
+async function getClientNotificationBootstrap(user = null, options = {}) {
   try {
-    return await listActiveNotificationsForUser(user);
+    return await listActiveNotificationsForUser(user, options);
   } catch (error) {
     logger.warn('[notification-service] 通知加载失败，前端降级为空', { error: error.message });
     return [];

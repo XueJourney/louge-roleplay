@@ -372,6 +372,7 @@ async function ensureCharacterImageColumns() {
     await ensureMysqlColumn('characters', 'import_batch_id', '`import_batch_id` BIGINT NULL');
     await ensureMysqlIndex('characters', 'idx_characters_source_file_hash', '(`source_file_hash`)');
     await ensureMysqlColumn('users', 'show_nsfw', '`show_nsfw` TINYINT(1) NOT NULL DEFAULT 0');
+    await ensureMysqlColumn('users', 'reply_length_preference', "`reply_length_preference` ENUM('low','medium','high') NOT NULL DEFAULT 'medium'");
     await query(`CREATE TABLE IF NOT EXISTS tags (
       id BIGINT PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(32) NOT NULL,

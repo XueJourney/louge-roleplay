@@ -15,6 +15,9 @@
   const emailStatusClass = user?.email_verified ? 'status-pill status-pill--ok' : 'status-pill status-pill--muted';
   const phoneStatusClass = user?.phone_verified ? 'status-pill status-pill--ok' : 'status-pill status-pill--muted';
   const statusClass = formStatus ? `form-message form-message--${formStatus}` : 'form-message';
+  const replyLengthPreference = ['low', 'medium', 'high'].includes(String(user?.reply_length_preference || ''))
+    ? String(user.reply_length_preference)
+    : 'medium';
 %>
 
 <div class="profile-shell">
@@ -209,6 +212,31 @@
           <div class="mini-note">关闭时，未登录用户和你的账号都不会从公共 API 收到 NSFW 角色。</div>
           <div class="settings-form-actions">
             <button class="submit-btn" type="submit">保存内容偏好</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="settings-section panel">
+        <div class="settings-section-head">
+          <div>
+            <div class="section-kicker">Reply Length</div>
+            <h2><%= t('回复长度偏好') %></h2>
+            <p><%= t('控制角色回复时的展开程度。默认“适中”不会额外写入提示词；“简洁”和“详细”会随你的账号设置注入本次提示词。') %></p>
+          </div>
+        </div>
+        <form method="POST" action="/profile" class="settings-form">
+          <input type="hidden" name="action" value="replyLength" />
+          <div class="field-group">
+            <label for="replyLengthPreference"><%= t('回复长度') %></label>
+            <select id="replyLengthPreference" name="replyLengthPreference">
+              <option value="low" <%= replyLengthPreference === 'low' ? 'selected' : '' %>><%= t('低 · 简洁回复，保留关键信息') %></option>
+              <option value="medium" <%= replyLengthPreference === 'medium' ? 'selected' : '' %>><%= t('中 · 默认适中，不额外约束') %></option>
+              <option value="high" <%= replyLengthPreference === 'high' ? 'selected' : '' %>><%= t('高 · 充分展开，尽力扩充细节') %></option>
+            </select>
+            <div class="mini-note"><%= t('低：更简短但不丢重点；中：遵循角色和系统默认；高：更饱满、更细腻、更高投入。') %></div>
+          </div>
+          <div class="settings-form-actions">
+            <button class="submit-btn" type="submit"><%= t('保存回复长度') %></button>
           </div>
         </form>
       </section>

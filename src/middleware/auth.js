@@ -6,7 +6,7 @@
 const logger = require('../lib/logger');
 const config = require('../config');
 const { translate } = require('../i18n');
-const { findUserById } = require('../services/user-service');
+const { findUserById, normalizeReplyLengthPreference } = require('../services/user-service');
 
 async function requireAuth(req, res, next) {
   if (!req.session || !req.session.user) {
@@ -17,7 +17,7 @@ async function requireAuth(req, res, next) {
     req.session.destroy(() => res.redirect('/login'));
     return undefined;
   }
-  req.session.user = { ...req.session.user, username: user.username, role: user.role || 'user', status: user.status || 'active', show_nsfw: Number(user.show_nsfw || 0) };
+  req.session.user = { ...req.session.user, username: user.username, role: user.role || 'user', status: user.status || 'active', show_nsfw: Number(user.show_nsfw || 0), reply_length_preference: normalizeReplyLengthPreference(user.reply_length_preference) };
   res.locals.currentUser = req.session.user;
   return next();
 }
@@ -31,7 +31,7 @@ async function requireAdmin(req, res, next) {
     req.session.destroy(() => res.redirect('/login'));
     return undefined;
   }
-  req.session.user = { ...req.session.user, username: user.username, role: user.role || 'user', status: user.status || 'active', show_nsfw: Number(user.show_nsfw || 0) };
+  req.session.user = { ...req.session.user, username: user.username, role: user.role || 'user', status: user.status || 'active', show_nsfw: Number(user.show_nsfw || 0), reply_length_preference: normalizeReplyLengthPreference(user.reply_length_preference) };
   res.locals.currentUser = req.session.user;
   if (req.session.user.role !== 'admin') {
     logger.warn('Forbidden admin access attempt', {
@@ -62,6 +62,14 @@ async function requireAdmin(req, res, next) {
         csrfToken: res.locals.csrfToken || '',
         cspNonce: res.locals.cspNonce || '',
         clientI18nMessages: res.locals.clientI18nMessages || {},
+        clientNotifications: [],
+        meta: {},
+        escapeHtml: (value) => String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;'),
         localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-TW': '?lang=zh-TW', 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
       });
     });

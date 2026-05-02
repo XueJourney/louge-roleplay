@@ -119,6 +119,7 @@ function buildRuntimeContext({ user = null, now = new Date() } = {}) {
   return {
     user: username,
     username,
+    replyLengthPreference: String(user?.reply_length_preference || user?.replyLengthPreference || 'medium').trim() || 'medium',
     now,
     timeZone: 'Asia/Hong_Kong',
     time: formatRuntimeTime(now, { timeZone: 'Asia/Hong_Kong' }),

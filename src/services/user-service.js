@@ -17,11 +17,19 @@
  *   updateUserRole(userId, role)     变更用户角色
  *   updateUsername(userId, username) 更新用户名
  *   updatePasswordHash(userId, hash) 更新密码哈希
+ *   updateUserReplyLengthPreference(userId, preference) 更新回复长度偏好
  */
 
 'use strict';
 
 const { query, withTransaction } = require('../lib/db');
+
+const VALID_REPLY_LENGTH_PREFERENCES = new Set(['low', 'medium', 'high']);
+
+function normalizeReplyLengthPreference(value) {
+  const normalized = String(value || '').trim();
+  return VALID_REPLY_LENGTH_PREFERENCES.has(normalized) ? normalized : 'medium';
+}
 const { assignDefaultPlanToUser } = require('./plan-service');
 const { generateUniqueUserPublicId } = require('../lib/user-public-id');
 
@@ -152,7 +160,7 @@ async function findUserById(id) {
   const rows = await query(
     `SELECT
        id, public_id, username, nickname, email, phone, country_type,
-       email_verified, phone_verified, role, status, show_nsfw, created_at
+       email_verified, phone_verified, role, status, show_nsfw, reply_length_preference, created_at
      FROM users
      WHERE id = ?
      LIMIT 1`,
@@ -170,7 +178,7 @@ async function findUserById(id) {
 async function findUserAuthById(id) {
   const rows = await query(
     `SELECT
-       id, public_id, username, password_hash, email, phone, role, status, show_nsfw, created_at, updated_at
+       id, public_id, username, password_hash, email, phone, role, status, show_nsfw, reply_length_preference, created_at, updated_at
      FROM users
      WHERE id = ?
      LIMIT 1`,
@@ -217,6 +225,13 @@ async function updateUserNsfwPreference(userId, showNsfw = false) {
   await query('UPDATE users SET show_nsfw = ?, updated_at = NOW() WHERE id = ?', [showNsfw ? 1 : 0, userId]);
 }
 
+async function updateUserReplyLengthPreference(userId, preference = 'medium') {
+  await query(
+    'UPDATE users SET reply_length_preference = ?, updated_at = NOW() WHERE id = ?',
+    [normalizeReplyLengthPreference(preference), userId],
+  );
+}
+
 async function unbindUserPhone(userId) {
   await query('UPDATE users SET phone = NULL, phone_verified = 0, updated_at = NOW() WHERE id = ?', [userId]);
 }
@@ -257,5 +272,7 @@ module.exports = {
   unbindUserEmail,
   updateUserPhone,
   updateUserNsfwPreference,
+  updateUserReplyLengthPreference,
+  normalizeReplyLengthPreference,
   unbindUserPhone,
 };

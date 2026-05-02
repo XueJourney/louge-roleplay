@@ -86,6 +86,7 @@ function ensureSqliteUsersSchema(db) {
   `);
   ensureSqliteColumn(db, 'users', 'public_id', 'public_id TEXT NULL');
   ensureSqliteColumn(db, 'users', 'show_nsfw', 'show_nsfw INTEGER NOT NULL DEFAULT 0');
+  ensureSqliteColumn(db, 'users', 'reply_length_preference', "reply_length_preference TEXT NOT NULL DEFAULT 'medium'");
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_username ON users (username)');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_email ON users (email) WHERE email IS NOT NULL');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_users_phone ON users (phone) WHERE phone IS NOT NULL');

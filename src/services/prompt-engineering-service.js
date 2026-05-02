@@ -214,7 +214,19 @@ function applyRuntimeTemplateToCharacter(character = {}, runtimeContext = {}) {
   return nextCharacter;
 }
 
+function buildReplyLengthInstruction(preference) {
+  const normalized = String(preference || 'medium').trim();
+  if (normalized === 'low') {
+    return '请用简洁、克制的篇幅回复：优先直达要点，避免不必要的铺陈，但必须保留情节推进、人物情绪、关键信息与必要细节。';
+  }
+  if (normalized === 'high') {
+    return '请以充分、细腻且高投入的方式回复：在不偏离角色与上下文的前提下，尽力扩展场景、心理、动作、对话层次与情节推进，让回复完整、饱满、有沉浸感。';
+  }
+  return '';
+}
+
 function composeSystemPrompt({ promptBlocks = [], characterPromptItems = [], systemHint = '', runtimeContext = {} }) {
+  const replyLengthInstruction = buildReplyLengthInstruction(runtimeContext.replyLengthPreference || runtimeContext.reply_length_preference);
   const sections = [
     ...normalizePromptItems(promptBlocks)
       .filter((item) => item.isEnabled && String(item.value || '').trim())
@@ -228,7 +240,7 @@ function composeSystemPrompt({ promptBlocks = [], characterPromptItems = [], sys
         applyRuntimeTemplate(item.key, runtimeContext),
         applyRuntimeTemplate(item.value, runtimeContext),
       )),
-    formatPromptSection('运行时要求', applyRuntimeTemplate(systemHint || '', runtimeContext)),
+    formatPromptSection('运行时要求', applyRuntimeTemplate([systemHint, replyLengthInstruction].filter(Boolean).join('\n'), runtimeContext)),
   ].filter(Boolean);
 
   return sections.join('\n\n');
@@ -315,6 +327,7 @@ module.exports = {
   formatRuntimeTime,
   applyRuntimeTemplate,
   applyRuntimeTemplateToCharacter,
+  buildReplyLengthInstruction,
   composeSystemPrompt,
   buildPromptPreview,
   listPromptBlocks,

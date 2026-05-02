@@ -19,6 +19,7 @@ function registerAuthProfileRoutes(app, ctx) {
     updateUserPhone,
     unbindUserPhone,
     updateUserNsfwPreference,
+    updateUserReplyLengthPreference,
     verifyEmailCode,
     verifyPhoneCode,
     hashPassword,
@@ -159,6 +160,22 @@ function registerAuthProfileRoutes(app, ctx) {
         req.session.user.show_nsfw = showNsfw ? 1 : 0;
         const refreshedUser = await findUserById(userId);
         return await renderProfileMessage(showNsfw ? 'NSFW 角色显示已开启。' : 'NSFW 角色显示已关闭，公共角色大厅会默认隐藏。', 'success', refreshedUser);
+      }
+
+      if (action === 'replyLength') {
+        const preference = String(req.body.replyLengthPreference || '').trim();
+        if (!['low', 'medium', 'high'].includes(preference)) {
+          return await renderProfileMessage('请选择有效的回复长度。');
+        }
+        await updateUserReplyLengthPreference(userId, preference);
+        req.session.user.reply_length_preference = preference;
+        const refreshedUser = await findUserById(userId);
+        const messageMap = {
+          low: '回复长度已设为简洁：之后会更克制地回复，同时保留关键信息。',
+          medium: '回复长度已设为适中：之后不额外加入长度约束。',
+          high: '回复长度已设为详细：之后会更充分展开，尽力补足细节与推演。',
+        };
+        return await renderProfileMessage(messageMap[preference], 'success', refreshedUser);
       }
 
       if (action === 'password') {

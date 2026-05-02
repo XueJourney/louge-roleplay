@@ -22,6 +22,22 @@
     priority: 100,
   };
   const supportAction = support.id ? `/admin/notifications/${support.id}` : '/admin/notifications/new';
+  const displayScopeOptions = [
+    ['global', t('全局显示')],
+    ['home', t('首页显示')],
+    ['dashboard', t('控制台显示')],
+    ['chat', t('聊天页显示')],
+    ['characters', t('角色页显示')],
+    ['profile', t('个人资料页显示')],
+    ['admin', t('管理后台显示')],
+  ];
+  const notificationHasScope = (notification, scope) => {
+    const scopes = Array.isArray(notification?.displayScopes)
+      ? notification.displayScopes
+      : String(notification?.display_scopes || 'global').split(',').map((item) => item.trim()).filter(Boolean);
+    return scopes.includes(scope) || (!scopes.length && scope === 'global');
+  };
+  const scopeLabel = (scope) => (displayScopeOptions.find((item) => item[0] === scope) || [scope, scope])[1];
 %>
 <div class="admin-shell">
   <section class="hero-card admin-hero">
@@ -56,6 +72,7 @@
       <form method="post" action="<%= supportAction %>" class="support-admin-form">
         <input type="hidden" name="notificationType" value="support" />
         <input type="hidden" name="audience" value="all" />
+        <input type="hidden" name="displayScopes" value="global" />
         <input type="hidden" name="displayPosition" value="modal" />
         <input type="hidden" name="displayDurationMs" value="0" />
         <input type="hidden" name="priority" value="100" />
@@ -126,6 +143,15 @@
               <option value="admin">管理员</option>
             </select>
           </label>
+          <fieldset class="admin-form-grid__wide admin-check-fieldset">
+            <legend><%= t('显示页面') %></legend>
+            <p class="mini-note"><%= t('选择通知在哪些页面出现；选择全局时会在所有页面展示。已有通知默认全局。') %></p>
+            <div class="admin-check-list">
+              <% displayScopeOptions.forEach(item => { %>
+                <label><input type="checkbox" name="displayScopes" value="<%= item[0] %>" <%= item[0] === 'global' ? 'checked' : '' %> /> <%= item[1] %></label>
+              <% }) %>
+            </div>
+          </fieldset>
           <label><%= t('显示位置') %>
             <select name="displayPosition">
               <option value="modal"><%= t('弹窗') %></option>
@@ -155,7 +181,7 @@
             <input name="actionUrl" maxlength="500" placeholder="<%= t('可选，留空则只展示通知内容') %>" />
           </label>
           <div class="admin-check-list admin-form-grid__wide">
-            <label><input type="checkbox" name="isActive" value="1" checked /> 启用</label>
+            <label><input type="checkbox" name="isActive" value="1" checked /> <%= t('启用') %></label>
             <label><input type="checkbox" name="forceDisplay" value="1" /> <%= t('强制显示（用户关闭后刷新仍会出现，除非下架/过期）') %></label>
             <label><input type="checkbox" name="showOnce" value="1" /> <%= t('只显示一次（浏览器本地记忆）') %></label>
             <label><input type="checkbox" name="newUserOnly" value="1" /> <%= t('仅新人通知（注册 7 天内）') %></label>
@@ -194,6 +220,7 @@
               <% if (notification.force_display) { %><span class="pill pill--level-warn"><%= t('强制') %></span><% } %>
               <% if (notification.show_once) { %><span class="pill pill--level-debug"><%= t('只一次') %></span><% } %>
               <% if (notification.new_user_only) { %><span class="pill pill--level-access"><%= t('新人') %></span><% } %>
+              <% (notification.displayScopes || ['global']).slice(0, 3).forEach(scope => { %><span class="pill pill--level-raw"><%= scopeLabel(scope) %></span><% }) %>
             </div>
           </summary>
           <div class="admin-item-body">
@@ -215,6 +242,15 @@
                   <% }) %>
                 </select>
               </label>
+              <fieldset class="admin-form-grid__wide admin-check-fieldset">
+                <legend><%= t('显示页面') %></legend>
+                <p class="mini-note"><%= t('选择通知在哪些页面出现；选择全局时会在所有页面展示。') %></p>
+                <div class="admin-check-list">
+                  <% displayScopeOptions.forEach(item => { %>
+                    <label><input type="checkbox" name="displayScopes" value="<%= item[0] %>" <%= notificationHasScope(notification, item[0]) ? 'checked' : '' %> /> <%= item[1] %></label>
+                  <% }) %>
+                </div>
+              </fieldset>
               <label><%= t('显示位置') %>
                 <select name="displayPosition">
                   <% [['modal','弹窗'],['banner','顶部横幅'],['toast','轻提示']].forEach(item => { %>
@@ -228,7 +264,7 @@
               <label><%= t('结束时间') %>
                 <input type="datetime-local" name="endsAt" value="<%= notification.ends_at_input %>" />
               </label>
-              <label>显示时长（毫秒）
+              <label><%= t('显示时长（毫秒，0 为手动关闭）') %>
                 <input type="number" name="displayDurationMs" min="0" step="500" value="<%= notification.display_duration_ms %>" />
               </label>
               <label><%= t('优先级') %>
@@ -244,7 +280,7 @@
                 <input name="actionUrl" maxlength="500" value="<%= notification.action_url || '' %>" />
               </label>
               <div class="admin-check-list admin-form-grid__wide">
-                <label><input type="checkbox" name="isActive" value="1" <%= notification.is_active ? 'checked' : '' %> /> 启用</label>
+                <label><input type="checkbox" name="isActive" value="1" <%= notification.is_active ? 'checked' : '' %> /> <%= t('启用') %></label>
                 <label><input type="checkbox" name="forceDisplay" value="1" <%= notification.force_display ? 'checked' : '' %> /> <%= t('强制显示') %></label>
                 <label><input type="checkbox" name="showOnce" value="1" <%= notification.show_once ? 'checked' : '' %> /> <%= t('只显示一次') %></label>
                 <label><input type="checkbox" name="newUserOnly" value="1" <%= notification.new_user_only ? 'checked' : '' %> /> <%= t('仅新人通知') %></label>

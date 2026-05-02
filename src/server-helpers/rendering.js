@@ -45,6 +45,17 @@ function buildDefaultMeta(params = {}) {
   };
 }
 
+function inferNotificationPageScope(view) {
+  const normalized = String(view || '').trim();
+  if (normalized === 'home') return 'home';
+  if (normalized === 'dashboard') return 'dashboard';
+  if (normalized === 'chat') return 'chat';
+  if (normalized === 'profile') return 'profile';
+  if (normalized === 'public-characters' || normalized === 'public-character-detail' || normalized === 'character-new') return 'characters';
+  if (normalized.startsWith('admin')) return 'admin';
+  return 'global';
+}
+
 async function renderPage(res, view, params = {}) {
   const locale = res.locals.locale || 'zh-CN';
   const t = res.locals.t || ((key, vars) => translate(locale, key, vars));
@@ -55,7 +66,9 @@ async function renderPage(res, view, params = {}) {
     locale,
     title,
   });
-  const clientNotifications = await getClientNotificationBootstrap(res.locals.currentUser || null);
+  const clientNotifications = await getClientNotificationBootstrap(res.locals.currentUser || null, {
+    pageScope: params.notificationPageScope || inferNotificationPageScope(view),
+  });
   return new Promise((resolve) => {
     res.render(view, params, (viewError, html) => {
       if (viewError) {
@@ -109,4 +122,5 @@ module.exports = {
   renderPage,
   renderRegisterPage,
   renderValidationMessage,
+  inferNotificationPageScope,
 };

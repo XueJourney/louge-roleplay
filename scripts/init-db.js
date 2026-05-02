@@ -337,6 +337,7 @@ async function main() {
       role          ENUM('user','admin') NOT NULL DEFAULT 'user',
       status        ENUM('active','blocked') NOT NULL DEFAULT 'active',
       show_nsfw     TINYINT(1) NOT NULL DEFAULT 0,
+      reply_length_preference ENUM('low','medium','high') NOT NULL DEFAULT 'medium',
       created_at    DATETIME NOT NULL,
       updated_at    DATETIME NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -350,6 +351,7 @@ async function main() {
   await ensureColumn('users', 'role',           "role ENUM('user','admin') NOT NULL DEFAULT 'user'");
   await ensureColumn('users', 'status',         "status ENUM('active','blocked') NOT NULL DEFAULT 'active'");
   await ensureColumn('users', 'show_nsfw',      'show_nsfw TINYINT(1) NOT NULL DEFAULT 0');
+  await ensureColumn('users', 'reply_length_preference', "reply_length_preference ENUM('low','medium','high') NOT NULL DEFAULT 'medium'");
   await ensureUniqueIndex('users', 'uniq_users_email', 'email');
   await ensureUniqueIndex('users', 'uniq_users_phone', 'phone');
   await backfillUserPublicIds(connection);
@@ -563,6 +565,7 @@ async function main() {
       body TEXT NOT NULL,
       notification_type ENUM('general','new_user','support','error','maintenance') NOT NULL DEFAULT 'general',
       audience ENUM('all','guest','user','admin') NOT NULL DEFAULT 'all',
+      display_scopes VARCHAR(160) NOT NULL DEFAULT 'global',
       display_position ENUM('modal','toast','banner') NOT NULL DEFAULT 'modal',
       display_duration_ms INT NOT NULL DEFAULT 0,
       force_display TINYINT(1) NOT NULL DEFAULT 0,
@@ -581,6 +584,9 @@ async function main() {
       INDEX idx_notifications_audience (audience, notification_type)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  await ensureColumn('notifications', 'display_scopes', "display_scopes VARCHAR(160) NOT NULL DEFAULT 'global' AFTER audience");
+  await connection.query("UPDATE notifications SET display_scopes = 'global' WHERE display_scopes IS NULL OR display_scopes = ''");
+  await ensureIndex('notifications', 'idx_notifications_display_scopes', '(display_scopes)');
 
   // ── 角色表 ───────────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 characters 表...');

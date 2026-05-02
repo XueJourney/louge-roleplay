@@ -32,6 +32,13 @@ async function renderErrorWithLayout(res, statusCode, title, message, errorCode)
       cspNonce: res.locals.cspNonce || '',
       clientI18nMessages: res.locals.clientI18nMessages || {},
       clientNotifications,
+      meta: {},
+      escapeHtml: (value) => String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'),
       localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-TW': '?lang=zh-TW', 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
     });
   });

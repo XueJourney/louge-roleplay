@@ -386,3 +386,17 @@
     grid-template-columns: 1fr;
   }
 }
+
+.admin-check-fieldset {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.admin-check-fieldset legend {
+  padding: 0 8px;
+  color: var(--text-strong);
+  font-weight: 700;
+}
