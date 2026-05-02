@@ -431,6 +431,41 @@ async function main() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+
+  // ── 站内信表 ───────────────────────────────────────────────────────────────
+  console.log('[init-db] 初始化 site_messages / recipients 表...');
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS site_messages (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      title VARCHAR(120) NOT NULL,
+      body TEXT NOT NULL,
+      sender_admin_user_id BIGINT NULL,
+      target_mode ENUM('all','filtered','users') NOT NULL DEFAULT 'all',
+      filter_role ENUM('any','user','admin') NOT NULL DEFAULT 'any',
+      filter_status ENUM('any','active','blocked') NOT NULL DEFAULT 'any',
+      filter_plan_code VARCHAR(50) NULL,
+      is_important TINYINT(1) NOT NULL DEFAULT 0,
+      recipient_count INT NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL,
+      INDEX idx_site_messages_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS site_message_recipients (
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      message_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      is_read TINYINT(1) NOT NULL DEFAULT 0,
+      read_at DATETIME NULL,
+      created_at DATETIME NOT NULL,
+      UNIQUE INDEX uniq_site_message_recipient (message_id, user_id),
+      INDEX idx_site_message_recipients_user_read (user_id, is_read, created_at),
+      CONSTRAINT fk_site_message_recipients_message FOREIGN KEY (message_id) REFERENCES site_messages(id) ON DELETE CASCADE,
+      CONSTRAINT fk_site_message_recipients_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // ── LLM 提供商表 ─────────────────────────────────────────────────────────────
   console.log('[init-db] 初始化 llm_providers 表...');
   await connection.query(`

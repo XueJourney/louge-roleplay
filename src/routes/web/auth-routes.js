@@ -8,6 +8,7 @@ const { registerAuthRegisterRoutes } = require('./auth/register-routes');
 const { registerAuthSessionRoutes } = require('./auth/session-routes');
 const { registerAuthDashboardRoutes } = require('./auth/dashboard-routes');
 const { registerAuthProfileRoutes } = require('./auth/profile-routes');
+const { registerAuthSiteMessageRoutes } = require('./auth/site-message-routes');
 
 function registerAuthRoutes(app, ctx) {
   registerAuthVerificationRoutes(app, ctx);
@@ -15,6 +16,7 @@ function registerAuthRoutes(app, ctx) {
   registerAuthSessionRoutes(app, ctx);
   registerAuthDashboardRoutes(app, ctx);
   registerAuthProfileRoutes(app, ctx);
+  registerAuthSiteMessageRoutes(app, ctx);
 }
 
 module.exports = { registerAuthRoutes };

@@ -7,6 +7,7 @@ const config = require('../config');
 const logger = require('../lib/logger');
 const { translate, translateHtml } = require('../i18n');
 const { getClientNotificationBootstrap } = require('../services/notification-service');
+const { getUnreadSiteMessageCount } = require('../services/site-message-service');
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -66,9 +67,12 @@ async function renderPage(res, view, params = {}) {
     locale,
     title,
   });
-  const clientNotifications = await getClientNotificationBootstrap(res.locals.currentUser || null, {
-    pageScope: params.notificationPageScope || inferNotificationPageScope(view),
-  });
+  const [clientNotifications, unreadSiteMessageCount] = await Promise.all([
+    getClientNotificationBootstrap(res.locals.currentUser || null, {
+      pageScope: params.notificationPageScope || inferNotificationPageScope(view),
+    }),
+    res.locals.currentUser?.id ? getUnreadSiteMessageCount(res.locals.currentUser.id).catch(() => 0) : 0,
+  ]);
   return new Promise((resolve) => {
     res.render(view, params, (viewError, html) => {
       if (viewError) {
@@ -92,6 +96,7 @@ async function renderPage(res, view, params = {}) {
         cspNonce: res.locals.cspNonce || '',
         clientI18nMessages: res.locals.clientI18nMessages || {},
         clientNotifications,
+        unreadSiteMessageCount,
         localeSwitchLinks: res.locals.localeSwitchLinks || { 'zh-TW': '?lang=zh-TW', 'zh-CN': '?lang=zh-CN', en: '?lang=en' },
       });
       resolve();

@@ -56,6 +56,8 @@
   <script id="app-bootstrap-data" type="application/json" nonce="<%= cspNonce || '' %>"><%- JSON.stringify({
     i18n: { locale: locale || 'zh-CN', messages: clientI18nMessages || {} },
     notifications: { items: clientNotifications || [] },
+    siteMessages: { unreadCount: unreadSiteMessageCount || 0 },
+    currentUser: currentUser ? { id: currentUser.id, username: currentUser.username, role: currentUser.role } : null,
     csrfToken: csrfToken || ''
   }) %></script>
   <script nonce="<%= cspNonce || '' %>" src="/public/js/layout-bootstrap.js"></script>
@@ -64,6 +66,7 @@
   <script nonce="<%= cspNonce || '' %>" src="/public/js/form-guards.js"></script>
   <script nonce="<%= cspNonce || '' %>" src="/public/js/tag-input.js" defer></script>
   <script nonce="<%= cspNonce || '' %>" src="/public/js/notification-client.js" defer></script>
+  <script nonce="<%= cspNonce || '' %>" src="/public/js/site-message-client.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -74,6 +77,7 @@
       <% if (currentUser) { %>
         <a href="/dashboard"><%= t('控制台') %></a>
         <a href="/profile"><%= t('个人资料') %></a>
+        <a href="/messages" class="site-message-nav-link"><%= t('站内信') %><span class="site-message-badge" data-site-message-badge <%= (unreadSiteMessageCount || 0) > 0 ? '' : 'hidden' %>><%= (unreadSiteMessageCount || 0) > 99 ? '99+' : (unreadSiteMessageCount || 0) %></span></a>
       <% if (currentUser && currentUser.role === 'admin') { %>
         <a href="/admin"><%= t('管理后台') %></a>
       <% } %>

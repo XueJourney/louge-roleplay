@@ -1,0 +1,136 @@
+<!-- @file src/views/admin-site-messages.ejs
+     @description 管理后台站内信发送页。调用说明：GET /admin/site-messages 渲染，POST /admin/site-messages/send 投递。
+-->
+<%
+  const messageList = Array.isArray(messages) ? messages : [];
+  const planList = Array.isArray(plans) ? plans : [];
+  const userList = Array.isArray(users) ? users : [];
+  const formatDate = (value) => String(value || '—').replace('T', ' ').slice(0, 19);
+%>
+<div class="admin-shell">
+  <section class="hero-card admin-hero">
+    <div class="admin-hero-copy">
+      <p class="section-kicker">Site Mail</p>
+      <h1><%= t('站内信管理') %></h1>
+      <p class="muted-text"><%= t('站内信用于可追踪的定向消息：可发给全体用户、符合条件的用户、单个或多个指定用户。通知适合轻量公告，站内信适合需要用户后续查看和标记已读的内容。') %></p>
+    </div>
+  </section>
+
+  <section class="section-card admin-section">
+    <%- include('partials/admin-subnav', { activeAdminNav: 'site-messages' }) %>
+    <% if (formMessage) { %>
+      <div class="admin-notice admin-notice--<%= formMessage.type || 'info' %>"><%= formMessage.text %></div>
+    <% } %>
+  </section>
+
+  <section class="section-card admin-section">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">Compose</p>
+        <h2><%= t('发送站内信') %></h2>
+        <p class="muted-text"><%= t('选择投递范围后发送。指定用户模式可填写多个用户 ID，用逗号、空格或换行分隔。') %></p>
+      </div>
+    </div>
+
+    <form method="post" action="/admin/site-messages/send" class="admin-form-grid admin-form-grid--notifications">
+      <label><%= t('投递范围') %>
+        <select name="targetMode">
+          <option value="all"><%= t('全体用户') %></option>
+          <option value="filtered"><%= t('符合条件的用户') %></option>
+          <option value="users"><%= t('指定用户 ID') %></option>
+        </select>
+      </label>
+      <label><%= t('用户角色') %>
+        <select name="filterRole">
+          <option value="any"><%= t('不限角色') %></option>
+          <option value="user"><%= t('普通用户') %></option>
+          <option value="admin"><%= t('管理员') %></option>
+        </select>
+      </label>
+      <label><%= t('用户状态') %>
+        <select name="filterStatus">
+          <option value="any"><%= t('不限状态') %></option>
+          <option value="active"><%= t('状态正常') %></option>
+          <option value="blocked"><%= t('当前受限') %></option>
+        </select>
+      </label>
+      <label><%= t('套餐') %>
+        <select name="filterPlanCode">
+          <option value=""><%= t('不限套餐') %></option>
+          <% planList.forEach(plan => { %>
+            <option value="<%= plan.code %>"><%= plan.name %> · <%= plan.code %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label class="admin-form-grid__wide"><%= t('指定用户 ID') %>
+        <textarea name="userIds" rows="3" placeholder="<%= t('例如：1, 2, 3；只在投递范围选择“指定用户 ID”时生效') %>"></textarea>
+      </label>
+      <label><%= t('标题') %>
+        <input name="title" maxlength="120" required placeholder="<%= t('写给用户看的站内信标题') %>" />
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" name="isImportant" value="1" />
+        <span><%= t('标记为重要') %></span>
+      </label>
+      <label class="admin-form-grid__wide"><%= t('内容') %>
+        <textarea name="body" rows="7" maxlength="6000" required placeholder="<%= t('站内信正文，支持换行。') %>"></textarea>
+      </label>
+      <div class="toolbar-row toolbar-row--admin admin-form-grid__wide">
+        <button type="submit"><%= t('发送站内信') %></button>
+      </div>
+    </form>
+
+    <details class="admin-fold">
+      <summary><%= t('查看用户 ID 参考') %></summary>
+      <div class="admin-fold-body">
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>ID</th><th><%= t('用户名') %></th><th><%= t('角色') %></th><th><%= t('状态') %></th><th><%= t('套餐') %></th></tr></thead>
+            <tbody>
+              <% userList.slice(0, 200).forEach(user => { %>
+                <tr>
+                  <td><%= user.id %></td>
+                  <td><%= user.username %></td>
+                  <td><%= t(user.role === 'admin' ? '管理员' : '普通用户') %></td>
+                  <td><%= t(user.status === 'active' ? '状态正常' : '当前受限') %></td>
+                  <td><%= user.plan_name || t('未配置') %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="section-card admin-section">
+    <div class="section-heading">
+      <div>
+        <p class="section-kicker">History</p>
+        <h2><%= t('发送记录') %></h2>
+        <p class="muted-text"><%= t('最近 50 条站内信，按发送时间倒序。') %></p>
+      </div>
+    </div>
+
+    <div class="admin-list">
+      <% if (!messageList.length) { %>
+        <p class="muted-text"><%= t('还没有发送过站内信。') %></p>
+      <% } %>
+      <% messageList.forEach(message => { %>
+        <article class="admin-item admin-item--notification">
+          <div class="admin-item-summary">
+            <div class="admin-item-main">
+              <strong><%= message.title %></strong>
+              <span><%= String(message.body || '').slice(0, 120) %><%= String(message.body || '').length > 120 ? '…' : '' %></span>
+            </div>
+            <div class="admin-item-meta">
+              <% if (Number(message.is_important || 0) === 1) { %><span class="pill pill--level-warn"><%= t('重要') %></span><% } %>
+              <span class="pill pill--brand"><%= t('收件人 {count}', { count: Number(message.recipient_count || 0) }) %></span>
+              <span class="pill pill--level-raw"><%= formatDate(message.created_at) %></span>
+            </div>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+</div>

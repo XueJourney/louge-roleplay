@@ -10,6 +10,7 @@ function registerAuthDashboardRoutes(app, ctx) {
     listUserCharacters,
     getActiveSubscriptionForUser,
     getUserQuotaSnapshot,
+    getUnreadSiteMessageCount,
     listUserConversations,
     renderPage,
   } = ctx;
@@ -25,7 +26,8 @@ function registerAuthDashboardRoutes(app, ctx) {
       const conversations = await listUserConversations(req.session.user.id);
       const subscription = await getActiveSubscriptionForUser(req.session.user.id);
       const quota = await getUserQuotaSnapshot(req.session.user.id);
-      renderPage(res, 'dashboard', { title: '控制台', user, characters, conversations, subscription, quota });
+      const unreadSiteMessages = getUnreadSiteMessageCount ? await getUnreadSiteMessageCount(req.session.user.id) : 0;
+      renderPage(res, 'dashboard', { title: '控制台', user, characters, conversations, subscription, quota, unreadSiteMessages });
     } catch (error) {
       next(error);
     }

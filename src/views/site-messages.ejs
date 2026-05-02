@@ -1,0 +1,59 @@
+<!-- @file src/views/site-messages.ejs
+     @description 用户站内信收件箱。调用说明：GET /messages 渲染。
+-->
+<%
+  const messageList = Array.isArray(messages) ? messages : [];
+  const unreadCount = messageList.filter((message) => Number(message.is_read || 0) !== 1).length;
+  const formatDate = (value) => String(value || '—').replace('T', ' ').slice(0, 19);
+%>
+<div class="dashboard-shell site-message-shell">
+  <section class="dashboard-hero-card">
+    <div class="dashboard-welcome">
+      <div class="section-kicker">Inbox</div>
+      <h1><%= t('站内信') %></h1>
+      <p><%= t('这里保存管理员发送给你的站内信。重要消息会优先显示，读过后可以标记已读。') %></p>
+      <div class="dashboard-actions">
+        <a class="quick-link" href="/dashboard"><%= t('回控制台') %></a>
+        <% if (unreadCount > 0) { %>
+          <form method="post" action="/messages/read-all" class="inline-form">
+            <button type="submit" class="quick-link"><%= t('全部标记已读') %></button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+    <aside class="dashboard-account-card">
+      <div>
+        <span><%= t('未读站内信') %></span>
+        <strong><%= unreadCount %></strong>
+      </div>
+    </aside>
+  </section>
+
+  <section class="panel dashboard-section">
+    <% if (!messageList.length) { %>
+      <div class="empty-panel dashboard-empty-state"><%= t('暂时没有站内信。') %></div>
+    <% } %>
+    <div class="site-message-list">
+      <% messageList.forEach(message => { %>
+        <article class="site-message-card <%= Number(message.is_read || 0) === 1 ? 'is-read' : 'is-unread' %>">
+          <div class="site-message-card__head">
+            <div>
+              <div class="site-message-card__meta">
+                <% if (Number(message.is_important || 0) === 1) { %><span class="pill pill--level-warn"><%= t('重要') %></span><% } %>
+                <span class="pill <%= Number(message.is_read || 0) === 1 ? 'pill--level-raw' : 'pill--level-info' %>"><%= Number(message.is_read || 0) === 1 ? t('已读') : t('未读') %></span>
+                <span class="muted-text"><%= formatDate(message.created_at) %></span>
+              </div>
+              <h2><%= message.title %></h2>
+            </div>
+            <% if (Number(message.is_read || 0) !== 1) { %>
+              <form method="post" action="/messages/<%= message.id %>/read">
+                <button type="submit"><%= t('标记已读') %></button>
+              </form>
+            <% } %>
+          </div>
+          <div class="site-message-card__body"><%= message.body %></div>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+</div>

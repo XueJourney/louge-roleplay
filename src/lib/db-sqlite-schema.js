@@ -11,6 +11,7 @@ const { ensureSqliteSubscriptionsSchema } = require('./sqlite-schema/subscriptio
 const { ensureSqliteLlmSchema } = require('./sqlite-schema/llm');
 const { ensureSqlitePromptNotificationSchema } = require('./sqlite-schema/prompts-notifications');
 const { ensureSqliteCharacterConversationSchema } = require('./sqlite-schema/characters-conversations');
+const { ensureSqliteSiteMessageSchema } = require('./sqlite-schema/site-messages');
 const { seedSqliteDefaults } = require('./sqlite-schema/seed');
 
 function initSqliteSchema(db) {
@@ -20,6 +21,7 @@ function initSqliteSchema(db) {
   ensureSqliteLlmSchema(db);
   ensureSqlitePromptNotificationSchema(db);
   ensureSqliteCharacterConversationSchema(db);
+  ensureSqliteSiteMessageSchema(db);
   seedSqliteDefaults(db);
 }
 

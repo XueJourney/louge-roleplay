@@ -77,8 +77,14 @@
   function renderToast(notification) {
     const toast = document.createElement('div');
     toast.className = 'site-notification-toast';
-    toast.innerHTML = '<strong></strong><span></span><button type="button">×</button>';
+    toast.innerHTML = '<strong></strong><span></span><a hidden></a><button type="button">×</button>';
     toast.querySelector('button').setAttribute('aria-label', t('关闭通知'));
+    const action = toast.querySelector('a');
+    if (text(notification.actionUrl)) {
+      action.hidden = false;
+      action.href = text(notification.actionUrl);
+      action.textContent = text(notification.actionLabel) || t('打开链接');
+    }
     toast.querySelector('strong').textContent = text(notification.title) || t('通知');
     toast.querySelector('span').textContent = text(notification.body);
     toast.querySelector('button').addEventListener('click', () => {
@@ -112,6 +118,13 @@
       markSeen(notification);
     });
     banner.appendChild(copy);
+    if (text(notification.actionUrl)) {
+      const action = document.createElement('a');
+      action.className = 'site-notification-action';
+      action.href = text(notification.actionUrl);
+      action.textContent = text(notification.actionLabel) || t('打开链接');
+      banner.appendChild(action);
+    }
     banner.appendChild(close);
     document.body.prepend(banner);
     const duration = Number(notification.displayDurationMs || 0);

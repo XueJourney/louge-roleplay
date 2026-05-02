@@ -32,6 +32,7 @@ async function renderErrorWithLayout(res, statusCode, title, message, errorCode)
       cspNonce: res.locals.cspNonce || '',
       clientI18nMessages: res.locals.clientI18nMessages || {},
       clientNotifications,
+      unreadSiteMessageCount: 0,
       meta: {},
       escapeHtml: (value) => String(value ?? '')
         .replace(/&/g, '&amp;')

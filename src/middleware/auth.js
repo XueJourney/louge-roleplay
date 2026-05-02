@@ -63,6 +63,7 @@ async function requireAdmin(req, res, next) {
         cspNonce: res.locals.cspNonce || '',
         clientI18nMessages: res.locals.clientI18nMessages || {},
         clientNotifications: [],
+        unreadSiteMessageCount: 0,
         meta: {},
         escapeHtml: (value) => String(value ?? '')
           .replace(/&/g, '&amp;')

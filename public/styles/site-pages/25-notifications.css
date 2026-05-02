@@ -400,3 +400,69 @@
   color: var(--text-strong);
   font-weight: 700;
 }
+
+.site-message-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.site-message-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.site-message-badge[hidden] {
+  display: none;
+}
+
+.site-message-list {
+  display: grid;
+  gap: 14px;
+}
+
+.site-message-card {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.site-message-card.is-unread {
+  border-color: rgba(99, 216, 205, 0.32);
+  background: rgba(99, 216, 205, 0.06);
+}
+
+.site-message-card.is-read {
+  opacity: 0.78;
+}
+
+.site-message-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.site-message-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.site-message-card__body {
+  margin-top: 12px;
+  white-space: pre-wrap;
+  color: var(--text-soft);
+  line-height: 1.75;
+}

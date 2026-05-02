@@ -25,6 +25,7 @@
   const tokenUsagePercent = tokenQuotaTotal > 0 ? Math.min(100, Math.round((safeNum(quota.usage.usedTokens) / tokenQuotaTotal) * 100)) : 0;
   const latestConversation = conversationList[0];
   const accountInitial = String(user.username || 'L').slice(0, 1).toUpperCase();
+  const unreadSiteMessages = Number(locals.unreadSiteMessages || 0);
 %>
 
 <div class="dashboard-shell">
@@ -40,6 +41,7 @@
         <% } %>
         <a class="quick-link" href="/characters/public">逛公开角色</a>
         <a class="quick-link" href="/profile">个人资料</a>
+        <a class="quick-link" href="/messages"><%= t('站内信') %><%= unreadSiteMessages > 0 ? `（${unreadSiteMessages}）` : '' %></a>
       </div>
     </div>
 
@@ -105,6 +107,11 @@
       <span>累计会话</span>
       <strong><%= formatNum(conversationList.length) %></strong>
       <small><%= latestConversation ? t('最近更新：{updatedAt}', { updatedAt: latestConversation.updated_at }) : '还没有会话' %></small>
+    </article>
+    <article class="stat-card">
+      <span><%= t('未读站内信') %></span>
+      <strong><%= unreadSiteMessages %></strong>
+      <small><%= unreadSiteMessages > 0 ? t('有新的站内信待查看') : t('暂无未读站内信') %></small>
     </article>
     <article class="stat-card stat-card--plan">
       <span>当前套餐</span>

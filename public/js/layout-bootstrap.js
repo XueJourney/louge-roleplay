@@ -16,5 +16,7 @@
 
   window.AI_ROLEPLAY_I18N = payload.i18n || { locale: 'zh-CN', messages: {} };
   window.AI_ROLEPLAY_NOTIFICATIONS = payload.notifications || { items: [] };
+  window.AI_ROLEPLAY_SITE_MESSAGES = payload.siteMessages || { unreadCount: 0 };
+  window.AI_ROLEPLAY_CURRENT_USER = payload.currentUser || null;
   window.AI_ROLEPLAY_CSRF_TOKEN = payload.csrfToken || '';
 }());
