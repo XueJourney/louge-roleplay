@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+## [1.3.16] - 2026-05-02
+
+### Changed
+
+- 继续拆分过大文件：`scripts/init-db.js` 改为轻量入口，表结构、迁移、种子数据与工具函数拆入 `scripts/init-db/`。
+- `src/services/character-service.js` 保留兼容门面，将公共角色查询与角色表结构自修复拆入 `src/services/character/`。
+- `public/styles/site-pages/51-chat-polish.css` 改为聚合入口，聊天页结构/消息操作/头部菜单/响应式样式拆入 `public/styles/site-pages/chat-polish/`。
+- `public/js/chat/rich-renderer.js` 改为渲染入口，将 Markdown、净化与折叠块逻辑拆入 `public/js/chat/rich-renderer/`。
+
 ## [1.3.15] - 2026-05-02
 
 ### Changed
