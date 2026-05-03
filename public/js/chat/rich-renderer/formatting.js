@@ -30,6 +30,95 @@
       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   }
 
+
+  function splitTableRow(line) {
+    let source = String(line || '').trim();
+    if (!source.includes('|')) return [];
+    if (source.startsWith('|')) source = source.slice(1);
+    if (source.endsWith('|') && !source.endsWith('\\|')) source = source.slice(0, -1);
+
+    const cells = [];
+    let current = '';
+    let inCode = false;
+    for (let i = 0; i < source.length; i += 1) {
+      const char = source[i];
+      const next = source[i + 1];
+      if (char === '`') {
+        inCode = !inCode;
+        current += char;
+        continue;
+      }
+      if (char === '\\' && next === '|') {
+        current += '|';
+        i += 1;
+        continue;
+      }
+      if (char === '|' && !inCode) {
+        cells.push(current.trim());
+        current = '';
+        continue;
+      }
+      current += char;
+    }
+    cells.push(current.trim());
+    return cells;
+  }
+
+  function parseTableSeparator(line) {
+    const cells = splitTableRow(line);
+    if (cells.length < 2) return null;
+    const alignments = [];
+    for (const cell of cells) {
+      const value = String(cell || '').trim();
+      if (!/^:?-{3,}:?$/.test(value)) return null;
+      if (/^:-+:$/.test(value)) alignments.push('center');
+      else if (/^-+:$/.test(value)) alignments.push('right');
+      else if (/^:-+$/.test(value)) alignments.push('left');
+      else alignments.push('');
+    }
+    return alignments;
+  }
+
+  function normalizeTableCells(cells, columnCount) {
+    const normalized = cells.slice(0, columnCount);
+    while (normalized.length < columnCount) normalized.push('');
+    return normalized;
+  }
+
+  function renderTableCell(tag, content, alignment) {
+    const alignClass = alignment ? ` class="align-${alignment}"` : '';
+    return `<${tag}${alignClass}>${applyInlineMarkdown(String(content || '').trim())}</${tag}>`;
+  }
+
+  function tryParseTable(lines, startIndex) {
+    const headerCells = splitTableRow(lines[startIndex]);
+    const alignments = parseTableSeparator(lines[startIndex + 1]);
+    if (headerCells.length < 2 || !alignments) return null;
+
+    const columnCount = headerCells.length;
+    const headerHtml = normalizeTableCells(headerCells, columnCount)
+      .map((cell, index) => renderTableCell('th', cell, alignments[index]))
+      .join('');
+    const bodyRows = [];
+    let endIndex = startIndex + 2;
+
+    while (endIndex < lines.length) {
+      const rowLine = lines[endIndex];
+      if (!String(rowLine || '').trim()) break;
+      const cells = splitTableRow(rowLine);
+      if (cells.length < 2 || parseTableSeparator(rowLine)) break;
+      bodyRows.push(`<tr>${normalizeTableCells(cells, columnCount)
+        .map((cell, index) => renderTableCell('td', cell, alignments[index]))
+        .join('')}</tr>`);
+      endIndex += 1;
+    }
+
+    return {
+      html: `<div class="bubble-table-wrap"><table><thead><tr>${headerHtml}</tr></thead>${bodyRows.length ? `<tbody>${bodyRows.join('')}</tbody>` : ''}</table></div>`,
+      endIndex,
+    };
+  }
+
   function markdownToHtml(text) {
     const normalized = normalizeMarkdownLines(text);
     const escaped = escapeHtml(normalized);
@@ -67,6 +156,14 @@
       if (isBlank(line)) { flushParagraph(); continue; }
       if (isFencePlaceholder(trimmed)) { flushParagraph(); parts.push(trimmed); continue; }
       if (isHr(line)) { flushParagraph(); parts.push('<hr>'); continue; }
+
+      const parsedTable = i + 1 < lines.length ? tryParseTable(lines, i) : null;
+      if (parsedTable) {
+        flushParagraph();
+        parts.push(parsedTable.html);
+        i = parsedTable.endIndex - 1;
+        continue;
+      }
 
       const headingMatch = parseHeading(line);
       if (headingMatch) {
