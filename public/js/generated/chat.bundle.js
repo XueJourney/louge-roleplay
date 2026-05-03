@@ -37,6 +37,95 @@
       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   }
 
+
+  function splitTableRow(line) {
+    let source = String(line || '').trim();
+    if (!source.includes('|')) return [];
+    if (source.startsWith('|')) source = source.slice(1);
+    if (source.endsWith('|') && !source.endsWith('\\|')) source = source.slice(0, -1);
+
+    const cells = [];
+    let current = '';
+    let inCode = false;
+    for (let i = 0; i < source.length; i += 1) {
+      const char = source[i];
+      const next = source[i + 1];
+      if (char === '`') {
+        inCode = !inCode;
+        current += char;
+        continue;
+      }
+      if (char === '\\' && next === '|') {
+        current += '|';
+        i += 1;
+        continue;
+      }
+      if (char === '|' && !inCode) {
+        cells.push(current.trim());
+        current = '';
+        continue;
+      }
+      current += char;
+    }
+    cells.push(current.trim());
+    return cells;
+  }
+
+  function parseTableSeparator(line) {
+    const cells = splitTableRow(line);
+    if (cells.length < 2) return null;
+    const alignments = [];
+    for (const cell of cells) {
+      const value = String(cell || '').trim();
+      if (!/^:?-{3,}:?$/.test(value)) return null;
+      if (/^:-+:$/.test(value)) alignments.push('center');
+      else if (/^-+:$/.test(value)) alignments.push('right');
+      else if (/^:-+$/.test(value)) alignments.push('left');
+      else alignments.push('');
+    }
+    return alignments;
+  }
+
+  function normalizeTableCells(cells, columnCount) {
+    const normalized = cells.slice(0, columnCount);
+    while (normalized.length < columnCount) normalized.push('');
+    return normalized;
+  }
+
+  function renderTableCell(tag, content, alignment) {
+    const alignClass = alignment ? ` class="align-${alignment}"` : '';
+    return `<${tag}${alignClass}>${applyInlineMarkdown(String(content || '').trim())}</${tag}>`;
+  }
+
+  function tryParseTable(lines, startIndex) {
+    const headerCells = splitTableRow(lines[startIndex]);
+    const alignments = parseTableSeparator(lines[startIndex + 1]);
+    if (headerCells.length < 2 || !alignments) return null;
+
+    const columnCount = headerCells.length;
+    const headerHtml = normalizeTableCells(headerCells, columnCount)
+      .map((cell, index) => renderTableCell('th', cell, alignments[index]))
+      .join('');
+    const bodyRows = [];
+    let endIndex = startIndex + 2;
+
+    while (endIndex < lines.length) {
+      const rowLine = lines[endIndex];
+      if (!String(rowLine || '').trim()) break;
+      const cells = splitTableRow(rowLine);
+      if (cells.length < 2 || parseTableSeparator(rowLine)) break;
+      bodyRows.push(`<tr>${normalizeTableCells(cells, columnCount)
+        .map((cell, index) => renderTableCell('td', cell, alignments[index]))
+        .join('')}</tr>`);
+      endIndex += 1;
+    }
+
+    return {
+      html: `<div class="bubble-table-wrap"><table><thead><tr>${headerHtml}</tr></thead>${bodyRows.length ? `<tbody>${bodyRows.join('')}</tbody>` : ''}</table></div>`,
+      endIndex,
+    };
+  }
+
   function markdownToHtml(text) {
     const normalized = normalizeMarkdownLines(text);
     const escaped = escapeHtml(normalized);
@@ -74,6 +163,14 @@
       if (isBlank(line)) { flushParagraph(); continue; }
       if (isFencePlaceholder(trimmed)) { flushParagraph(); parts.push(trimmed); continue; }
       if (isHr(line)) { flushParagraph(); parts.push('<hr>'); continue; }
+
+      const parsedTable = i + 1 < lines.length ? tryParseTable(lines, i) : null;
+      if (parsedTable) {
+        flushParagraph();
+        parts.push(parsedTable.html);
+        i = parsedTable.endIndex - 1;
+        continue;
+      }
 
       const headingMatch = parseHeading(line);
       if (headingMatch) {
@@ -163,7 +260,18 @@
 (function () {
   window.ChatRichRenderer = window.ChatRichRenderer || {};
   const ns = window.ChatRichRenderer;
-  const QUOTE_RE = /(“[^”<>\n]{0,280}”|‘[^’<>\n]{0,280}’|「[^」<>\n]{0,280}」|&quot;[^<>\n]{0,280}&quot;|&#39;[^<>\n]{0,280}&#39;|"[^"<>\n]{0,280}"|'[^'<>\n]{0,280}')/g;
+  const QUOTE_TOKENS = [
+    { value: '&quot;', family: 'double', role: 'both' },
+    { value: '&#39;', family: 'single', role: 'both' },
+    { value: '“', family: 'double', role: 'open' },
+    { value: '”', family: 'double', role: 'close' },
+    { value: '"', family: 'double', role: 'both' },
+    { value: '‘', family: 'single', role: 'open' },
+    { value: '’', family: 'single', role: 'close' },
+    { value: "'", family: 'single', role: 'both' },
+    { value: '「', family: 'corner', role: 'open' },
+    { value: '」', family: 'corner', role: 'close' },
+  ];
   const ALLOWED_TAGS = new Set(['p', 'br', 'pre', 'code', 'strong', 'em', 'b', 'i', 'u', 's', 'blockquote', 'ul', 'ol', 'li', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'div', 'span', 'details', 'summary', 'style', 'a', 'img']);
 
   function sanitizeCss(cssText, scopeSelector) {
@@ -187,36 +295,81 @@
     });
   }
 
+  function findQuoteToken(source, index) {
+    return QUOTE_TOKENS.find((token) => source.startsWith(token.value, index)) || null;
+  }
+
+  function findClosingQuote(source, startIndex, openingToken) {
+    for (let index = startIndex; index < source.length; index += 1) {
+      const char = source[index];
+      if (char === '<' || char === '>' || char === '\n') return null;
+      const token = findQuoteToken(source, index);
+      if (!token) continue;
+      if (token.family !== openingToken.family) {
+        index += token.value.length - 1;
+        continue;
+      }
+      if (token.role === 'open' && token.role !== 'both') {
+        index += token.value.length - 1;
+        continue;
+      }
+      return { token, index };
+    }
+    return null;
+  }
+
+  function collectQuoteMatches(text) {
+    const source = String(text || '');
+    const matches = [];
+    let index = 0;
+
+    while (index < source.length) {
+      const openingToken = findQuoteToken(source, index);
+      if (!openingToken || openingToken.role === 'close') {
+        index += 1;
+        continue;
+      }
+
+      const closing = findClosingQuote(source, index + openingToken.value.length, openingToken);
+      if (!closing || closing.index === index + openingToken.value.length) {
+        index += openingToken.value.length;
+        continue;
+      }
+
+      const end = closing.index + closing.token.value.length;
+      matches.push({ index, end, text: source.slice(index, end) });
+      index = end;
+    }
+
+    return matches;
+  }
+
   function highlightQuotesInNodeTree(root) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         const parent = node.parentElement;
-        if (!parent || parent.closest('pre, code, style, a')) return NodeFilter.FILTER_REJECT;
-        if (!QUOTE_RE.test(node.nodeValue || '')) {
-          QUOTE_RE.lastIndex = 0;
-          return NodeFilter.FILTER_REJECT;
-        }
-        QUOTE_RE.lastIndex = 0;
-        return NodeFilter.FILTER_ACCEPT;
+        if (!parent || parent.closest('pre, code, style, a, .bubble-quote')) return NodeFilter.FILTER_REJECT;
+        return collectQuoteMatches(node.nodeValue || '').length ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
       },
     });
     const textNodes = [];
     while (walker.nextNode()) textNodes.push(walker.currentNode);
 
     textNodes.forEach((node) => {
-      const fragment = document.createDocumentFragment();
       const text = node.nodeValue || '';
+      const matches = collectQuoteMatches(text);
+      if (!matches.length) return;
+
+      const fragment = document.createDocumentFragment();
       let lastIndex = 0;
-      QUOTE_RE.lastIndex = 0;
-      let match;
-      while ((match = QUOTE_RE.exec(text))) {
+      matches.forEach((match) => {
         if (match.index > lastIndex) fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
         const span = document.createElement('span');
         span.className = 'bubble-quote';
-        span.textContent = match[0];
+        span.textContent = match.text;
         fragment.appendChild(span);
-        lastIndex = match.index + match[0].length;
-      }
+        lastIndex = match.end;
+      });
       if (lastIndex < text.length) fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
       node.replaceWith(fragment);
     });
@@ -268,6 +421,7 @@
   }
 
   ns.sanitizeNodeTree = sanitizeNodeTree;
+  ns.collectQuoteMatches = collectQuoteMatches;
   ns.highlightQuotesInNodeTree = highlightQuotesInNodeTree;
 }());
 

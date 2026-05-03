@@ -98,22 +98,36 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.bubble-rich .bubble-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+}
+
 .bubble-rich table {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
 }
 
 .bubble-rich th,
 .bubble-rich td {
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.075);
+  vertical-align: top;
 }
 
 .bubble-rich th {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
+}
+
+.bubble-rich .align-center {
+  text-align: center;
+}
+
+.bubble-rich .align-right {
+  text-align: right;
 }
 
 .bubble-folds {

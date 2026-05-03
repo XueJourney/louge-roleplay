@@ -3366,7 +3366,8 @@ textarea,
 .markdown-body ul,
 .markdown-body ol,
 .markdown-body blockquote,
-.markdown-body pre {
+.markdown-body pre,
+.markdown-body .bubble-table-wrap {
   margin: 0 0 0.86em;
 }
 
@@ -3439,6 +3440,39 @@ textarea,
   border: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.11);
   margin: 1em 0;
+}
+
+
+.markdown-body .bubble-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+}
+
+.markdown-body table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 0.62em 0.75em;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  vertical-align: top;
+}
+
+.markdown-body th {
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+}
+
+.markdown-body .align-center {
+  text-align: center;
+}
+
+.markdown-body .align-right {
+  text-align: right;
 }
 
 .site-notification-body.markdown-body,
@@ -5918,22 +5952,36 @@ textarea,
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.bubble-rich .bubble-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+}
+
 .bubble-rich table {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
 }
 
 .bubble-rich th,
 .bubble-rich td {
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.075);
+  vertical-align: top;
 }
 
 .bubble-rich th {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
+}
+
+.bubble-rich .align-center {
+  text-align: center;
+}
+
+.bubble-rich .align-right {
+  text-align: right;
 }
 
 .bubble-folds {
